@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：:valid / :invalid 与 :user-valid / :user-invalid
+           的体验分水岭 + autocomplete 填充友好
+  ------------------------------------------------------------
+  【知识点】
+    1. :invalid 在"页面刚加载、用户还没输入"时就命中 ——
+       满屏红框的"红色风暴"从何而来
+    2. :user-invalid / :user-valid 只在用户交互之后（输入过且
+       失焦，或尝试提交）才命中 —— 错误展示的正确时机
+       （需 Chrome 119+ / Firefox 88+ / Safari 16.5+）
+    3. 降级策略：旧浏览器不识别 :user-invalid 时如何兜底
+       （演示用 JS 添加 .touched class 的传统方案对照）
+    4. autocomplete 令牌（name/email/tel/current-password/
+       new-password/one-time-code）与浏览器自动填充的关系
+    5. 提交后表单的整体校验状态反馈
+  【运行方式】
+    双击本文件即可打开，零网络依赖。
+  【效果说明】
+    页面上下两个"同款"登录表单：
+    · 上表单用 :invalid 直接标红 —— 加载完就是红的，模拟反面教材；
+    · 下表单用 :user-invalid + JS 触碰标记双保险 —— 只有用户真正
+      输入并失焦后才会变红；
+    两个表单的字段状态指示灯（绿/红/灰）实时显示伪类命中情况，
+    直观对比"时机"差异。填入内容并失焦、再点击提交，观察区别。
+  【注意事项】
+    :user-invalid 的"交互后"定义：用户修改过值且控件失焦，或该
+    表单尝试过提交。逐字段输入过程中（未失焦）不会标红。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 03 · :user-invalid 与自动填充</title>
+<style>
+  :root {
+    --ink: #22303f; --muted: #6b7a8c; --line: #dbe3ec;
+    --brand: #0b6bcb; --bg: #f2f5f9; --card: #fff;
+    --ok: #178a50; --bad: #c0392b; --bad-bg: #fdf0f0; --ok-bg: #eefaf2;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.65; padding: 20px;
+  }
+  h1 { font-size: 1.4rem; }
+  .sub { color: var(--muted); font-size: .88rem; margin: 4px 0 16px; }
+  .layout { display: flex; gap: 16px; flex-wrap: wrap; max-width: 920px; }
+  .formcard { flex: 1 1 380px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .formcard h2 { font-size: .98rem; margin-bottom: 4px; }
+  .formcard .desc { font-size: .78rem; color: var(--muted); margin-bottom: 10px; }
+  .formcard.bad-v { border-top: 4px solid var(--bad); }
+  .formcard.user-v { border-top: 4px solid var(--brand); }
+
+  label { display: block; font-size: .84rem; font-weight: 600; margin-top: 10px; }
+  .wrap { position: relative; } /* 状态指示灯的定位父级 */
+  input {
+    width: 100%; margin-top: 4px; font-size: .88rem; padding: 7px 34px 7px 10px;
+    border: 1px solid var(--line); border-radius: 8px; background: #fbfcfe;
+  }
+  input:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+  /* 状态指示灯：默认灰 */
+  .dot {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-38%);
+    width: 9px; height: 9px; border-radius: 50%; background: #c6d2e0;
+  }
+
+  /* ========== 方案 A（反面教材）：:invalid 立刻命中 ========== */
+  .formcard.bad-v input:invalid { border-color: var(--bad); background: var(--bad-bg); }
+  .formcard.bad-v input:invalid + .dot { background: var(--bad); }
+  .formcard.bad-v input:valid + .dot { background: var(--ok); }
+
+  /* ========== 方案 B（推荐）：:user-invalid 交互后才命中 ========== */
+  /* 新基线：Chrome 119+ / Firefox 88+ / Safari 16.5+ 生效 */
+  .formcard.user-v input:user-invalid { border-color: var(--bad); background: var(--bad-bg); }
+  .formcard.user-v input:user-invalid + .dot { background: var(--bad); }
+  .formcard.user-v input:user-valid { border-color: #bfe6cd; background: var(--ok-bg); }
+  .formcard.user-v input:user-valid + .dot { background: var(--ok); }
+
+  /* ========== 方案 B 的旧浏览器降级（JS 添加 .touched） ========== */
+  /* 脚本在 blur 时给"用户碰过"的控件加 .touched；老浏览器走这条 */
+  .formcard.user-v input.touched:invalid { border-color: var(--bad); background: var(--bad-bg); }
+  .formcard.user-v input.touched:invalid + .dot { background: var(--bad); }
+  .formcard.user-v input.touched:valid { border-color: #bfe6cd; background: var(--ok-bg); }
+  .formcard.user-v input.touched:valid + .dot { background: var(--ok); }
+
+  @supports selector(input:user-invalid) {
+    /* 支持新伪类的浏览器：让降级规则失效，避免双重逻辑竞争
+       （其实规则一致无冲突，这里主要演示 @supports 探测写法） */
+    .formcard.user-v .only-old { display: none; }
+  }
+  .only-old { font-size: .7rem; color: var(--muted); }
+
+  .btnrow { display: flex; gap: 8px; margin-top: 14px; align-items: center; }
+  button {
+    background: var(--brand); color: #fff; border: 0; border-radius: 8px;
+    padding: 8px 18px; font-size: .86rem; cursor: pointer;
+  }
+  button.ghost { background: #eef2f8; color: var(--ink); border: 1px solid var(--line); }
+  #msgA, #msgB { font-size: .8rem; }
+  .hitlist { font-family: "SF Mono", Consolas, monospace; font-size: .72rem; background: #101826; color: #9fe0b5; border-radius: 8px; padding: 8px 10px; margin-top: 10px; }
+  .note {
+    font-size: .78rem; color: var(--muted); background: #fff8e6;
+    border-left: 3px solid #e0a800; padding: 5px 10px; border-radius: 0 6px 6px 0;
+    margin: 10px 0 14px; max-width: 920px;
+  }
+</style>
+</head>
+<body>
+
+<h1>示例 03 · :user-invalid 与自动填充</h1>
+<p class="sub">同款登录表单 ×2：上表单用 :invalid（加载即红，反面教材），下表单用 :user-invalid（交互后才红）+ touched 降级。指示灯显示实时校验状态。</p>
+<p class="note">观察要点：刷新页面后上表单"未输入就全红"；下表单全灰 —— 直到你输入过且失焦（或点过提交）。桌面 Safari ≤16.4 等旧浏览器只走下方降级路径。</p>
+
+<div class="layout">
+  <!-- ============ 方案 A：:invalid 直接标红（反面教材） ============ -->
+  <form class="formcard bad-v" id="formA" novalidate>
+    <h2>方案 A · <code>:invalid</code>（反面教材）</h2>
+    <p class="desc">CSS 只有 <code>input:invalid</code> 一条规则 —— 页面加载瞬间就命中，用户还没开始输入就被"红色风暴"包围。</p>
+
+    <label for="a-user">账号
+      <span class="wrap">
+        <!-- required：空值 → valueMissing → :invalid 命中 -->
+        <input id="a-user" name="user" required minlength="3" autocomplete="username" placeholder="至少 3 位">
+        <i class="dot" aria-hidden="true"></i>
+      </span>
+    </label>
+    <label for="a-pwd">密码
+      <span class="wrap">
+        <input id="a-pwd" name="pwd" type="password" required minlength="6" autocomplete="current-password">
+        <i class="dot" aria-hidden="true"></i>
+      </span>
+    </label>
+
+    <div class="btnrow">
+      <button type="submit">登录</button>
+      <span id="msgA" role="status"></span>
+    </div>
+    <div class="hitlist" id="hitA">:invalid 命中数：—</div>
+  </form>
+
+  <!-- ============ 方案 B：:user-invalid + touched 降级（推荐） ============ -->
+  <form class="formcard user-v" id="formB" novalidate>
+    <h2>方案 B · <code>:user-invalid</code>（推荐）</h2>
+    <p class="desc">新伪类只在"用户改过值且失焦"或"表单尝试提交"后命中；旧浏览器降级到 JS 的 <code>.touched:invalid</code> 组合。</p>
+    <p class="only-old">※ 当前浏览器不支持 :user-invalid，正在走 .touched 降级路径。</p>
+
+    <label for="b-user">账号
+      <span class="wrap">
+        <input id="b-user" name="user" required minlength="3" autocomplete="username" placeholder="至少 3 位">
+        <i class="dot" aria-hidden="true"></i>
+      </span>
+    </label>
+    <label for="b-mail">邮箱
+      <span class="wrap">
+        <input id="b-mail" name="mail" type="email" required autocomplete="email" placeholder="dev@example.com">
+        <i class="dot" aria-hidden="true"></i>
+      </span>
+    </label>
+    <label for="b-pwd">密码
+      <span class="wrap">
+        <input id="b-pwd" name="pwd" type="password" required minlength="6" autocomplete="current-password">
+        <i class="dot" aria-hidden="true"></i>
+      </span>
+    </label>
+
+    <div class="btnrow">
+      <button type="submit">登录</button>
+      <span id="msgB" role="status"></span>
+    </div>
+    <div class="hitlist" id="hitB">状态：—</div>
+  </form>
+</div>
+
+<!-- ============ autocomplete 令牌速查 ============ -->
+<div class="note" style="margin-top:16px;">
+  <strong>autocomplete 令牌与本页用到的字段：</strong>
+  账号 → <code>username</code>；邮箱 → <code>email</code>；
+  已有密码 → <code>current-password</code>（登录）；新密码 → <code>new-password</code>（注册/改密）；
+  短信验证码 → <code>one-time-code</code>（iOS 可从短信一键填充）。
+  这些令牌是密码管理器与系统填充的"翻译字典"，写对它们比写任何 placeholder 都更能提升填充成功率。
+</div>
+
+<script>
+/* ==========================================================
+   模块一：方案 A 观测 —— :invalid 在加载时就命中多少个？
+   目的：用数据呈现"红色风暴"——刷新页面立即统计。
+   ========================================================== */
+const formA = document.getElementById('formA');
+const hitA = document.getElementById('hitA');
+function countInvalid(form) {
+  return [...form.elements].filter(el => el.willValidate && !el.validity.valid).length;
+}
+function refreshA() {
+  hitA.textContent = ':invalid 命中数：' + countInvalid(formA) + ' / 2（用户尚未输入也命中）';
+}
+formA.addEventListener('input', refreshA);
+refreshA(); // 页面加载即统计 —— 预期：2 个全中
+
+/* ==========================================================
+   模块二：方案 B 的降级路径 —— blur 时打 .touched 标记
+   :user-invalid 语义 = "用户交互过的才报错"。
+   旧浏览器不认识它，我们用 .touched:invalid 手工复刻：
+   focus 后修改过值 + blur 失焦 → touched = true。
+   注意 .touched:invalid 规则写在 :user-invalid 之后，
+   支持新伪类的浏览器两条路径结果一致，互不冲突。
+   ========================================================== */
+const formB = document.getElementById('formB');
+formB.querySelectorAll('input').forEach(el => {
+  el.addEventListener('blur', () => {
+    if (el.value !== '') el.classList.add('touched'); // 碰过且非空才算"已交互"
+  });
+});
+
+/* ==========================================================
+   模块三：提交行为 —— novalidate 下自定义反馈
+   两个表单都演示"提交时整体校验"与结果播报（role=status）。
+   ========================================================== */
+const hitB = document.getElementById('hitB');
+formB.addEventListener('submit', e => {
+  e.preventDefault();
+  const bad = countInvalid(formB);
+  if (formB.checkValidity()) {
+    document.getElementById('msgB').textContent = '✔ 登录成功（演示）';
+    document.getElementById('msgB').style.color = 'var(--ok)';
+  } else {
+    document.getElementById('msgB').textContent = '有 ' + bad + ' 个字段未通过';
+    document.getElementById('msgB').style.color = 'var(--bad)';
+    // 提交尝试后，浏览器会给所有控件打上"已尝试提交"标记，
+    // :user-invalid 从此刻起也会对"从未碰过"的字段生效
+  }
+  // 报告当前命中情况：区分伪类支持与否
+  const supportsUser = CSS.supports('selector(input:user-invalid)');
+  const userHit = [...formB.elements].filter(el => el.matches(supportsUser ? ':user-invalid' : '.touched:invalid')).length;
+  hitB.textContent = '校验失败字段：' + bad + ' · ' +
+    (supportsUser ? ':user-invalid' : '.touched:invalid（降级）') + ' 命中：' + userHit;
+});
+formA.addEventListener('submit', e => {
+  e.preventDefault();
+  const ok = formA.checkValidity();
+  const m = document.getElementById('msgA');
+  m.textContent = ok ? '✔ 登录成功（演示）' : '有 ' + countInvalid(formA) + ' 个字段未通过';
+  m.style.color = ok ? 'var(--ok)' : 'var(--bad)';
+});
+</script>
+</body>
+</html>

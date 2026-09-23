@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：picture 响应式 / Canvas captureStream / Web Audio 可视化
+  ------------------------------------------------------------
+  【知识点】
+    1. <picture> 决策模型：source 从上到下评估 media/type，命中
+       即停；art direction（不同构图）与格式渐进增强；<img>
+       是必须的回退与真正渲染载体
+    2. srcset 密度描述符（1x/2x）与 sizes 的关系
+    3. canvas.captureStream()：把画布动画变成 MediaStream 喂给
+       video —— 完全不依赖外部媒体文件（Firefox 不支持，需特性
+       检测）
+    4. Web Audio 可视化：OscillatorNode 合成音频 → AnalyserNode
+       取频谱/波形 → Canvas 绘制；用户手势内创建/恢复
+       AudioContext；MediaElementSource 是桥接真实媒体元素的
+       生产路径
+  【运行方式】
+    双击即可打开，本页完全零网络依赖：
+    - picture 的三张"图"是内联 SVG data URI 自绘；
+    - captureStream 的视频源是 Canvas 动画；
+    - 可视化的音频源是振荡器合成音。
+  【效果说明】
+    ① picture 区：拖窄窗口（<640px）观察"横构图→竖构图"的
+       art direction 切换；右侧指示器实时显示当前命中的 source
+       与浏览器决策依据；
+    ② captureStream 区：Canvas 上有一个弹跳球动画，点击"接入
+       video"后下方 video 播放的正是这块画布的实时流；
+    ③ Web Audio 区：点击"启动合成器"播放振荡器音，Canvas 上
+       同步绘制频谱柱状图与示波器波形，可调频率/音量/波形。
+  【注意事项】
+    AudioContext 必须在用户手势（点击按钮）内 resume，否则处于
+    suspended 无声——这是自动播放策略在音频侧的体现。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 03 · picture / captureStream / Web Audio</title>
+<style>
+  :root {
+    --ink: #22303f; --muted: #6b7a8c; --line: #dbe3ec;
+    --brand: #0b6bcb; --bg: #f2f5f9; --card: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.65; padding: 20px;
+  }
+  h1 { font-size: 1.4rem; }
+  .sub { color: var(--muted); font-size: .88rem; margin: 4px 0 16px; }
+  section.box {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px; margin-bottom: 14px; max-width: 880px;
+  }
+  h2 { font-size: 1rem; margin-bottom: 8px; }
+  p { font-size: .85rem; }
+  .note {
+    font-size: .76rem; color: var(--muted); background: #fff8e6;
+    border-left: 3px solid #e0a800; padding: 5px 10px; border-radius: 0 6px 6px 0;
+    margin: 8px 0;
+  }
+  button {
+    background: var(--brand); color: #fff; border: 0; border-radius: 8px;
+    padding: 7px 16px; font-size: .84rem; cursor: pointer;
+  }
+  button.ghost { background: #eef2f8; color: var(--ink); border: 1px solid var(--line); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  label { font-size: .84rem; }
+  input[type="range"], select { accent-color: var(--brand); font-size: .84rem; }
+
+  /* ---------- ① picture 区 ---------- */
+  .pic-wrap { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+  picture img { width: 320px; border-radius: 10px; display: block; }
+  #pick-info {
+    font-family: "SF Mono", Consolas, monospace; font-size: .74rem;
+    background: #101826; color: #9fe0b5; border-radius: 8px; padding: 8px 10px;
+    flex: 1 1 240px; white-space: pre-wrap;
+  }
+
+  /* ---------- ② canvas / video 区 ---------- */
+  .duo { display: flex; gap: 14px; flex-wrap: wrap; }
+  .duo > div { flex: 1 1 300px; }
+  canvas { width: 100%; border-radius: 10px; background: #0a0f16; display: block; }
+  .tag { font-size: .72rem; color: var(--muted); margin-top: 4px; }
+
+  /* ---------- ③ 可视化区 ---------- */
+  .viz-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+  #spec { width: 100%; height: 150px; }
+  #scope { width: 100%; height: 110px; }
+</style>
+</head>
+<body>
+
+<h1>示例 03 · picture / captureStream / Web Audio</h1>
+<p class="sub">本页完全零网络依赖：图片用内联 SVG data URI 自绘，视频流来自 Canvas 画布，音频由振荡器合成。</p>
+
+<!-- ============ ① picture：art direction 与决策指示器 ============ -->
+<section class="box">
+  <h2>① picture 响应式：art direction（不同构图，不只是不同分辨率）</h2>
+  <div class="pic-wrap">
+    <!--
+      决策顺序：从上到下评估每个 source 的条件，命中第一个即停。
+      source 1：窄视口 → 竖构图（art direction：构图决策）
+      source 2：支持 SVG 的浏览器其实都命中不了它前面的？——注意
+        本例把"竖构图"放最前，"通用横构图"作为 <img> 回退。
+      生产中还要叠加格式渐进（avif/webp source）与 srcset/sizes。
+    -->
+    <picture id="hero">
+      <source media="(max-width: 640px)" srcset='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="480"><rect width="320" height="480" fill="%230b6bcb"/><circle cx="160" cy="150" r="70" fill="%23ffd479"/><rect x="40" y="260" width="240" height="24" rx="12" fill="white"/><rect x="70" y="300" width="180" height="16" rx="8" fill="%23bcd8f5"/><text x="160" y="380" font-size="22" fill="white" text-anchor="middle" font-family="sans-serif">竖构图 · 移动端</text></svg>'>
+      <img src='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="%230b6bcb"/><circle cx="70" cy="60" r="40" fill="%23ffd479"/><rect x="130" y="45" width="160" height="20" rx="10" fill="white"/><rect x="130" y="75" width="120" height="14" rx="7" fill="%23bcd8f5"/><rect x="130" y="105" width="90" height="14" rx="7" fill="%23bcd8f5"/><text x="160" y="160" font-size="16" fill="white" text-anchor="middle" font-family="sans-serif">横构图 · 桌面</text></svg>'
+           alt="促销主视觉：横构图展示商品与文案，竖构图特写商品" width="320">
+    </picture>
+    <div id="pick-info">监听视口…</div>
+  </div>
+  <p class="note">把窗口拖窄到 640px 以下再拖宽，观察构图切换。picture 的选择在"布局阶段"完成，浏览器用 matchMedia 同款条件评估 source；<img> 是真正的渲染元素与最终回退。</p>
+</section>
+
+<!-- ============ ② Canvas → captureStream → video ============ -->
+<section class="box">
+  <h2>② Canvas 动画变成视频流（captureStream，零媒体文件）</h2>
+  <div class="duo">
+    <div>
+      <canvas id="src" width="480" height="270"></canvas>
+      <p class="tag">源头：Canvas 2D 动画（requestAnimationFrame 驱动）</p>
+      <p style="margin-top:8px;">
+        <button id="link-btn" type="button">接入下方 video</button>
+        <button class="ghost" id="unlink-btn" type="button">断开</button>
+      </p>
+    </div>
+    <div>
+      <!-- 这个 video 没有任何 src/source：内容完全来自 MediaStream -->
+      <video id="sink" autoplay muted playsinline style="width:100%; border-radius:10px; background:#0a0f16;"></video>
+      <p class="tag">接收端：video 元素（srcObject = canvas.captureStream()）</p>
+      <p id="cs-note" class="tag"></p>
+    </div>
+  </div>
+  <p class="note">captureStream 把画布每一帧作为 MediaStream 输出，可喂给 video、WebRTC、MediaRecorder 录制。Firefox 不支持 canvas.captureStream，脚本已做特性检测并提示。</p>
+</section>
+
+<!-- ============ ③ Web Audio 可视化 ============ -->
+<section class="box">
+  <h2>③ Web Audio 音频可视化（振荡器合成 → 频谱 + 示波器）</h2>
+  <div class="viz-row">
+    <button id="osc-btn" type="button">启动合成器</button>
+    <label>波形
+      <select id="wave">
+        <option value="sine" selected>sine 正弦</option>
+        <option value="square">square 方波</option>
+        <option value="triangle">triangle 三角</option>
+        <option value="sawtooth">sawtooth 锯齿</option>
+      </select>
+    </label>
+    <label>频率 <input type="range" id="freq" min="80" max="1200" value="330"> <output id="freq-out">330</output>Hz</label>
+    <label>音量 <input type="range" id="g" min="0" max="1" step="0.05" value="0.3"></label>
+  </div>
+  <canvas id="spec" width="840" height="150"></canvas>
+  <p class="tag">频谱（AnalyserNode.getByteFrequencyData，fftSize=512）</p>
+  <canvas id="scope" width="840" height="110"></canvas>
+  <p class="tag">示波器（getByteTimeDomainData，波形形状直观反映方波/锯齿差异）</p>
+  <p class="note">链路：OscillatorNode(发声) → GainNode(音量) → AnalyserNode(分析) → destination(输出)。生产中用 ctx.createMediaElementSource(video) 桥接真实媒体元素后接同样的分析链。注意 AudioContext 必须在用户手势内 resume——这就是自动播放策略在音频侧的形态。</p>
+</section>
+
+<script>
+/* ==========================================================
+   模块一：picture 决策指示器
+   浏览器对 source 的评估 = 对 media 属性做 matchMedia。
+   我们用同样的条件实时复现决策结果，展示"命中了哪个源"。
+   ========================================================== */
+(function pictureInfo() {
+  const narrow = matchMedia('(max-width: 640px)');   // 与 source[media] 完全一致的条件
+  const info = document.getElementById('pick-info');
+  function render() {
+    // 复现决策：命中竖构图 source 或回退 img
+    const picked = narrow.matches ? '<source media="(max-width:640px)">（竖构图）' : '<img> 回退（横构图）';
+    info.textContent =
+      '视口宽度：' + window.innerWidth + 'px\n' +
+      'matchMedia("(max-width:640px)") → ' + narrow.matches + '\n' +
+      '浏览器命中：' + picked + '\n' +
+      '决策时机：布局阶段（拉伸窗口会重新评估）';
+  }
+  narrow.addEventListener('change', render);
+  window.addEventListener('resize', render);
+  render();
+})();
+
+/* ==========================================================
+   模块二：Canvas 动画 → captureStream → video
+   特性检测：video.captureStream 在 Chrome/Edge/Safari 可用，
+   Firefox 不支持 —— 检测不到时给出说明并禁用按钮。
+   ========================================================== */
+(function canvasStream() {
+  const cv = document.getElementById('src');
+  const ctx = cv.getContext('2d');
+  const sink = document.getElementById('sink');
+  const linkBtn = document.getElementById('link-btn');
+  const note = document.getElementById('cs-note');
+
+  // —— 画布动画：弹跳球 + 渐变背景（内容自绘，零外部资源）——
+  const ball = { x: 60, y: 60, vx: 2.6, vy: 2.1, r: 22 };
+  let hue = 210;
+  function draw() {
+    // 背景：缓慢旋转色相的深色渐变
+    hue = (hue + 0.3) % 360;
+    const grad = ctx.createLinearGradient(0, 0, cv.width, cv.height);
+    grad.addColorStop(0, 'hsl(' + hue + ',45%,14%)');
+    grad.addColorStop(1, 'hsl(' + ((hue + 60) % 360) + ',45%,8%)');
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, cv.width, cv.height);
+    // 球体：碰壁反弹
+    ball.x += ball.vx; ball.y += ball.vy;
+    if (ball.x < ball.r || ball.x > cv.width - ball.r) ball.vx *= -1;
+    if (ball.y < ball.r || ball.y > cv.height - ball.r) ball.vy *= -1;
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffd479'; ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.font = '14px sans-serif';
+    ctx.fillText('Canvas 实时帧 · ' + new Date().toLocaleTimeString('zh-CN', { hour12: false }), 12, 24);
+    requestAnimationFrame(draw);
+  }
+  draw();
+
+  // —— 特性检测 + 接流 ——
+  if (!cv.captureStream) {
+    note.textContent = '当前浏览器（Firefox）不支持 canvas.captureStream()，按钮已禁用。可用 MediaRecorder + WebRTC 相关 polyfill 或换 Chrome/Edge/Safari 体验。';
+    linkBtn.disabled = true;
+    return;
+  }
+  let stream = null;
+  linkBtn.addEventListener('click', () => {
+    stream = cv.captureStream(30);      // 参数：期望帧率 30fps
+    sink.srcObject = stream;            // MediaStream 直接赋给 video（不是 src!）
+    sink.play().catch(() => {});
+    note.textContent = '已接入：video.srcObject = canvas.captureStream(30)。video 无需任何 src——内容完全来自画布。';
+  });
+  document.getElementById('unlink-btn').addEventListener('click', () => {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    sink.srcObject = null;
+    note.textContent = '已断开。';
+  });
+})();
+
+/* ==========================================================
+   模块三：Web Audio 可视化
+   音频图：Oscillator → Gain → Analyser → destination
+   - AnalyserNode.fftSize=512 → frequencyBinCount=256 个频域样本
+   - getByteFrequencyData：频谱（柱状图）
+   - getByteTimeDomainData：波形（示波器，方波/锯齿形状分明）
+   ========================================================== */
+(function audioViz() {
+  let ctx = null, osc = null, gain = null, analyser = null;
+  let running = false;
+  const spec = document.getElementById('spec').getContext('2d');
+  const scope = document.getElementById('scope').getContext('2d');
+  const btn = document.getElementById('osc-btn');
+
+  function start() {
+    // AudioContext 必须在用户手势中创建/恢复（点击按钮 = 手势 ✔）
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    ctx.resume();
+    osc = ctx.createOscillator();          // 振荡器：发声源（可替代媒体元素）
+    gain = ctx.createGain();               // 音量节点
+    analyser = ctx.createAnalyser();       // 分析节点：取数据给 Canvas
+    analyser.fftSize = 512;                // 越大频谱越细、开销越高
+    osc.type = document.getElementById('wave').value;
+    osc.frequency.value = +document.getElementById('freq').value;
+    gain.gain.value = +document.getElementById('g').value;
+    // 接线：任何节点都必须最终 connect(destination) 才有声音
+    osc.connect(gain).connect(analyser).connect(ctx.destination);
+    osc.start();
+    running = true;
+    btn.textContent = '停止合成器';
+    loop();                                // 启动绘制循环
+  }
+  function stop() {
+    if (osc) { try { osc.stop(); } catch (_) {} osc = null; }
+    running = false;
+    btn.textContent = '启动合成器';
+  }
+  btn.addEventListener('click', () => running ? stop() : start());
+
+  // 波形切换 / 频率 / 音量：直接写 AudioParam（自带平滑插值）
+  document.getElementById('wave').addEventListener('change', e => { if (osc) osc.type = e.target.value; });
+  const freqEl = document.getElementById('freq');
+  freqEl.addEventListener('input', e => {
+    document.getElementById('freq-out').value = e.target.value;
+    if (osc) osc.frequency.setTargetAtTime(+e.target.value, ctx.currentTime, 0.02);
+  });
+  document.getElementById('g').addEventListener('input', e => {
+    if (gain) gain.gain.setTargetAtTime(+e.target.value, ctx.currentTime, 0.02);
+  });
+
+  // —— 绘制循环：频谱柱状图 + 示波器 ——
+  function loop() {
+    if (!running) { return; }
+    requestAnimationFrame(loop);
+    const bins = analyser.frequencyBinCount;
+    const freqData = new Uint8Array(bins);
+    const timeData = new Uint8Array(bins);
+    analyser.getByteFrequencyData(freqData); // 频域：0~255 的强度
+    analyser.getByteTimeDomainData(timeData);// 时域：128 为中线的波形
+
+    // ① 频谱柱状图：取前 160 个 bin 绘制（高频通常接近 0）
+    spec.fillStyle = '#101826';
+    spec.fillRect(0, 0, spec.canvas.width, spec.canvas.height);
+    const bars = 160, bw = spec.canvas.width / bars;
+    for (let i = 0; i < bars; i++) {
+      const h = freqData[i] / 255 * spec.canvas.height;
+      // 按强度着色：低强度蓝 → 高强度黄
+      spec.fillStyle = 'hsl(' + (210 - freqData[i] * 0.6) + ',80%,' + (35 + freqData[i] * 0.25) + '%)';
+      spec.fillRect(i * bw, spec.canvas.height - h, bw - 1, h);
+    }
+
+    // ② 示波器：把 128 中线的数据点连成波形
+    scope.fillStyle = '#101826';
+    scope.fillRect(0, 0, scope.canvas.width, scope.canvas.height);
+    scope.strokeStyle = '#7fe0a0';
+    scope.lineWidth = 2;
+    scope.beginPath();
+    for (let i = 0; i < bins; i++) {
+      const x = i / bins * scope.canvas.width;
+      const y = timeData[i] / 255 * scope.canvas.height;
+      i ? scope.lineTo(x, y) : scope.moveTo(x, y);
+    }
+    scope.stroke();
+  }
+})();
+</script>
+</body>
+</html>

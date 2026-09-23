@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 02：行内与交互语义 —— details 手风琴 / time / figure /
+           mark / strong-em-b-i 语义四兄弟
+  ------------------------------------------------------------
+  【知识点】
+    1. <details>/<summary> 原生手风琴：open 属性、toggle 事件、
+       name 属性（同名互斥）实现排他展开
+    2. <time datetime> 机器可读时间；非法 datetime 等于没写
+    3. <figure>/<figcaption> 图文绑定单元
+    4. <mark>/<strong>/<em>/<b>/<i>/<s>/<del>/<ins>/<small> 的
+       语义分野：视觉相近，读屏与机器解读完全不同
+    5. <address> 只装联系人信息
+  【运行方式】
+    双击本文件即可打开，零网络依赖（图示用内联 SVG 自绘）。
+  【效果说明】
+    ① 排他手风琴：打开一项会自动收起其他（需 Chrome 120+ /
+       Safari 17.2+ / Firefox 130+；旧浏览器退化为可多开，页面
+       不报错——渐进增强）；
+    ② toggle 事件日志实时打印（事件不冒泡，这里逐个绑定并演示
+       捕获委托的两种写法）；
+    ③ 语义四兄弟对照区：同一段话分别用 strong/em/b/i 改写，
+       悬停查看"读屏视角"的解读差异；
+    ④ 搜索高亮演示：输入关键词，命中文本用 <mark> 动态包裹。
+  【注意事项】
+    details 展开是瞬时动画，::details-content 与 interpolate-size
+    目前支持有限，本例不做展开动画，保持原生行为。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 02 · details 手风琴与行内语义</title>
+<style>
+  :root {
+    --ink: #22303f; --muted: #6b7a8c; --line: #dbe3ec;
+    --brand: #0b6bcb; --bg: #f2f5f9; --card: #fff; --warn: #b45309;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.7;
+    padding: 20px; max-width: 860px; margin: 0 auto;
+  }
+  h1 { font-size: 1.4rem; }
+  .sub { color: var(--muted); font-size: .88rem; margin: 4px 0 16px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 16px; margin-bottom: 16px;
+  }
+  h2 { font-size: 1.02rem; margin-bottom: 8px; }
+  p { font-size: .88rem; }
+  .note {
+    font-size: .78rem; color: var(--muted);
+    background: #f6f8fb; border-left: 3px solid var(--brand);
+    padding: 5px 10px; border-radius: 0 6px 6px 0; margin: 8px 0;
+  }
+
+  /* ---------- 原生手风琴：只需少许装饰，交互浏览器全包 ---------- */
+  details {
+    border: 1px solid var(--line); border-radius: 8px;
+    margin-bottom: 8px; background: #fbfcfe; overflow: hidden;
+  }
+  summary {
+    cursor: pointer; padding: 9px 12px; font-size: .9rem;
+    font-weight: 600; user-select: none;
+    /* summary 默认的三角 marker 用 CSS 自定义成 "+ / -" 风格 */
+    display: flex; align-items: center; gap: 8px; list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; } /* 隐藏 WebKit 默认三角 */
+  summary::before {
+    content: "+";                      /* 收起态显示 + */
+    width: 20px; height: 20px; border-radius: 6px;
+    background: var(--brand); color: #fff; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: transform .18s;
+  }
+  details[open] summary::before { content: "−"; }  /* 展开态换成 − */
+  details > div { padding: 0 12px 12px 40px; font-size: .86rem; }
+  summary:hover { background: #f0f5fc; }
+  summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+  /* ---------- toggle 日志面板 ---------- */
+  #log {
+    background: #101826; color: #9fe0b5; border-radius: 8px;
+    font-family: "SF Mono", Consolas, monospace; font-size: .74rem;
+    padding: 8px 10px; height: 84px; overflow: auto; margin-top: 8px;
+  }
+
+  /* ---------- 语义四兄弟对照 ---------- */
+  .quad { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+  .quad figure {
+    background: #fbfcfe; border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px; position: relative;
+  }
+  .quad figcaption { font-size: .72rem; color: var(--muted); margin-top: 6px; }
+  .quad .reader { display: none; }
+  .quad figure:hover .reader, .quad figure:focus-within .reader {
+    /* 悬停/聚焦时显示"读屏视角"，hover 面板属于增强说明 */
+    display: block; margin-top: 6px; font-size: .72rem; color: var(--brand);
+  }
+  .quad b, .quad strong, .quad i, .quad em { color: var(--warn); }
+  code { background: #eef2f7; border-radius: 4px; padding: 0 4px; font-size: .82em; }
+
+  /* ---------- 搜索高亮 ---------- */
+  #q {
+    padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px;
+    width: 220px; font-size: .86rem;
+  }
+  #q:focus-visible { outline: 2px solid var(--brand); }
+  mark { background: #ffe58a; color: inherit; padding: 0 2px; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<h1>示例 02 · details 手风琴与行内语义</h1>
+<p class="sub">不写一行业务 JS 的折叠面板、机器可读的时间、以及 strong/em/b/i 四个"长得像"的标签到底差在哪。</p>
+
+<!-- ============ ① 排他手风琴（details + name） ============ -->
+<section>
+  <h2>① FAQ 排他手风琴（原生 details + name 互斥）</h2>
+  <p class="note">三个 details 的 name 都是 "faq" → 打开一个自动收起其他。
+     旧浏览器忽略 name 退化为可多开（渐进增强，不报错）。summary 是天然焦点元素，Tab + Enter/Space 可操作。</p>
+
+  <!-- open 属性 = 默认展开；name 分组 = 互斥 -->
+  <details name="faq" open data-id="q1">
+    <summary>如何申请退款？</summary>
+    <div>进入"我的订单"→ 选择订单 → 点击"申请退款"，1~3 个工作日原路退回。</div>
+  </details>
+  <details name="faq" data-id="q2">
+    <summary>支持哪些支付方式？</summary>
+    <div>微信支付、支付宝、主流银行卡，均由支付网关代收。</div>
+  </details>
+  <details name="faq" data-id="q3">
+    <summary>发票如何开具？</summary>
+    <div>支付成功后 24 小时内，电子发票将发送至下单邮箱。</div>
+  </details>
+
+  <!-- toggle 事件日志：details 展开收起时在其自身触发，不冒泡 -->
+  <p class="note">toggle 事件日志（事件不冒泡：委托需用捕获阶段，或逐个绑定——两种写法都演示）：</p>
+  <div id="log" aria-live="polite"></div>
+</section>
+
+<!-- ============ ② time / figure / address ============ -->
+<section>
+  <h2>② time、figure 与 address</h2>
+  <p>文章发布于 <time datetime="2026-09-23T10:30:00+08:00">今天上午 10:30</time>，
+     最后更新 <time datetime="2026-09-23">2026-09-23</time>。
+     <!-- 说明：datetime 必须是合法格式（RFC3339 / YYYY-MM-DD / HH:mm 等），
+          人读的文案随便写，机器读的值必须严格 —— 这就是"双轨"。 -->
+  </p>
+  <!-- figure：图与说明绑定为一个可整体搬移/引用的单元；figcaption 必须是首或尾子元素 -->
+  <figure style="max-width:320px; margin:10px 0;">
+    <svg viewBox="0 0 320 120" role="img" aria-label="2026 年 Q3 销量柱状图：七月 120，八月 160，九月 210" style="width:100%; background:#f6f9ff; border:1px solid #dbe3ec; border-radius:8px;">
+      <!-- 纯 SVG 自绘柱状图：零图片、零网络 -->
+      <rect x="40"  y="60" width="50" height="40" fill="#0b6bcb"/>
+      <rect x="135" y="40" width="50" height="60" fill="#0b6bcb"/>
+      <rect x="230" y="20" width="50" height="80" fill="#0b6bcb"/>
+      <text x="65"  y="56"  font-size="11" text-anchor="middle" fill="#22303f">120</text>
+      <text x="160" y="36"  font-size="11" text-anchor="middle" fill="#22303f">160</text>
+      <text x="255" y="16"  font-size="11" text-anchor="middle" fill="#22303f">210</text>
+      <text x="65"  y="112" font-size="10" text-anchor="middle" fill="#6b7a8c">7 月</text>
+      <text x="160" y="112" font-size="10" text-anchor="middle" fill="#6b7a8c">8 月</text>
+      <text x="255" y="112" font-size="10" text-anchor="middle" fill="#6b7a8c">9 月</text>
+    </svg>
+    <figcaption>图 1 · Q3 销量趋势（内联 SVG 自绘，figcaption 只能是 figure 的第一个或最后一个子元素）</figcaption>
+  </figure>
+  <p class="note">address 用于"当前文档/文章的联系人"，别拿它包正文；它默认是斜体块级元素。</p>
+  <address>文章作者：<a href="mailto:lin@example.dev">lin@example.dev</a></address>
+</section>
+
+<!-- ============ ③ strong / em / b / i 语义四兄弟 ============ -->
+<section>
+  <h2>③ strong / em / b / i：视觉相近，语义不同</h2>
+  <p class="note">悬停（或 Tab 聚焦）任一卡片，查看"读屏视角"对它的解读。选错标签 = 给听障用户错误的重音与轻重信号。</p>
+  <div class="quad">
+    <figure tabindex="0">
+      <!-- strong：重要性，真的重要。提交不可撤销是"后果严重"的信息 -->
+      <p><strong>请勿</strong>在支付过程中刷新页面。</p>
+      <figcaption>&lt;strong&gt; → 重要性强调（severity），可嵌套递增</figcaption>
+      <div class="reader">🎧 读屏：加重语气读"请勿"，语义 = 警告</div>
+    </figure>
+    <figure tabindex="0">
+      <!-- em：语气重读，重音落在"灰度"上 —— 同一句话重音不同含义不同 -->
+      <p>本次发布采用<em>灰度</em>放量。</p>
+      <figcaption>&lt;em&gt; → 语气重读（stress），改变句意重心</figcaption>
+      <div class="reader">🎧 读屏：重音读"灰度"——回答"怎么放量"</div>
+    </figure>
+    <figure tabindex="0">
+      <!-- b：无重要性的实用性提醒，比如摘要关键词、产品名 -->
+      <p>新品 <b>Kraken</b> 排队引擎今日上线。</p>
+      <figcaption>&lt;b&gt; → 关键词加粗，无重要性、无语气</figcaption>
+      <div class="reader">🎧 读屏：普通朗读；视觉醒目但语义中性</div>
+    </figure>
+    <figure tabindex="0">
+      <!-- i：科技术语/外文/分类性文本，替代语气而非强调 -->
+      <p>引擎代号 <i>Kraken</i> 源自北欧神话。</p>
+      <figcaption>&lt;i&gt; → 术语/外文/思想，分类性文本</figcaption>
+      <div class="reader">🎧 读屏：普通朗读；斜体仅表示"这是术语"</div>
+    </figure>
+  </div>
+  <p style="margin-top:8px;">同场加映：<s>原价 ¥399</s>（不再准确）与 <del>¥399</del><ins>¥299</ins>（编辑修订）、
+     页脚 <small>© 附属细则</small> —— 划线价用 s，改价留痕用 del/ins。</p>
+</section>
+
+<!-- ============ ④ mark：搜索关键词高亮 ============ -->
+<section>
+  <h2>④ mark：与"当前关注点"相关的高亮</h2>
+  <p class="note">mark 的语义是"这段文字因为与用户当前的操作相关而被标出"——典型场景就是搜索结果命中高亮，而不是"我觉得重要就标黄"。</p>
+  <p>
+    <label for="q">在下面这段话中搜索：</label>
+    <!-- input 放进 label 里，天然关联，无需 id/for 也行；这里双保险 -->
+    <input id="q" type="search" placeholder="试试输入：语义" autocomplete="off">
+  </p>
+  <!-- 原始文本由 JS 保存；每次输入重新渲染，命中的片段包 <mark> -->
+  <p id="para" style="margin-top:8px;">语义化标签让 HTML 从一堆 div 变成机器可读的文档结构。语义化的收益里，无障碍的确定性远高于 SEO 的不确定性。</p>
+</section>
+
+<script>
+/* ==========================================================
+   模块一：toggle 事件日志
+   重点：toggle 在 <details> 自身触发、不冒泡。
+   写法 A：逐个绑定（简单直接）；
+   写法 B：document 捕获阶段委托 addEventListener(..., true)
+   ——捕获发生在冒泡之前，能拦截"不冒泡"的事件。
+   ========================================================== */
+const log = document.getElementById('log');
+function printLog(msg) {
+  // 每行带时间戳，方便观察"打开 A"与"自动关闭 B"是同一批次发生
+  const t = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  log.innerHTML += '[' + t + '] ' + msg + '<br>';
+  log.scrollTop = log.scrollHeight; // 自动滚到底，模拟控制台
+}
+
+// 写法 A：逐个绑定（toggle 的标准姿势）
+document.querySelectorAll('details[name="faq"]').forEach(d => {
+  d.addEventListener('toggle', () => {
+    printLog('写法A · ' + d.dataset.id + (d.open ? ' 展开' : ' 收起') + '（toggle 事件）');
+  });
+});
+// 写法 B：捕获阶段委托 —— 证明 toggle 虽不冒泡但能被捕获拦截
+document.addEventListener('toggle', e => {
+  if (e.target.matches('details[name="faq"]')) {
+    printLog('写法B · 捕获委托捕获到 ' + e.target.dataset.id);
+  }
+}, true);
+printLog('就绪。点击上方任意问题标题试试。');
+
+/* ==========================================================
+   模块二：mark 搜索高亮
+   原理：保存原始 innerHTML → 每次输入时按原文重建。
+   坑点：如果直接对 innerHTML 做字符串替换，会把标签名也替换掉，
+   破坏结构。正确做法是只替换 textContent，或者像本例一样
+   在"纯文本段落"上操作并转义正则特殊字符。
+   ========================================================== */
+const para = document.getElementById('para');
+const q = document.getElementById('q');
+const raw = para.textContent;                 // 保存纯文本原文，作为唯一数据源
+const escapeReg = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // 转义正则元字符
+
+q.addEventListener('input', () => {
+  const kw = q.value.trim();
+  if (!kw) { para.textContent = raw; return; } // 清空输入 → 恢复原文
+  // 全局 + 忽略大小写替换，命中部分包上 <mark>
+  const re = new RegExp(escapeReg(kw), 'gi');
+  para.innerHTML = raw.replace(re, m => '<mark>' + m + '</mark>');
+});
+</script>
+</body>
+</html>

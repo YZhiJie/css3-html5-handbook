@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：标题大纲分析器 —— 实时扫描 DOM，输出"语义体检报告"
+  ------------------------------------------------------------
+  【知识点】
+    1. HTML5 分段大纲算法（outline algorithm）的现状：从未被
+       浏览器/读屏实现，且已被 W3C 废弃 → 标题层级以字面
+       h1~h6 为准
+    2. 标题层级体检：多个 h1、跳级（h2 直接到 h4）都是读屏
+       灾难；每页一个 h1、逐级递进
+    3. 地标体检：header/footer 的 banner/contentinfo 身份判定、
+       无标题 section 不构成 region、多个 nav 需命名
+    4. div 滥用统计：靠统计 generic 容器数量发现"div 池"页面
+  【运行方式】
+    双击本文件即可打开，零网络依赖。
+  【效果说明】
+    页面中部嵌着一份"故意写坏"的示例文档（多 h1、跳级、无标题
+    section、未命名 nav、div 当标题），脚本实时扫描它的 DOM 并
+    生成体检报告：
+      ① 大纲视图：按字面层级画出的标题树（等价读屏真实听到的）；
+      ② 问题列表：每条给出违规点与修复建议；
+      ③ 编辑区：可以勾选"自动修复预览"，观察报告随修复更新。
+  【注意事项】
+    分析器仅覆盖本手册总结的高频规则（h1 唯一、不跳级、section
+    需标题、nav/aside 需命名），真实项目建议配合 axe / Lighthouse
+    做全量无障碍审计。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 03 · 标题大纲分析器</title>
+<style>
+  :root {
+    --ink: #22303f; --muted: #6b7a8c; --line: #dbe3ec;
+    --brand: #0b6bcb; --bg: #f2f5f9; --card: #fff;
+    --ok: #178a50; --bad: #c0392b; --warn: #b45309;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.65; padding: 20px;
+  }
+  h1 { font-size: 1.4rem; }
+  .sub { color: var(--muted); font-size: .88rem; margin: 4px 0 16px; }
+  .layout { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .col { flex: 1 1 360px; }
+  section.box {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px; margin-bottom: 14px;
+  }
+  h2 { font-size: 1rem; margin-bottom: 8px; }
+  p { font-size: .86rem; }
+
+  /* ---------- 被分析的"示例文档"容器：故意写坏 ---------- */
+  #specimen { border: 1.5px dashed #e2b4b4; border-radius: 10px; padding: 12px; background: #fffafa; }
+  #specimen h1, #specimen h2, #specimen h4 { margin: 6px 0 4px; }
+  #specimen p { color: #4a5a6a; }
+  /* 修复模式下的高亮：被脚本"纠正"的标题加绿色描边 */
+  .fixed { outline: 2px dashed var(--ok); outline-offset: 2px; }
+
+  /* ---------- 报告区 ---------- */
+  .report { background: #101826; color: #d7e3f4; border-radius: 10px; padding: 12px; font-size: .8rem; }
+  #outline { font-family: "SF Mono", Consolas, monospace; white-space: pre-wrap; margin-bottom: 10px; }
+  #issues li { margin: 6px 0 6px 18px; }
+  .lv-err  { color: #ff9c9c; }
+  .lv-warn { color: #ffd479; }
+  .lv-ok   { color: #7fe0a0; }
+  .fix-row { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; }
+  .fix-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: .84rem; }
+  .btn {
+    border: 1px solid #3d5775; background: #1b2a3f; color: #d7e3f4;
+    padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: .8rem;
+  }
+  .btn:hover { background: #24384f; }
+  .legend { font-size: .76rem; color: var(--muted); margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>示例 03 · 标题大纲分析器</h1>
+<p class="sub">左：一份"故意写坏"的示例文档。右：脚本扫描其 DOM 生成的语义体检报告——大纲视图 + 问题清单 + 一键修复预览。</p>
+
+<div class="layout">
+  <!-- ============ 左列：被检体（故意写坏的文档） ============ -->
+  <div class="col">
+    <section class="box">
+      <h2>被检文档（故意包含 5 类问题）</h2>
+      <div class="fix-row">
+        <label>
+          <!-- 勾选后脚本"就地修复"标题层级与命名，报告实时刷新 -->
+          <input type="checkbox" id="fix-mode"> 自动修复预览
+        </label>
+        <button class="btn" id="rescan" type="button">重新扫描</button>
+      </div>
+
+      <div id="specimen">
+        <h1>产品帮助中心</h1>
+        <p>欢迎来到帮助中心……</p>
+        <h1>账户问题</h1>          <!-- 问题①：第二个 h1，页面主题分裂 -->
+        <h4>如何修改密码</h4>       <!-- 问题②：h1 之后直接 h4，跳了两级 -->
+        <p>进入"设置-安全"，点击"修改密码"。</p>
+        <h4>如何绑定手机</h4>
+        <p>在"设置-安全-手机"中完成绑定。</p>
+        <section>                  <!-- 问题③：无标题的 section（形不成 region） -->
+          <p>支付遇到问题？先检查银行卡限额。</p>
+        </section>
+        <nav>                      <!-- 问题④：未命名的 nav（读屏菜单里分不清） -->
+          <a href="#a">账户</a> <a href="#b">支付</a>
+        </nav>
+        <div class="footer-title">常见错误代码</div>  <!-- 问题⑤：div 冒充标题 -->
+        <p>E-1001：余额不足……</p>
+      </div>
+      <p class="legend">绿色虚线框 = 修复模式中被脚本纠正的元素。</p>
+    </section>
+  </div>
+
+  <!-- ============ 右列：体检报告 ============ -->
+  <div class="col report">
+    <h2 style="color:#8ec5ff;">① 大纲视图（读屏真实听到的层级）</h2>
+    <div id="outline">扫描中……</div>
+    <h2 style="color:#8ec5ff;">② 问题清单</h2>
+    <ul id="issues"></ul>
+    <p id="score"></p>
+  </div>
+</div>
+
+<script>
+/* ==========================================================
+   核心思想：屏幕阅读器读到的大纲 = 字面的 h1~h6 级别。
+   HTML5 曾设计"section 内 h1 自动降级"的大纲算法，但从未被
+   实现，且已废弃。所以本分析器只看字面级别 —— 这正是真实
+   读屏行为。
+   ========================================================== */
+const $ = s => document.querySelector(s);
+const specimen = $('#specimen');
+
+// 大纲树渲染：按字面级别缩进，模拟读屏 rotor 的"标题列表"
+function renderOutline() {
+  const hs = specimen.querySelectorAll('h1,h2,h3,h4,h5,h6');
+  // 额外把"div 冒充标题"也列出来：匹配常见命名习惯
+  const fake = specimen.querySelectorAll('div[class*="title"]');
+  const lines = [];
+  hs.forEach(h => {
+    const lv = +h.tagName[1];
+    lines.push('  '.repeat(lv - 1) + '├ h' + lv + '  ' + h.textContent.trim());
+  });
+  fake.forEach(d => {
+    lines.push('  ???  <div class="' + d.className + '"> ← 读屏读作普通文本，不进大纲');
+  });
+  $('#outline').textContent = lines.join('\n') || '（未发现标题）';
+}
+
+// 问题检测：每条规则 = {检测, 报告}，返回问题数组
+function analyze() {
+  const issues = [];
+  const hs = [...specimen.querySelectorAll('h1,h2,h3,h4,h5,h6')];
+
+  // 规则 1：每页应只有一个 h1
+  const h1s = hs.filter(h => h.tagName === 'H1');
+  if (h1s.length > 1) {
+    issues.push(['err', '存在 ' + h1s.length + ' 个 <h1>（"产品帮助中心""账户问题"）。页面主题分裂，读屏用户会以为打开了两个页面。',
+      '修复：站点名/栏目名降级为 h2，或改用 p+样式。']);
+  }
+  if (h1s.length === 0) issues.push(['warn', '没有 <h1>：页面缺少主标题锚点。']);
+
+  // 规则 2：标题不跳级（相邻两级差 > 1 即报警）
+  for (let i = 1; i < hs.length; i++) {
+    const prev = +hs[i - 1].tagName[1], cur = +hs[i].tagName[1];
+    if (cur - prev > 1) {
+      issues.push(['err', '跳级：' + hs[i-1].tagName + '「' + hs[i-1].textContent.trim() + '」之后直接出现 ' +
+        hs[i].tagName + '「' + hs[i].textContent.trim() + '」。读屏会误判内容"凭空降级"。',
+        '修复：插入缺失层级或把标题改到正确级别。']);
+    }
+  }
+
+  // 规则 3：无标题的 section 不构成 region 地标
+  specimen.querySelectorAll('section').forEach((s, i) => {
+    const named = s.getAttribute('aria-label') || s.getAttribute('aria-labelledby') || s.querySelector('h1,h2,h3,h4,h5,h6');
+    if (!named) issues.push(['warn', '第 ' + (i + 1) + ' 个 <section> 没有标题也没有 aria-label：读屏不会把它当作 region 地标，等于白写。',
+      '修复：给它一个标题；若只是样式分组，退回 <div>。']);
+  });
+
+  // 规则 4：nav 需要可访问名称
+  specimen.querySelectorAll('nav').forEach((n, i) => {
+    if (!n.getAttribute('aria-label') && !n.getAttribute('aria-labelledby')) {
+      issues.push(['warn', '第 ' + (i + 1) + ' 个 <nav> 未命名。页面出现多个导航时，读屏菜单里全叫 navigation 无法区分。',
+        '修复：加 aria-label="xxx 导航"。']);
+    }
+  });
+
+  // 规则 5：div 冒充标题
+  specimen.querySelectorAll('div[class*="title"]').forEach(d => {
+    issues.push(['err', '<div class="' + d.className + '">「' + d.textContent.trim() + '」在视觉上是标题，但读屏读作普通文本，也不会出现在大纲中。',
+      '修复：改用真实标题标签（如 h2/h3）。']);
+  });
+
+  // 规则 6：main 缺失提示
+  if (!specimen.querySelector('main') && !document.querySelector('main')) {
+    issues.push(['warn', '未发现 <main>：读屏用户没有"跳到主内容"的地标落点。']);
+  }
+  return issues;
+}
+
+// 报告渲染：err 红 / warn 黄 / 通过绿 + 评分
+function renderReport() {
+  const issues = analyze();
+  const ul = $('#issues');
+  ul.innerHTML = '';
+  issues.forEach(([lv, text, fix]) => {
+    const li = document.createElement('li');
+    li.className = 'lv-' + lv;
+    li.innerHTML = '<b>' + (lv === 'err' ? '[严重]' : '[警告]') + '</b> ' + text + (fix ? '<br>　→ ' + fix : '');
+    ul.appendChild(li);
+  });
+  const errs = issues.filter(i => i[0] === 'err').length;
+  const warns = issues.filter(i => i[0] === 'warn').length;
+  const score = Math.max(0, 100 - errs * 20 - warns * 10);
+  $('#score').innerHTML = '<span class="' + (score >= 80 ? 'lv-ok' : 'lv-err') + '">体检得分：' + score +
+    ' / 100（严重 -20，警告 -10）</span>';
+}
+
+/* ==========================================================
+   修复模式：模拟"按建议改写"后的 DOM，观察报告变化。
+   真实项目里这一步应该由人来完成——工具只负责发现。
+   ========================================================== */
+let fixed = false;
+const originalHTML = specimen.innerHTML; // 保存原始 HTML，支持来回切换
+
+$('#fix-mode').addEventListener('change', e => {
+  if (e.target.checked) applyFixes(); else specimen.innerHTML = originalHTML;
+  runAll();
+});
+
+function applyFixes() {
+  // 修复①：第二个 h1 降级为 h2 —— 保持文档主题唯一
+  const h1s = specimen.querySelectorAll('h1');
+  h1s.forEach((h, i) => { if (i > 0) { h.outerHTML = '<h2 class="fixed">' + h.innerHTML + '</h2>'; } });
+  // 修复②：跳级的 h4 → h3（紧跟在 h2 之后的正确层级）
+  specimen.querySelectorAll('h4').forEach(h => { h.outerHTML = '<h3 class="fixed">' + h.innerHTML + '</h3>'; });
+  // 修复③：无标题 section → 给出带名称的 section（演示 labelledby 用法）
+  specimen.querySelectorAll('section').forEach(s => {
+    if (!s.querySelector('h1,h2,h3,h4,h5,h6') && !s.getAttribute('aria-label')) {
+      s.innerHTML = '<h3 class="fixed">支付问题</h3>' + s.innerHTML;
+      s.setAttribute('aria-labelledby', ''); // 实际项目应给标题加 id 并引用
+      const h = s.querySelector('h3'); h.id = 'fix-sec';
+      s.setAttribute('aria-labelledby', 'fix-sec');
+    }
+  });
+  // 修复④：nav 命名
+  specimen.querySelectorAll('nav').forEach(n => { if (!n.getAttribute('aria-label')) n.setAttribute('aria-label', '帮助中心导航'); });
+  // 修复⑤：div 标题 → h2
+  specimen.querySelectorAll('div[class*="title"]').forEach(d => {
+    d.outerHTML = '<h2 class="fixed">' + d.innerHTML + '</h2>';
+  });
+}
+
+// 扫描入口：大纲 + 报告一起刷新
+function runAll() { renderOutline(); renderReport(); }
+$('#rescan').addEventListener('click', runAll);
+runAll();
+</script>
+</body>
+</html>

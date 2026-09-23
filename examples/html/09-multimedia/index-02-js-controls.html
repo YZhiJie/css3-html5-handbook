@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 02：JS 控制播放 —— 自定义播放器 + 音频演示 + 事件流日志
+  ------------------------------------------------------------
+  【知识点】
+    1. HTMLMediaElement 控制接口：play()/pause()/currentTime/
+      volume/muted/playbackRate/duration
+    2. 自定义播放器的三根支柱：
+       ① 控件 → 属性/方法（UI 驱动媒体）
+       ② 事件流 → UI 状态（媒体驱动 UI：timeupdate/playing/waiting）
+       ③ Promise 化的 play() 与自动播放策略拒绝处理
+    3. 进度条 seek 的正确姿势：loadedmetadata 之后 duration 才
+       不是 NaN
+    4. 缓冲态：waiting/playing 事件对驱动 loading 指示器
+    5. 音频元素同理；iOS 不允许 JS 设 volume（跟随系统）
+  【运行方式】
+    视频需联网加载 MDN 公开样例；音频部分为"离线可演示"：
+    若样例音频加载失败，自动切换到 WebAudio 合成音（振荡器），
+    控制条逻辑照常工作。其余 UI 不依赖网络。
+  【效果说明】
+    上半部分是品牌化自定义视频播放器（无原生 controls）：
+    播放/暂停、进度条拖拽 seek、音量、倍速、时间显示、
+    loading 菊花；下方实时事件日志展示完整事件流。
+    下半部分音频播放器：尝试加载 MDN 样例音频，失败则用
+    振荡器合成一段琶音"歌曲"——同一套按钮逻辑演示 audio API。
+  【注意事项】
+    自定义播放器必须补键盘操作（本例实现 Space/←/→/↑/↓），
+    否则可访问性差于原生 controls——这是"造轮子"的真实成本。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 02 · JS 控制播放</title>
+<style>
+  :root {
+    --ink: #22303f; --muted: #6b7a8c; --line: #dbe3ec;
+    --brand: #0b6bcb; --bg: #f2f5f9; --card: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.65; padding: 20px;
+  }
+  h1 { font-size: 1.4rem; }
+  .sub { color: var(--muted); font-size: .88rem; margin: 4px 0 16px; }
+  section.box {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px; margin-bottom: 14px; max-width: 860px;
+  }
+  h2 { font-size: 1rem; margin-bottom: 8px; }
+  p { font-size: .85rem; }
+
+  /* ---------- 自定义播放器（无原生 controls） ---------- */
+  .player { position: relative; border-radius: 10px; overflow: hidden; background: #0a0f16; }
+  video { width: 100%; display: block; }
+  .bar {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,.78));
+    padding: 18px 12px 10px; color: #fff;
+  }
+  /* 进度条：input[type=range] 定制外观 */
+  .bar input[type="range"] { width: 100%; accent-color: #ff5f57; cursor: pointer; }
+  .ctl { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: .78rem; }
+  .ctl button {
+    background: rgba(255,255,255,.14); border: 0; color: #fff; border-radius: 6px;
+    min-width: 40px; padding: 5px 10px; cursor: pointer; font-size: .8rem;
+  }
+  .ctl button:hover { background: rgba(255,255,255,.28); }
+  .ctl input[type="range"] { width: 90px; accent-color: #8ec5ff; }
+  .time { margin-left: auto; font-variant-numeric: tabular-nums; color: #dbe7f5; }
+  /* loading 菊花：waiting 事件显示 / playing 隐藏 */
+  .spin {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .spin::before {
+    content: ""; width: 42px; height: 42px; border-radius: 50%;
+    border: 4px solid rgba(255,255,255,.25); border-top-color: #8ec5ff;
+    animation: r 0.9s linear infinite;
+  }
+  .spin.on { display: flex; }
+  @keyframes r { to { transform: rotate(360deg); } }
+  .placeholder {
+    aspect-ratio: 16/9; display: flex; flex-direction: column; gap: 6px;
+    align-items: center; justify-content: center; color: #9db4cc; text-align: center;
+    background: repeating-linear-gradient(45deg, #101826 0 14px, #0d141f 14px 28px);
+    font-size: .85rem; padding: 16px;
+  }
+  .placeholder b { color: #ffd479; }
+  .demo-badge {
+    position: absolute; top: 10px; left: 10px; background: rgba(255,95,87,.9);
+    color: #fff; font-size: .7rem; padding: 2px 8px; border-radius: 999px; display: none;
+  }
+
+  /* ---------- 音频播放器 ---------- */
+  .audio-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .84rem; }
+  .audio-row button {
+    background: var(--brand); color: #fff; border: 0; border-radius: 8px;
+    padding: 7px 14px; cursor: pointer;
+  }
+  .audio-row button.ghost { background: #eef2f8; color: var(--ink); border: 1px solid var(--line); }
+  .audio-row input[type="range"] { width: 130px; accent-color: var(--brand); }
+  #audio-note { font-size: .76rem; color: var(--muted); margin-top: 6px; }
+
+  /* ---------- 事件日志 ---------- */
+  #log {
+    background: #101826; color: #9fe0b5; border-radius: 8px;
+    font-family: "SF Mono", Consolas, monospace; font-size: .72rem;
+    padding: 8px 10px; height: 130px; overflow: auto; white-space: pre-wrap;
+  }
+  .note {
+    font-size: .76rem; color: var(--muted); background: #fff8e6;
+    border-left: 3px solid #e0a800; padding: 5px 10px; border-radius: 0 6px 6px 0;
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+
+<h1>示例 02 · JS 控制播放</h1>
+<p class="sub">自定义播放器 = 控件驱动媒体（属性/方法）+ 媒体驱动 UI（事件流）。视频引用 MDN 公开样例（联网）；音频失败时自动降级为 WebAudio 合成音。</p>
+
+<!-- ============ 自定义视频播放器 ============ -->
+<section class="box">
+  <h2>自定义视频播放器（controls 已隐藏，全部 JS 接管）</h2>
+  <div class="player" id="player">
+    <span class="demo-badge" id="badge">离线演示模式</span>
+    <div class="spin" id="spin"></div>
+    <video id="v" muted playsinline preload="metadata"
+           src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4"></video>
+    <div class="placeholder" id="ph" hidden>
+      <b>⚠ 视频加载失败</b>
+      <span>样例源不可用（可能离线）。播放器逻辑可通过下方"离线演示模式"体验。</span>
+    </div>
+    <!-- 品牌化控制条：进度 / 播放 / 音量 / 倍速 / 时间 -->
+    <div class="bar" id="bar">
+      <input type="range" id="seek" min="0" max="100" value="0" step="0.1" aria-label="播放进度">
+      <div class="ctl">
+        <button id="toggle" type="button" aria-label="播放或暂停">▶</button>
+        <button id="mute" type="button" aria-label="静音切换">🔇</button>
+        <input type="range" id="vol" min="0" max="1" step="0.05" value="0.8" aria-label="音量">
+        <select id="rate" aria-label="倍速">
+          <option value="0.5">0.5x</option><option value="1" selected>1x</option>
+          <option value="1.5">1.5x</option><option value="2">2x</option>
+        </select>
+        <span class="time" id="time">0:00 / 0:00</span>
+      </div>
+    </div>
+  </div>
+  <p class="note">键盘快捷键：Space 播放/暂停 · ←/→ 快退/快进 5s · ↑/↓ 音量（自定义播放器必须自补键盘支持，否则不如原生 controls）。</p>
+</section>
+
+<!-- ============ 音频播放器（带离线降级） ============ -->
+<section class="box">
+  <h2>音频控制（audio 同一套 API）</h2>
+  <div class="audio-row">
+    <button id="a-toggle" type="button">播放</button>
+    <input type="range" id="a-vol" min="0" max="1" step="0.05" value="0.6" aria-label="音量">
+    <span id="a-state">空闲</span>
+  </div>
+  <!-- 样例音频（MDN）；失败时脚本切换为 WebAudio 振荡器合成 -->
+  <audio id="a" preload="metadata" src="https://interactive-examples.mdn.mozilla.net/media/cc0-audios/t-rex-roar.mp3"></audio>
+  <p id="audio-note">状态：<code>loading…</code>（若样例加载失败，将自动切换为 WebAudio 合成的"离线琶音"，控制逻辑相同）。</p>
+</section>
+
+<!-- ============ 事件流日志 ============ -->
+<section class="box">
+  <h2>媒体事件流日志</h2>
+  <div id="log"></div>
+</section>
+
+<script>
+/* ==========================================================
+   模块一：日志工具
+   ========================================================== */
+const log = document.getElementById('log');
+function plog(msg) {
+  const t = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  log.textContent += '[' + t + '] ' + msg + '\n';
+  log.scrollTop = log.scrollHeight;
+}
+
+/* ==========================================================
+   模块二：视频播放器
+   三根支柱：
+   A. 加载失败 → 占位 + 离线演示模式（badge，控制条仍可拖动）
+   B. 控件 → 媒体：play/pause/currentTime/volume/playbackRate
+   C. 媒体 → UI：timeupdate 驱动进度、waiting/playing 驱动菊花
+   ========================================================== */
+const v = document.getElementById('v');
+const ph = document.getElementById('ph');
+const badge = document.getElementById('badge');
+const spin = document.getElementById('spin');
+const seek = document.getElementById('seek');
+const toggleBtn = document.getElementById('toggle');
+const timeEl = document.getElementById('time');
+let demoMode = false;   // 离线演示：用虚拟时钟驱动 UI
+let demoClock = 0, demoTimer = null;
+const DEMO_LEN = 30;    // 演示片长 30s
+
+// —— A. 失败检测：全源失败（单 source 写法，error 在 video 上触发）——
+let poll = setInterval(() => {
+  if (v.networkState === v.NETWORK_NO_SOURCE) fail();
+}, 400);
+v.addEventListener('loadedmetadata', () => clearInterval(poll));
+function fail() {
+  clearInterval(poll);
+  demoMode = true;
+  ph.hidden = false;
+  v.style.display = 'none';
+  badge.style.display = 'inline-block';
+  plog('✘ 视频源加载失败 → 进入离线演示模式（虚拟时长 30s）');
+}
+
+// 格式化时间 mm:ss
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '-:--';
+// 统一取"当前播放进度"（演示模式走虚拟时钟）
+function cur() { return demoMode ? demoClock : v.currentTime; }
+function len() { return demoMode ? DEMO_LEN : v.duration; }
+
+// —— B. 控件 → 媒体 ——
+async function doPlay() {
+  if (demoMode) {                       // 演示模式：虚拟时钟 + 事件模拟
+    demoTimer = setInterval(() => {
+      demoClock += 0.25;
+      if (demoClock >= DEMO_LEN) { doPause(); demoClock = DEMO_LEN; plog('⏹ ended（演示）'); }
+      renderUI();
+    }, 250);
+    toggleBtn.textContent = '⏸';
+    plog('▶ play（演示模式）');
+    return;
+  }
+  try {
+    await v.play();                     // play() 返回 Promise：必须 await/catch
+    plog('▶ play() 成功');
+  } catch (e) {
+    plog('✘ play() 被拒绝：' + e.name + ' —— 降级为静音重试');
+    v.muted = true; syncMuteBtn();
+    v.play().catch(() => plog('✘ 静音重试仍失败，等待用户手势'));
+  }
+}
+function doPause() {
+  if (demoMode) { clearInterval(demoTimer); toggleBtn.textContent = '▶'; plog('⏸ pause（演示）'); return; }
+  v.pause();
+}
+toggleBtn.addEventListener('click', () => (demoMode ? demoTimer : !v.paused) ? doPause() : doPlay());
+
+// 进度拖拽 seek：currentTime 可写（演示模式直接改虚拟时钟）
+seek.addEventListener('input', () => {
+  const t = seek.value / 100 * len();
+  if (demoMode) { demoClock = t; } else { v.currentTime = t; }
+  plog('⟳ seek → ' + t.toFixed(1) + 's（seeking→seeked）');
+});
+
+// 音量：volume 0~1；muted 是独立状态。iOS 上 JS 设 volume 无效，UI 仍可用
+const vol = document.getElementById('vol');
+const muteBtn = document.getElementById('mute');
+function syncMuteBtn() { muteBtn.textContent = v.muted ? '🔇' : '🔊'; }
+vol.addEventListener('input', () => { v.volume = +vol.value; v.muted = false; syncMuteBtn(); });
+muteBtn.addEventListener('click', () => { v.muted = !v.muted; syncMuteBtn(); });
+document.getElementById('rate').addEventListener('change', e => {
+  v.playbackRate = +e.target.value;   // ratechange 事件将打印日志
+});
+
+// —— C. 媒体 → UI ——
+function renderUI() {
+  const l = len(), c = cur();
+  seek.value = l ? (c / l * 100) : 0;
+  timeEl.textContent = fmt(c) + ' / ' + fmt(l);
+}
+v.addEventListener('timeupdate', renderUI);          // 约 4 次/秒的心跳
+v.addEventListener('loadedmetadata', () => { renderUI(); plog('✔ loadedmetadata：duration=' + v.duration.toFixed(2) + 's（此前进度条不可初始化）'); });
+v.addEventListener('play',  () => toggleBtn.textContent = '⏸');
+v.addEventListener('pause', () => toggleBtn.textContent = '▶');
+v.addEventListener('waiting', () => { spin.classList.add('on'); plog('⏳ waiting（缓冲饿）'); });
+v.addEventListener('playing', () => { spin.classList.remove('on'); plog('✅ playing（缓冲饱）'); });
+v.addEventListener('volumechange', () => plog('🔈 volumechange muted=' + v.muted + ' vol=' + v.volume.toFixed(2)));
+v.addEventListener('ratechange',  () => plog('⏩ ratechange rate=' + v.playbackRate));
+v.addEventListener('seeking',  () => plog('… seeking'));
+v.addEventListener('seeked',   () => plog('… seeked'));
+v.addEventListener('ended',    () => plog('⏹ ended'));
+
+// —— 键盘无障碍：自定义播放器必须补齐 ——
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input,select,textarea')) return; // 不干扰表单操作
+  if (e.code === 'Space') { e.preventDefault(); toggleBtn.click(); }
+  if (e.code === 'ArrowRight') { v.currentTime = Math.min(cur() + 5, len() || 0); }
+  if (e.code === 'ArrowLeft')  { v.currentTime = Math.max(cur() - 5, 0); }
+  if (e.code === 'ArrowUp')   { e.preventDefault(); v.volume = Math.min(1, v.volume + 0.1); vol.value = v.volume; }
+  if (e.code === 'ArrowDown') { e.preventDefault(); v.volume = Math.max(0, v.volume - 0.1); vol.value = v.volume; }
+});
+
+/* ==========================================================
+   模块三：音频播放器（离线降级为 WebAudio 合成）
+   音频 API 与视频完全同源；降级方案用振荡器演奏一段琶音，
+   同一套"播放/暂停/音量"按钮驱动 —— 演示 API 的一致性。
+   ========================================================== */
+const a = document.getElementById('a');
+const aNote = document.getElementById('audio-note');
+const aBtn = document.getElementById('a-toggle');
+const aVol = document.getElementById('a-vol');
+const aState = document.getElementById('a-state');
+
+// —— 检测样例音频是否可用：error 事件（audio 上直接触发，无 source 列表）——
+let offline = false;
+a.addEventListener('error', () => {
+  offline = true;
+  aNote.innerHTML = '状态：<b>样例音频加载失败 → 已切换为 WebAudio 合成琶音</b>（零网络依赖）';
+  plog('⚠ 音频源失败 → WebAudio 降级模式');
+});
+
+// —— WebAudio 合成器：4 个音符循环琶音 ——
+let actx = null, osc = null, gain = null, playing = false;
+const NOTES = [261.63, 329.63, 392.0, 523.25]; // C4 E4 G4 C5
+let noteIdx = 0;
+function synthStart() {
+  // AudioContext 必须在用户手势中创建/恢复（浏览器策略）
+  actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+  actx.resume();
+  osc = actx.createOscillator();
+  gain = actx.createGain();
+  osc.type = 'triangle';                 // 三角波：比正弦饱满、比锯齿柔和
+  osc.frequency.value = NOTES[noteIdx];
+  gain.gain.value = +aVol.value * 0.5;   // 音量映射到 GainNode
+  osc.connect(gain).connect(actx.destination); // 必须 connect 到 destination 才出声
+  osc.start();
+  // 每 0.45s 切换音符，形成琶音旋律
+  synthTimer = setInterval(() => {
+    noteIdx = (noteIdx + 1) % NOTES.length;
+    osc.frequency.setTargetAtTime(NOTES[noteIdx], actx.currentTime, 0.02);
+  }, 450);
+}
+let synthTimer = null;
+function synthStop() {
+  clearInterval(synthTimer);
+  if (osc) { try { osc.stop(); } catch (_) {} osc = null; }
+}
+// 同一套按钮逻辑：真实音频 / 合成音二选一路径
+aBtn.addEventListener('click', () => {
+  if (offline) {
+    if (playing) { synthStop(); aState.textContent = '已暂停（合成音）'; aBtn.textContent = '播放'; }
+    else { synthStart(); aState.textContent = '播放中（合成音）'; aBtn.textContent = '暂停'; }
+    playing = !playing;
+    return;
+  }
+  if (a.paused) { a.volume = +aVol.value; a.play().catch(e => plog('✘ 音频 play 失败：' + e.name)); }
+  else a.pause();
+});
+a.addEventListener('play',  () => { aState.textContent = '播放中（样例音频）'; aBtn.textContent = '暂停'; });
+a.addEventListener('pause', () => { aState.textContent = '已暂停'; aBtn.textContent = '播放'; });
+a.addEventListener('ended', () => { aState.textContent = '播放结束'; aBtn.textContent = '播放'; });
+// 音量滑杆双路：真实音频设 volume；合成音设 GainNode
+aVol.addEventListener('input', () => {
+  if (offline && gain && actx) gain.gain.setTargetAtTime(+aVol.value * 0.5, actx.currentTime, 0.02);
+  else a.volume = +aVol.value;
+});
+</script>
+</body>
+</html>

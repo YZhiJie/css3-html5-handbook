@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 01：文档结构标签 —— 地标导航可视化 + div 滥用反模式对比
+  ------------------------------------------------------------
+  【知识点】
+    1. header / nav / main / article / section / aside / footer
+       的语义角色，以及它们到 ARIA 地标（landmark）的隐式映射
+    2. 页面级 header/footer 才是 banner/contentinfo 地标；
+       嵌在 article 内部只是普通分组容器
+    3. 多个 nav / aside 需要用 aria-label 命名以示区分
+    4. div 滥用反模式：结构信息只存在于 class 命名中，机器不可读
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需服务器与网络。
+  【效果说明】
+    页面左侧是一个"迷你博客"，它本身就用语义标签搭建（身教）；
+    每个地标区域左上角挂有徽标，显示它对应的无障碍角色。
+    页面右侧面板：
+      ① "地标地图"——脚本实时扫描 DOM，按嵌套层级列出所有
+         地标及其 role/名称，模拟屏幕阅读器的地标跳转列表；
+      ② "反模式对照"——同一张卡片分别用语义标签与 div+class
+         实现，点击按钮查看两者在"机器视角"下的差异。
+  【注意事项】
+    section 只有"有标题、值得进目录"时才该用；本示例故意保留
+    一个无标题的滥用 section 以便对照。徽标是视觉演示，真实
+    屏幕阅读器通过快捷键在地标间跳转（如 NVDA 的 D 键）。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 01 · 文档结构与地标导航</title>
+<style>
+  /* ---------- 基础样式：仅负责"好看"，结构语义全部由标签承担 ---------- */
+  :root {
+    --ink: #22303f; --muted: #6b7a8c; --line: #dbe3ec;
+    --brand: #0b6bcb; --bg: #f2f5f9; --card: #fff;
+    --land: #e7f0ff; --land-edge: #9ec1e8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.65;
+    padding: 20px;
+  }
+  h1 { font-size: 1.45rem; }
+  .sub { color: var(--muted); font-size: .88rem; margin: 4px 0 16px; }
+  .layout { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .col { flex: 1 1 380px; min-width: 340px; }
+
+  /* ---------- 给"语义区块"画可视化边框，方便肉眼看出结构 ---------- */
+  [data-land] {
+    position: relative;
+    border: 1.5px dashed var(--land-edge);
+    border-radius: 10px;
+    background: var(--land);
+    padding: 14px;
+    margin-bottom: 10px;
+  }
+  [data-land]::before {
+    /* 区块左上角的"地标徽标"：内容来自 data-land 属性，演示 role 映射 */
+    content: "地标 role=" attr(data-land);
+    position: absolute; top: -11px; left: 10px;
+    font-size: .7rem; color: #23517e;
+    background: #cfe3fa; border: 1px solid var(--land-edge);
+    padding: 1px 8px; border-radius: 999px;
+  }
+  .inner { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+  h2 { font-size: 1.05rem; margin-bottom: 6px; }
+  h3 { font-size: .95rem; margin-bottom: 4px; }
+  p, li { font-size: .88rem; }
+  ul { padding-left: 1.2em; }
+  a { color: var(--brand); }
+
+  /* ---------- 右侧面板 ---------- */
+  .panel {
+    background: #101826; color: #d7e3f4; border-radius: 12px;
+    padding: 14px; font-size: .84rem;
+  }
+  .panel h2 { color: #8ec5ff; font-size: .95rem; margin-bottom: 8px; }
+  #landmark-tree { font-family: "SF Mono", Consolas, monospace; white-space: pre-wrap; }
+  .lm { padding: 2px 0; }
+  .lm b { color: #ffd479; }           /* role 名高亮 */
+  .lm .name { color: #9be6b0; }       /* 可访问名称高亮 */
+  .btn {
+    border: 1px solid #3d5775; background: #1b2a3f; color: #d7e3f4;
+    padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: .82rem;
+  }
+  .btn:hover { background: #24384f; }
+  .btn.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .contrast { margin-top: 8px; }
+  .contrast pre {
+    background: #0a101c; border: 1px solid #2a3c52; border-radius: 8px;
+    padding: 10px; font-size: .74rem; overflow: auto; line-height: 1.5;
+    color: #a9c2e0;
+  }
+  .ok   { color: #7fe0a0; }
+  .bad  { color: #ff9c9c; }
+  .tip {
+    font-size: .8rem; color: var(--muted);
+    background: #fff8e6; border-left: 3px solid #e0a800;
+    padding: 6px 10px; border-radius: 0 6px 6px 0; margin-bottom: 12px;
+  }
+</style>
+</head>
+<body>
+
+<!-- 页面大标题放在 <header> 外部的普通容器里，避免干扰"页面级 header=banner"的演示 -->
+<h1>示例 01 · 文档结构与地标导航</h1>
+<p class="sub">下方"迷你博客"本身由语义标签搭建，虚线框与徽标标出每个地标及其无障碍角色；右侧面板是脚本模拟的"屏幕阅读器地标列表"。</p>
+
+<div class="layout">
+  <!-- ================= 左列：语义骨架演示（身教） ================= -->
+  <div class="col">
+
+    <!-- 页面级 <header>：body 直接子级 → 隐式 role=banner -->
+    <header data-land="banner" class="inner" style="margin-bottom:10px;">
+      <p><strong>前端小站</strong> · 专注于 CSS/HTML 进阶</p>
+      <!-- 多个 nav 必须命名：读屏菜单里会显示"站内导航"而不是干巴巴的 navigation -->
+      <nav data-land="navigation" aria-label="站内导航" style="display:flex; gap:12px;">
+        <a href="#posts">文章</a><a href="#about">关于</a><a href="#sub">订阅</a>
+      </nav>
+    </header>
+
+    <!-- <main>：整页唯一的主内容区，role=main；读屏用户"跳到主内容"的落点 -->
+    <main data-land="main">
+      <article class="inner" style="margin-bottom:10px;">
+        <h2>语义化重构实战笔记</h2>
+        <p>发布于 <time datetime="2026-09-23">2026-09-23</time> · 作者：林一</p>
+        <p>我们把整站 div 换成了结构标签。正文是独立成篇的内容，
+           所以用 <b>article</b>——哪怕单独转发出去，它依然完整。</p>
+
+        <!-- article 内的 <header>：有祖先 article → 不再是 banner，只是普通分组 -->
+        <section aria-labelledby="sec-demo" style="margin-top:8px;">
+          <h3 id="sec-demo">为什么 section 必须带标题</h3>
+          <p>section 语义 = "值得出现在目录里的分组"。没有标题的分组
+             退回 div，否则读屏会多出一堆无法区分的 region。</p>
+        </section>
+      </article>
+
+      <!-- 页面级 <aside>：与主内容弱相关 → role=complementary -->
+      <aside data-land="complementary" aria-label="相关推荐" class="inner">
+        <h3>相关阅读</h3>
+        <ul><li><a href="#p2">表单校验从 novalidate 说起</a></li></ul>
+      </aside>
+    </main>
+
+    <!-- 页面级 <footer>：body 直接子级 → role=contentinfo -->
+    <footer data-land="contentinfo" class="inner">
+      <!-- address：联系人信息，语义上属于"如何联系我们" -->
+      <address>联系：<a href="mailto:hi@example.dev">hi@example.dev</a></address>
+      <p><small>© 2026 前端小站 · 京ICP备00000号</small></p>
+    </footer>
+  </div>
+
+  <!-- ================= 右列：机器视角面板 ================= -->
+  <div class="col panel">
+    <h2>① 地标地图（模拟读屏 rotor 列表）</h2>
+    <div class="tip">下面是脚本实时扫描 DOM 得到的地标树，相当于 VoiceOver 的"转子-地标"面板。</div>
+    <div id="landmark-tree">扫描中……</div>
+
+    <h2 style="margin-top:14px;">② div 滥用反模式对照</h2>
+    <div class="toolbar">
+      <!-- 切换按钮：查看同一张卡片两种写法在机器视角下的差异 -->
+      <button class="btn on" id="btn-sem" type="button">语义写法</button>
+      <button class="btn" id="btn-div" type="button">div 写法</button>
+    </div>
+    <div class="contrast">
+      <div id="mount"><!-- 两种写法动态挂载到这里 --></div>
+      <pre id="verdict">点击上方按钮，对比两种写法生成的"无障碍结构"。</pre>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ==========================================================
+   模块一：扫描文档，构建"地标地图"
+   原理：读屏软件看到的地标 = 元素的隐式 ARIA 角色。
+   我们用一段映射表 + querySelectorAll 复现这个推导过程，
+   特别要复现"页面级 header/footer 才是 banner/contentinfo"
+   的嵌套限制——这是最容易被忽略的规则。
+   ========================================================== */
+(function buildLandmarkMap() {
+  // 隐式角色映射表：等价于 W3C "HTML-AAM" 规范的核心结论
+  const ROLE = {
+    header: 'banner', nav: 'navigation', main: 'main',
+    aside: 'complementary', footer: 'contentinfo',
+    search: 'search', form: 'form', section: 'region'
+  };
+  // 这些祖先会让 header/footer 失去 banner/contentinfo 身份（HTML-AAM 规定）
+  const CANCEL_ANCESTORS = 'article, aside, main, nav, section';
+
+  // 收集所有"可能成为地标"的元素
+  const nodes = document.querySelectorAll('header, nav, main, aside, footer, section, form, search');
+  const lines = [];
+  nodes.forEach(el => {
+    let role = ROLE[el.tagName.toLowerCase()] || '';
+    if (!role) return;
+
+    // 关键规则：header/footer 嵌在分段祖先内 → 降级为普通容器
+    if ((el.tagName === 'HEADER' || el.tagName === 'FOOTER') && el.closest(CANCEL_ANCESTORS)) {
+      role = '（分组容器，非地标）';
+    }
+    // section 只有带可访问名称（aria-label / aria-labelledby）才是 region
+    if (el.tagName === 'SECTION') {
+      const named = el.getAttribute('aria-label') || el.getAttribute('aria-labelledby');
+      if (!named) role = '（未命名，读屏不当作地标）';
+    }
+    // form 要有名称才是 form 地标；无名称时读屏只是普通组
+    if (el.tagName === 'FORM') {
+      const named = el.getAttribute('aria-label') || el.getAttribute('aria-labelledby');
+      if (!named) role = '（未命名 form，非地标）';
+    }
+
+    // 名称：优先 aria-label，其次 aria-labelledby 指向的元素文本
+    let name = el.getAttribute('aria-label') || '';
+    const lb = el.getAttribute('aria-labelledby');
+    if (!name && lb) {
+      const target = document.getElementById(lb);
+      if (target) name = target.textContent.trim();
+    }
+    // 深度 = 祖先里同类地标的数量，用于画出缩进层级
+    let depth = 0, p = el.parentElement;
+    while (p) { if (ROLE[p.tagName?.toLowerCase()]) depth++; p = p.parentElement; }
+
+    lines.push(
+      '  '.repeat(depth) + '├ <' + el.tagName.toLowerCase() + '> → ' +
+      '<b>' + role + '</b>' + (name ? ' <span class="name">“' + name + '”</span>' : '')
+    );
+  });
+  document.getElementById('landmark-tree').innerHTML =
+    lines.join('\n') || '未发现地标元素。';
+})();
+
+/* ==========================================================
+   模块二：div 反模式对照
+   同一张"商品卡片"，两种写法视觉完全一致，但无障碍树不同：
+   - 语义写法：article(有名称) + 标题层级 + 真实链接
+   - div 写法：一串 generic 节点，读屏只能"从上到下盲读全文"
+   ========================================================== */
+const htmlSemantic = `
+<article aria-label="无线机械键盘">
+  <h3>无线机械键盘</h3>
+  <p>三模连接 · 87 键</p>
+  <p><strong>¥299</strong></p>
+  <a href="#p1">查看详情</a>
+</article>`;
+
+const htmlDiv = `
+<div class="card">
+  <div class="card-title">无线机械键盘</div>
+  <div class="card-desc">三模连接 · 87 键</div>
+  <div class="card-price">¥299</div>
+  <div class="card-link" onclick="void 0">查看详情</div>
+</div>`;
+
+const verdictSemantic =
+  '<span class="ok">✔ article → role=article（名称：无线机械键盘）\n' +
+  '✔ h3 → heading level 3\n' +
+  '✔ strong → importance（读屏可加重语气）\n' +
+  '✔ a → link（键盘可达，Enter 触发）</span>';
+
+const verdictDiv =
+  '<span class="bad">✘ 全部为 role=generic —— 无结构、无名称\n' +
+  '✘ "标题"只是加粗文本，读不出层级\n' +
+  '✘ 价格无 importance 语义\n' +
+  '✘ div 假链接：不可聚焦、Enter 无效，读屏读作普通文本</span>';
+
+const mount = document.getElementById('mount');
+const verdict = document.getElementById('verdict');
+const btnSem = document.getElementById('btn-sem');
+const btnDiv = document.getElementById('btn-div');
+
+// 渲染函数：innerHTML 展示结构，pre 展示推导结论
+function render(kind) {
+  if (kind === 'sem') {
+    mount.innerHTML = htmlSemantic; verdict.innerHTML = verdictSemantic;
+  } else {
+    mount.innerHTML = htmlDiv; verdict.innerHTML = verdictDiv;
+  }
+  btnSem.classList.toggle('on', kind === 'sem');
+  btnDiv.classList.toggle('on', kind === 'div');
+}
+// 绑定点击事件（真实项目里 div onclick 就是反模式本身，这里只是演示开关）
+btnSem.addEventListener('click', () => render('sem'));
+btnDiv.addEventListener('click', () => render('div'));
+render('sem'); // 初始显示语义写法
+</script>
+</body>
+</html>

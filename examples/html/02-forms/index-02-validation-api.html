@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 02：Constraint Validation API —— validity 实时面板 +
+           setCustomValidity 交叉校验 + novalidate 自定义验证
+  ------------------------------------------------------------
+  【知识点】
+    1. ValidityState 八个标志位的实时观测：valueMissing /
+       typeMismatch / tooShort / patternMismatch / customError…
+    2. checkValidity()（静默）与 reportValidity()（弹原生气泡）
+       的区别与返回值
+    3. setCustomValidity：业务级校验（两次密码一致）挂进原生
+       校验管线；合法时必须显式传 '' 清空
+    4. novalidate：关闭"提交时自动拦截"，但 API 与 validity 状态
+       全部保留 —— 自定义验证 UI 的基础
+    5. invalid 事件不冒泡，必须用捕获阶段委托
+  【运行方式】
+    双击本文件即可打开，零网络依赖。
+  【效果说明】
+    ① 上半部分：输入注册表单，右侧面板实时显示光标所在控件的
+       全部 ValidityState 标志与 validationMessage；
+    ② 提交时走"自定义验证流程"：novalidate 已关闭原生气泡，
+       脚本用 checkValidity() 收集全部错误渲染成顶部聚合列表
+       （真实产品常见形态），并聚焦第一个非法控件；
+    ③ "试一试原生气泡"按钮演示 reportValidity() 的默认 UI。
+  【注意事项】
+    setCustomValidity 的消息只影响 customError 标志；只要消息非
+    空，控件即视为非法 —— "合法时清空"必须写成固定习惯。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 02 · Constraint Validation API</title>
+<style>
+  :root {
+    --ink: #22303f; --muted: #6b7a8c; --line: #dbe3ec;
+    --brand: #0b6bcb; --bg: #f2f5f9; --card: #fff; --ok: #178a50; --bad: #c0392b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.65; padding: 20px;
+  }
+  h1 { font-size: 1.4rem; }
+  .sub { color: var(--muted); font-size: .88rem; margin: 4px 0 16px; }
+  .layout { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; max-width: 980px; }
+  form { flex: 1 1 380px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .panel { flex: 1 1 320px; }
+
+  label { display: block; font-size: .85rem; font-weight: 600; margin-top: 12px; }
+  input {
+    width: 100%; margin-top: 4px; font-size: .88rem; padding: 7px 10px;
+    border: 1px solid var(--line); border-radius: 8px; background: #fbfcfe;
+  }
+  input:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+  .hint { font-weight: 400; font-size: .72rem; color: var(--muted); }
+
+  /* 聚合错误列表（自定义验证 UI 的核心展示区） */
+  #errbox {
+    background: #fdf0f0; border: 1px solid #f2c4c4; border-left: 4px solid var(--bad);
+    border-radius: 8px; padding: 10px 12px; margin: 12px 0 2px; display: none;
+  }
+  #errbox.show { display: block; }
+  #errbox strong { color: var(--bad); font-size: .84rem; }
+  #errbox li { font-size: .8rem; margin-left: 16px; color: #a33; }
+
+  /* ValidityState 观测面板 */
+  .state { background: #101826; color: #d7e3f4; border-radius: 12px; padding: 14px; font-size: .8rem; }
+  .state h2 { color: #8ec5ff; font-size: .95rem; margin-bottom: 8px; }
+  #who { color: #ffd479; }
+  table.flags { width: 100%; border-collapse: collapse; font-family: "SF Mono", Consolas, monospace; font-size: .72rem; }
+  table.flags td { padding: 2px 4px; border-bottom: 1px solid #22334a; }
+  .t { color: #7fe0a0; font-weight: 700; }   /* true 绿 */
+  .f { color: #5d7590; }                     /* false 灰 */
+  #vmsg { margin-top: 8px; color: #9fe0b5; word-break: break-all; }
+  .btnrow { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  button {
+    background: var(--brand); color: #fff; border: 0; border-radius: 8px;
+    padding: 8px 18px; font-size: .86rem; cursor: pointer;
+  }
+  button.ghost { background: #1b2a3f; border: 1px solid #3d5775; color: #d7e3f4; }
+  button:hover { filter: brightness(1.08); }
+  #result { font-size: .84rem; color: var(--ok); margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>示例 02 · Constraint Validation API</h1>
+<p class="sub">右侧面板实时观测光标所在控件的 ValidityState；提交走自定义验证流程（聚合错误列表），"原生气泡"按钮对比 reportValidity 的默认 UI。</p>
+
+<div class="layout">
+  <!-- ============ 左：注册表单（novalidate 模式） ============ -->
+  <form id="reg" novalidate>
+    <!-- 聚合错误区：role=alert 让读屏在内容更新时立即播报 -->
+    <div id="errbox" role="alert"><strong>以下字段未通过校验：</strong><ul></ul></div>
+
+    <label for="name">昵称
+      <span class="hint">required + minlength=2 + maxlength=8</span>
+      <input id="name" name="nickname" required minlength="2" maxlength="8"
+             placeholder="2~8 个字符" autocomplete="username">
+    </label>
+
+    <label for="mail">邮箱
+      <span class="hint">type=email → typeMismatch</span>
+      <input id="mail" name="email" type="email" required autocomplete="email"
+             placeholder="dev@example.com">
+    </label>
+
+    <label for="pwd">密码
+      <span class="hint">required + minlength=8 + pattern 至少含一个数字</span>
+      <input id="pwd" name="pwd" type="password" required minlength="8"
+             pattern="(?=.*\d).+" autocomplete="new-password" placeholder="8 位以上，含数字">
+    </label>
+
+    <label for="pwd2">确认密码
+      <span class="hint">交叉校验 → setCustomValidity（customError）</span>
+      <input id="pwd2" name="pwd2" type="password" required autocomplete="new-password">
+    </label>
+
+    <div class="btnrow">
+      <button type="submit">注册（自定义验证流程）</button>
+      <!-- 演示按钮：对比"原生气泡"这一默认 UI -->
+      <button type="button" class="ghost" id="try-native">试一试 reportValidity 原生气泡</button>
+      <button type="reset" class="ghost">重置</button>
+    </div>
+    <p id="result"></p>
+  </form>
+
+  <!-- ============ 右：ValidityState 实时观测面板 ============ -->
+  <div class="panel state">
+    <h2>ValidityState 观测 · <span id="who">—</span></h2>
+    <!-- 八个标志位逐行显示：true 绿 / false 灰 -->
+    <table class="flags"><tbody id="flags"></tbody></table>
+    <div id="vmsg">validationMessage: —</div>
+  </div>
+</div>
+
+<script>
+/* ==========================================================
+   模块一：ValidityState 实时观测
+   每个可校验元素都有只读的 .validity（ValidityState）与
+   .validationMessage（浏览器本地化的失败原因）。
+   本面板监听 focusin/focusout + input，把光标所在控件的状态
+   逐标志打印出来 —— 是理解校验管线最直观的方式。
+   ========================================================== */
+const FLAGS = [
+  'valueMissing', 'typeMismatch', 'patternMismatch', 'tooLong',
+  'tooShort', 'rangeUnderflow', 'rangeOverflow', 'stepMismatch', 'customError'
+];
+const reg = document.getElementById('reg');
+const flagsBody = document.getElementById('flags');
+const who = document.getElementById('who');
+const vmsg = document.getElementById('vmsg');
+let current = null; // 当前观测的控件
+
+function renderFlags() {
+  if (!current) return;
+  who.textContent = current.name;
+  flagsBody.innerHTML = FLAGS.map(k => {
+    const on = current.validity[k];
+    return '<tr><td>' + k + '</td><td class="' + (on ? 't' : 'f') + '">' + on + '</td></tr>';
+  }).join('');
+  // validationMessage：空 = 合法；非空 = 浏览器翻译好的失败原因
+  vmsg.textContent = 'validationMessage: ' + (current.validationMessage || '（合法，空）');
+}
+// focusin/focusout 会冒泡（与 focus/blur 不同），适合委托
+reg.addEventListener('focusin', e => { if (e.target.matches('input')) { current = e.target; renderFlags(); } });
+reg.addEventListener('input', () => { syncCustom(); renderFlags(); });
+
+/* ==========================================================
+   模块二：setCustomValidity 交叉校验
+   "两次密码一致"是业务约束，原生属性表达不了。
+   做法：把非空消息挂到 pwd2 上 → customError=true → 控件非法；
+   合法时必须传 '' 清空，否则永远非法。
+   ========================================================== */
+const pwd = document.getElementById('pwd');
+const pwd2 = document.getElementById('pwd2');
+function syncCustom() {
+  // 只有当 pwd2 非空时才评估一致性，避免输入过程误报
+  if (pwd2.value === '') {
+    pwd2.setCustomValidity('');
+  } else if (pwd.value === pwd2.value) {
+    pwd2.setCustomValidity('');                  // 合法 → 清空（关键！）
+  } else {
+    pwd2.setCustomValidity('两次输入的密码不一致'); // 非法 → 设置消息
+  }
+  if (current === pwd || current === pwd2) renderFlags();
+}
+pwd.addEventListener('input', syncCustom);
+pwd2.addEventListener('input', syncCustom);
+
+/* ==========================================================
+   模块三：自定义验证流程（novalidate 的标准用法）
+   checkValidity()：静默检查，不弹 UI，返回布尔；
+   收集所有非法控件 → 渲染聚合错误列表 → 聚焦第一个非法控件。
+   invalid 事件不冒泡，这里演示捕获阶段委托打日志。
+   ========================================================== */
+const errbox = document.getElementById('errbox');
+const result = document.getElementById('result');
+
+reg.addEventListener('submit', e => {
+  e.preventDefault(); // 演示页不真提交
+  syncCustom();       // 提交前最后同步一次交叉校验
+
+  if (reg.checkValidity()) {           // 全部通过
+    errbox.classList.remove('show');
+    result.textContent = '✔ 校验全部通过（演示未提交）';
+    return;
+  }
+  // 收集非法控件：willValidate 过滤掉按钮等不参与校验的元素
+  const bad = [...reg.elements].filter(el => el.willValidate && !el.validity.valid);
+  // validationMessage 是浏览器按用户语言生成的文案 —— 免费的 i18n
+  errbox.querySelector('ul').innerHTML =
+    bad.map(el => '<li>' + (el.previousElementSibling?.textContent || el.name).trim() +
+                  '：' + el.validationMessage + '</li>').join('');
+  errbox.classList.add('show');
+  result.textContent = '';
+  bad[0].focus(); // 键盘用户落点：第一个错误处
+});
+
+// 捕获阶段委托监听 invalid —— 证明它不冒泡但能被捕获
+reg.addEventListener('invalid', e => {
+  console.log('[invalid 事件·捕获委托]', e.target.name, '→', e.target.validationMessage);
+}, true);
+
+/* ==========================================================
+   模块四：reportValidity 对比按钮
+   reportValidity() = checkValidity() + 浏览器默认错误气泡
+   （逐个展示，一次一个）。自定义 UI 的产品通常不用它提交，
+   但适合局部"即点即校"的场景。
+   ========================================================== */
+document.getElementById('try-native').addEventListener('click', () => {
+  syncCustom();
+  const ok = reg.reportValidity(); // 弹气泡；全通过返回 true
+  result.textContent = ok ? '✔ 原生气泡路径也通过了' : '（原生气泡已弹出，见对应控件）';
+});
+</script>
+</body>
+</html>
