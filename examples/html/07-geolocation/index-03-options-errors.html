@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：PositionOptions 参数调节 + 三种错误码处理 + 降级链
+  ------------------------------------------------------------
+  【知识点】
+    1. PositionOptions 三参数：enableHighAccuracy / timeout / maximumAge
+       的含义、默认值与对结果速度/精度/耗电的影响
+    2. PositionError 三种错误码：PERMISSION_DENIED(1) /
+       POSITION_UNAVAILABLE(2) / TIMEOUT(3)，业务分支只信 err.code
+    3. permissions.query({name:'geolocation'}) 权限预检：granted/prompt/denied
+    4. 降级链设计：精确定位 → IP 定位（城市级） → 手动选择，三级兜底
+    5. Mock 错误注入：不依赖真实权限即可演练全部错误分支
+
+  【运行方式】
+    双击本文件 → Mock 路径全功能可用（无需权限）。
+    真实路径需 http://localhost:xxxx 访问并授权（https/localhost 限制）。
+
+  【效果说明】
+    - 拖动滑块调节 timeout / maximumAge，开关高精度，点"发起定位（Mock）"
+      或"发起定位（真实）"观察参数对结果的影响；
+    - 下拉选择 Mock 行为：成功 / 权限拒绝 / 位置不可用 / 超时 / 精度差，
+      错误面板展示 code、常量名、message 与"处置建议"；
+    - 权限状态卡片实时显示 permissions API 的查询结果（不支持时提示降级）；
+    - 点"完整降级链演示"：依次走 精确定位失败 → IP 定位(Mock 数据) →
+      手动选择城市 三个阶段，面板记录每一步。
+
+  【注意事项】
+    - timeout 滑块调到最小（1000ms）+ 高精度关，真实模式也常能复现 TIMEOUT。
+    - maximumAge 的效果：真实模式下连续两次定位，第二次常直接命中缓存秒回。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>地理定位 示例 03 · PositionOptions 与错误处理</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: #0f172a;
+      color: #cbd5e1;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      padding: 26px 16px 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    h1 { color: #f1f5f9; font-size: 22px; }
+    p.desc { max-width: 700px; font-size: 14px; line-height: 1.8; text-align: center; }
+
+    .layout { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 860px; align-items: flex-start; }
+    .col { flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 16px; }
+
+    .panel { background: #111c33; border: 1px solid #24344d; border-radius: 14px; padding: 16px 18px; }
+    .panel h2 { color: #7dd3fc; font-size: 15px; margin-bottom: 10px; }
+    .panel p.tip { font-size: 12.5px; color: #94a3b8; line-height: 1.7; margin-bottom: 10px; }
+
+    .opt { margin-bottom: 12px; }
+    .opt label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+    .opt label .val { color: #38bdf8; font-family: Consolas, monospace; }
+    input[type="range"] { width: 100%; accent-color: #38bdf8; }
+
+    .check { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 12px; }
+    select {
+      width: 100%; background: #0b1322; border: 1px solid #334155; color: #e2e8f0;
+      border-radius: 8px; padding: 8px 10px; font-size: 13px; margin-bottom: 12px;
+    }
+
+    button {
+      background: #2563eb; color: #fff; border: none;
+      border-radius: 8px; padding: 9px 16px; font-size: 13.5px; cursor: pointer;
+    }
+    button:hover { background: #1d4ed8; }
+    button.ghost { background: #1e293b; color: #cbd5e1; border: 1px solid #334155; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .out {
+      background: #0b1322; border-left: 3px solid #38bdf8; border-radius: 6px;
+      padding: 10px 12px; font-size: 12.5px; font-family: Consolas, monospace;
+      white-space: pre-wrap; word-break: break-all; line-height: 1.8;
+      max-height: 260px; overflow: auto;
+    }
+    .out .err { color: #f87171; }
+    .out .ok { color: #4ade80; }
+    .out .warn { color: #fbbf24; }
+    .out .step { color: #38bdf8; }
+
+    /* 权限状态徽标 */
+    .perm {
+      display: inline-block; padding: 4px 12px; border-radius: 999px;
+      font-size: 12.5px; font-family: Consolas, monospace; background: #0b1322;
+      border: 1px solid #334155; color: #94a3b8;
+    }
+    .perm.granted { color: #4ade80; border-color: #166534; }
+    .perm.denied { color: #f87171; border-color: #7f1d1d; }
+    .perm.prompt { color: #fbbf24; border-color: #713f12; }
+
+    #toast {
+      position: fixed; left: 50%; bottom: 34px;
+      transform: translateX(-50%) translateY(20px);
+      background: #0ea5e9; color: #04283a;
+      font-size: 13.5px; padding: 10px 18px; border-radius: 10px;
+      opacity: 0; pointer-events: none; transition: all .25s; z-index: 99;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+
+<body>
+  <h1>地理定位 示例 03 · PositionOptions 与错误处理</h1>
+  <p class="desc">
+    真实项目的定位代码，错误分支远多于成功分支。本页提供<b>参数调节面板</b>与<b>Mock 错误注入</b>，
+    无需真实权限即可演练全部错误码与降级链。真实路径仅限 <b>https / localhost</b>。
+  </p>
+
+  <div class="layout">
+    <!-- ============ 左列：参数面板 + 权限状态 ============ -->
+    <div class="col">
+      <div class="panel">
+        <h2>PositionOptions 调节面板</h2>
+        <div class="opt">
+          <label><span>timeout（超时毫秒）</span><span class="val" id="v-timeout">8000</span></label>
+          <input type="range" id="r-timeout" min="1000" max="20000" step="500" value="8000">
+        </div>
+        <div class="opt">
+          <label><span>maximumAge（允许缓存毫秒）</span><span class="val" id="v-maxage">0</span></label>
+          <input type="range" id="r-maxage" min="0" max="120000" step="5000" value="0">
+        </div>
+        <div class="check">
+          <input type="checkbox" id="c-high" checked>
+          <label for="c-high" style="margin:0">enableHighAccuracy（尝试 GPS，更准但更慢更耗电）</label>
+        </div>
+        <div class="opt">
+          <label><span>Mock 行为（下拉注入）</span></label>
+          <select id="mock-behavior">
+            <option value="ok">成功（返回模拟坐标）</option>
+            <option value="denied">错误：PERMISSION_DENIED（1）</option>
+            <option value="unavailable">错误：POSITION_UNAVAILABLE（2）</option>
+            <option value="timeout">错误：TIMEOUT（3，模拟超过 timeout）</option>
+            <option value="poor">成功但精度极差（accuracy≈800m）</option>
+          </select>
+        </div>
+        <div class="row">
+          <button id="btn-mock">发起定位（Mock）</button>
+          <button id="btn-real" class="ghost">发起定位（真实）</button>
+          <button id="btn-chain" class="ghost">完整降级链演示</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>权限状态（Permissions API 预检）</h2>
+        <p class="tip">denied 后浏览器不会再弹窗，页面只能引导用户去站点设置开启——预检的意义就在于此。</p>
+        <span class="perm" id="perm-badge">查询中…</span>
+        <button id="btn-recheck" class="ghost" style="margin-top:10px">重新查询权限</button>
+      </div>
+    </div>
+
+    <!-- ============ 右列：输出面板 ============ -->
+    <div class="col">
+      <div class="panel" style="flex:1">
+        <h2>定位结果 / 错误面板</h2>
+        <div class="out" id="out">（输出区：每次定位的参数、结果或错误都会记录在这里）</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    /* ================================================================
+     * 0. 通用工具
+     * ================================================================ */
+    var toastEl = document.getElementById('toast'), toastTimer;
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2200);
+    }
+
+    var outEl = document.getElementById('out');
+    function out(html) {
+      var div = document.createElement('div');
+      div.innerHTML = html;
+      outEl.insertBefore(div, outEl.firstChild);   // 新记录插到最上面
+    }
+    function line(text, cls) {
+      return cls ? '<span class="' + cls + '">' + text + '</span>' : text;
+    }
+
+    /* ================================================================
+     * 1. 滑块与选项绑定
+     * ================================================================ */
+    function bindRange(id, valId, fmt) {
+      var r = document.getElementById(id), v = document.getElementById(valId);
+      r.oninput = function () { v.textContent = fmt ? fmt(+this.value) : this.value; };
+      v.textContent = r.value;
+    }
+    bindRange('r-timeout', 'v-timeout');
+    bindRange('r-maxage', 'v-maxage');
+
+    // 从面板收集当前 options
+    function getOptions() {
+      return {
+        enableHighAccuracy: document.getElementById('c-high').checked,
+        timeout: +document.getElementById('r-timeout').value,
+        maximumAge: +document.getElementById('r-maxage').value
+      };
+    }
+
+    /* ================================================================
+     * 2. 权限预检（不支持 Permissions API 的环境要 try/catch 降级）
+     * ================================================================ */
+    var permBadge = document.getElementById('perm-badge');
+    function checkPerm() {
+      permBadge.textContent = '查询中…';
+      permBadge.className = 'perm';
+      if (!navigator.permissions || !navigator.permissions.query) {
+        permBadge.textContent = '浏览器不支持 Permissions API（旧 Safari），跳过预检';
+        return;
+      }
+      navigator.permissions.query({ name: 'geolocation' }).then(function (st) {
+        permBadge.textContent = 'geolocation: ' + st.state;
+        permBadge.className = 'perm ' + st.state;
+      }).catch(function () {
+        permBadge.textContent = '查询失败（部分浏览器不支持该 name）';
+      });
+    }
+    checkPerm();
+    document.getElementById('btn-recheck').onclick = checkPerm;
+
+    /* ================================================================
+     * 3. 统一的结果/错误处理
+     * ================================================================ */
+    var CODE_NAME = { 1: 'PERMISSION_DENIED', 2: 'POSITION_UNAVAILABLE', 3: 'TIMEOUT' };
+    var CODE_TIP = {
+      1: '处置：不要反复重试（浏览器不会再弹窗）。引导用户到浏览器"站点设置/位置权限"手动开启。',
+      2: '处置：提示检查网络/GPS 环境，稍后重试；或降级到 IP 定位。',
+      3: '处置：加大 timeout 或降低精度要求（关 enableHighAccuracy）后重试一次。'
+    };
+
+    function onOk(pos, source, opts) {
+      var c = pos.coords;
+      out(line('✓ 定位成功（' + source + '）', 'ok'));
+      out('  参数：high=' + opts.enableHighAccuracy + ' timeout=' + opts.timeout + 'ms maxAge=' + opts.maximumAge + 'ms');
+      out('  结果：lat=' + c.latitude.toFixed(6) + ' lng=' + c.longitude.toFixed(6) +
+          ' accuracy=' + Math.round(c.accuracy) + 'm');
+      if (c.accuracy > 500) {
+        out(line('  ⚠ 精度 > 500m：该结果不宜用于精细场景（附近门店/围栏），建议降级或重测', 'warn'));
+      }
+      out('');
+      toast('定位成功（' + source + '）');
+    }
+
+    function onErr(err, source, opts) {
+      var name = CODE_NAME[err.code] || ('UNKNOWN(' + err.code + ')');
+      out(line('✗ 定位失败（' + source + '）', 'err'));
+      out('  参数：high=' + opts.enableHighAccuracy + ' timeout=' + opts.timeout + 'ms maxAge=' + opts.maximumAge + 'ms');
+      out(line('  code=' + err.code + ' → ' + name, 'err'));
+      out('  message：' + (err.message || '（浏览器未提供）'));
+      out(line('  ' + (CODE_TIP[err.code] || ''), 'warn'));
+      out('');
+      toast('定位失败：' + name);
+    }
+
+    /* ================================================================
+     * 4. 发起定位：Mock 与真实两条路径
+     * ================================================================ */
+    document.getElementById('btn-mock').onclick = function () {
+      var opts = getOptions();
+      var behavior = document.getElementById('mock-behavior').value;
+      out(line('── Mock 发起：behavior=' + behavior + ' ──', 'step'));
+
+      if (behavior === 'timeout') {
+        // 模拟"超过 timeout 才有结果"：故意等 timeout+300ms 再回 TIMEOUT 错误
+        setTimeout(function () {
+          onErr({ code: 3, message: 'Mock：定位用时超过 timeout=' + opts.timeout + 'ms' }, 'Mock', opts);
+        }, opts.timeout + 300);
+        out('（模拟中：结果将在 timeout+300ms 后到达，触发 TIMEOUT）');
+        return;
+      }
+      // 其余行为用短延迟模拟
+      setTimeout(function () {
+        if (behavior === 'ok' || behavior === 'poor') {
+          var acc = behavior === 'poor' ? 800 : (20 + Math.random() * 60); // poor 注入大精度
+          onOk({
+            coords: { latitude: 30.2489 + (Math.random() - .5) * .006, longitude: 120.1443 + (Math.random() - .5) * .006, accuracy: acc },
+            timestamp: Date.now()
+          }, 'Mock', opts);
+        } else if (behavior === 'denied') {
+          onErr({ code: 1, message: 'Mock：用户拒绝了定位授权' }, 'Mock', opts);
+        } else if (behavior === 'unavailable') {
+          onErr({ code: 2, message: 'Mock：设备无法确定位置' }, 'Mock', opts);
+        }
+      }, 500 + Math.random() * 500);
+    };
+
+    document.getElementById('btn-real').onclick = function () {
+      var opts = getOptions();
+      out(line('── 真实发起：options=' + JSON.stringify(opts) + ' ──', 'step'));
+      if (!('geolocation' in navigator)) {
+        onErr({ code: 2, message: '非安全上下文（http/file），Geolocation API 不存在。请用 localhost 服务器访问或改用 Mock' }, '真实', opts);
+        return;
+      }
+      var t0 = performance.now();
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        out('  实际用时：' + Math.round(performance.now() - t0) + 'ms');
+        onOk(pos, '真实', opts);
+      }, function (err) {
+        out('  实际用时：' + Math.round(performance.now() - t0) + 'ms');
+        onErr(err, '真实', opts);
+      }, opts);
+    };
+
+    /* ================================================================
+     * 5. 完整降级链：精确定位 → IP 定位 → 手动选择
+     * 真实项目模板：任何一级失败都能落到下一级，功能永远有出路
+     * ================================================================ */
+    document.getElementById('btn-chain').onclick = function () {
+      var opts = getOptions();
+      out(line('═══ 降级链演示开始 ═══', 'step'));
+
+      // 第 1 级：精确定位（Mock 注入 PERMISSION_DENIED，模拟最常见失败）
+      setTimeout(function () {
+        out(line('第1级 精确定位：失败（code=1 权限被拒）', 'err'));
+        // 第 2 级：IP 定位（真实项目 fetch 自己的后端；此处用 Mock 数据演示）
+        setTimeout(function () {
+          out(line('第2级 IP 定位：成功（城市级，accuracy≈5000m）', 'ok'));
+          out('  结果：杭州市（lat=30.2741, lng=120.1551）——只能到城市粒度');
+          // 第 3 级：手动选择（真实项目渲染城市选择器；此处模拟用户选中）
+          setTimeout(function () {
+            out(line('第3级 手动选择：用户在 UI 上确认了城市', 'warn'));
+            out(line('═══ 链路结束：功能未中断，精度逐级让步 ═══', 'step'));
+            toast('降级链演示完成，详见输出面板');
+          }, 700);
+        }, 700);
+      }, 700);
+    };
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 01：Blob URL 内联 Worker + 主线程阻塞对比演示
+  ------------------------------------------------------------
+  【知识点】
+    1. 用 Blob + URL.createObjectURL 创建"内联 Worker"，file:// 双击可用
+       （外部 worker.js 文件在 file:// 下会被同源策略拦截，这是本地演示的关键写法）
+    2. 主线程跑长任务 → CSS 动画冻结、按钮无响应（事件循环被占满）
+    3. 同样的任务丢给 Worker → 动画全程流畅（计算在后台线程）
+    4. postMessage 双向通信：主线程发参数，Worker 算完回传结果
+    5. worker.terminate() 主动终止；worker.onerror 捕获 Worker 内异常
+
+  【运行方式】
+    双击本文件直接打开。右上角的小方块一直在旋转——它是"主线程是否卡死"的探测器。
+
+  【效果说明】
+    输入运算规模后：
+    - 点"主线程计算"：旋转方块当场冻结、页面短暂无响应，直到算完才恢复；
+    - 点"Worker 计算"：方块持续旋转，结果照常返回并显示耗时；
+    - 点"终止 Worker"：立即 terminate 并重建，后续任务不受影响。
+    两条日志对比同一规模的耗时，直观感受"计算挪到后台"的意义。
+
+  【注意事项】
+    - 主线程计算时页面会真实卡死几秒，属于演示目的，请耐心等待恢复。
+    - 提示信息全部用页面内日志面板展示，不使用 alert/prompt。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Workers 示例 01 · Blob 内联 Worker 与主线程阻塞对比</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: #0f172a;
+      color: #cbd5e1;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      padding: 26px 16px 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    h1 { color: #f1f5f9; font-size: 22px; }
+
+    p.desc {
+      max-width: 680px;
+      font-size: 14px;
+      line-height: 1.8;
+      text-align: center;
+    }
+
+    /* 旋转方块：主线程是否被阻塞的"探测器"——主线程卡死它就停 */
+    .spinner-box {
+      width: 74px;
+      height: 74px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #111c33;
+      border: 1px solid #24344d;
+      border-radius: 14px;
+    }
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: conic-gradient(from 0deg, #38bdf8, #818cf8, #f472b6, #38bdf8);
+      /* CSS 动画跑在主线程渲染循环里：主线程被长任务占住时它就会冻结 */
+      animation: spin 1.6s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .spinner-label { font-size: 12px; color: #94a3b8; text-align: center; }
+
+    .panel {
+      width: 100%;
+      max-width: 720px;
+      background: #111c33;
+      border: 1px solid #24344d;
+      border-radius: 14px;
+      padding: 16px 18px;
+    }
+    .panel h2 { color: #7dd3fc; font-size: 15px; margin-bottom: 8px; }
+    .panel p.tip { font-size: 12.5px; color: #94a3b8; line-height: 1.7; margin-bottom: 10px; }
+
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+
+    input[type="number"] {
+      background: #0b1322;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 13px;
+      width: 130px;
+    }
+    select {
+      background: #0b1322;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    button:hover { background: #1d4ed8; }
+    button.ghost { background: #1e293b; color: #cbd5e1; border: 1px solid #334155; }
+    button.danger { background: #b91c1c; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+
+    .status {
+      font-size: 13px;
+      background: #0b1322;
+      border-left: 3px solid #38bdf8;
+      padding: 8px 10px;
+      border-radius: 6px;
+      line-height: 1.8;
+      margin-bottom: 10px;
+    }
+
+    /* 日志面板：等宽字体、自动滚动 */
+    .log {
+      background: #0b1322;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.8;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 240px;
+      overflow: auto;
+    }
+    .log .t-main { color: #f87171; }   /* 主线程任务日志：红色系 */
+    .log .t-worker { color: #4ade80; } /* Worker 任务日志：绿色系 */
+    .log .t-sys { color: #94a3b8; }    /* 系统消息：灰色 */
+
+    #toast {
+      position: fixed;
+      left: 50%;
+      bottom: 34px;
+      transform: translateX(-50%) translateY(20px);
+      background: #0ea5e9;
+      color: #04283a;
+      font-size: 13.5px;
+      padding: 10px 18px;
+      border-radius: 10px;
+      opacity: 0;
+      pointer-events: none;
+      transition: all .25s;
+      z-index: 99;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+
+<body>
+  <h1>Web Workers 示例 01 · 主线程阻塞 vs 后台线程</h1>
+  <p class="desc">
+    下面的小方块是一个 CSS 无限旋转动画——它跑在主线程上。<b>主线程一旦执行长任务，动画就会当场冻结</b>；
+    而把同样的任务交给 Worker，动画全程流畅。请分别点击两个按钮对比。
+  </p>
+
+  <div class="spinner-box">
+    <div class="spinner" id="spinner"></div>
+  </div>
+  <div class="spinner-label">↑ 旋转探测器（主线程卡死它会停转）</div>
+
+  <div class="panel">
+    <h2>控制台</h2>
+    <p class="tip">任务：对 0..N 求和累加（纯 CPU 循环）。默认 40,000,000 次，可调整规模。</p>
+    <div class="row">
+      <label style="font-size:13px">运算规模 N：</label>
+      <input type="number" id="n" value="40000000" min="1000000" step="10000000">
+      <button id="btn-main">主线程计算（会卡死）</button>
+      <button id="btn-worker">Worker 计算</button>
+      <button id="btn-kill" class="ghost">终止并重建 Worker</button>
+      <button id="btn-err" class="danger">触发 Worker 内部错误</button>
+    </div>
+    <div class="status" id="status">状态：空闲。方块旋转正常，说明主线程未被占用。</div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    /* ================================================================
+     * 0. 通用工具
+     * ================================================================ */
+    var toastEl = document.getElementById('toast'), toastTimer;
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2400);
+    }
+
+    var logEl = document.getElementById('log');
+    function log(html, cls) {
+      // 每条日志带时间戳插入到顶部，cls 决定颜色（区分主线程/Worker/系统消息）
+      var t = new Date().toLocaleTimeString();
+      var div = document.createElement('div');
+      div.className = cls || 't-sys';
+      div.textContent = '[' + t + '] ' + html.replace(/<[^>]+>/g, ''); // textContent 防注入
+      logEl.insertBefore(div, logEl.firstChild);
+    }
+
+    var statusEl = document.getElementById('status');
+    function setStatus(s) { statusEl.textContent = '状态：' + s; }
+
+    /* ================================================================
+     * 1. 核心：用 Blob URL 创建内联 Worker
+     * 为什么不用 new Worker('worker.js')？
+     *   file:// 协议下外部脚本 Worker 会被同源策略拦截（origin 为 null），
+     *   而 Blob URL 不依赖网络与外部文件，双击打开即可用。
+     * ================================================================ */
+    var workerCode = [
+      '/* Worker 线程内部：self 是全局对象（没有 window/document） */',
+      'self.onmessage = function (e) {',
+      '  var type = e.data.type;',
+      '  if (type === "sum") {                       // 任务1：大循环求和',
+      '    var n = e.data.n, sum = 0, t0 = Date.now();',
+      '    for (var i = 0; i < n; i++) sum += i;     // 纯 CPU 密集，几百 ms 到数秒',
+      '    self.postMessage({ type: "sum", sum: sum, cost: Date.now() - t0 });',
+      '  } else if (type === "boom") {               // 任务2：故意抛错，演示 onerror',
+      '    throw new Error("Worker 内部故意抛出的异常！");',
+      '  }',
+      '};'
+    ].join('\n');
+
+    var worker = null, blobUrl = null;
+
+    // 创建/重建 Worker：terminate 后、或首次使用时调用
+    function createWorker() {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);   // 旧的 blob URL 及时释放，防内存泄漏
+      blobUrl = URL.createObjectURL(new Blob([workerCode], { type: 'text/javascript' }));
+      worker = new Worker(blobUrl);
+
+      // 接收 Worker 回包
+      worker.onmessage = function (e) {
+        if (e.data.type === 'sum') {
+          var ms = e.data.cost;
+          log('Worker 计算完成：sum = ' + e.data.sum + '，耗时 ' + ms + 'ms（动画全程流畅）', 't-worker');
+          setStatus('Worker 计算完成，耗时 ' + ms + 'ms，主线程全程未阻塞');
+          toast('Worker 算完了：' + ms + 'ms');
+        }
+      };
+
+      // Worker 内任何未捕获异常都会冒泡到这里——必须监听，否则错误被静默吞掉
+      worker.onerror = function (e) {
+        log('捕获 Worker 异常：' + e.message + '（第 ' + e.lineno + ' 行）—— onerror 触发', 't-main');
+        setStatus('Worker 发生异常（已被 onerror 捕获），线程仍可用');
+      };
+      log('Worker 已创建（Blob URL 内联，file:// 可用）', 't-sys');
+    }
+    createWorker();
+
+    /* ================================================================
+     * 2. 演示一：主线程直接计算（反例）
+     * ================================================================ */
+    document.getElementById('btn-main').onclick = function () {
+      var n = +document.getElementById('n').value || 40000000;
+      log('主线程开始计算 N = ' + n + ' ……注意旋转方块是否冻结', 't-main');
+      setStatus('主线程正在计算，动画已冻结、页面无响应……');
+      var t0 = performance.now();
+      var sum = 0;
+      for (var i = 0; i < n; i++) sum += i;        // 同步长任务：事件循环被完全占住
+      var ms = Math.round(performance.now() - t0);
+      // 走到这里才意味着主线程"缓过来了"
+      log('主线程计算完成：sum = ' + sum + '，耗时 ' + ms + 'ms（刚才动画是否冻结了？）', 't-main');
+      setStatus('主线程计算完成，耗时 ' + ms + 'ms。刚才这段时间点击/动画全部无响应');
+      toast('主线程算完了：' + ms + 'ms，期间页面全程卡死');
+    };
+
+    /* ================================================================
+     * 3. 演示二：同样的任务交给 Worker
+     * ================================================================ */
+    document.getElementById('btn-worker').onclick = function () {
+      var n = +document.getElementById('n').value || 40000000;
+      log('已把 N = ' + n + ' 的求和任务 postMessage 给 Worker', 't-worker');
+      setStatus('Worker 后台计算中……注意方块仍在旋转');
+      worker.postMessage({ type: 'sum', n: n });   // 主线程瞬间返回，去做 UI 的事
+    };
+
+    /* ================================================================
+     * 4. 演示三：terminate 硬杀与重建
+     * ================================================================ */
+    document.getElementById('btn-kill').onclick = function () {
+      worker.terminate();                           // 硬杀：不管它正在算什么
+      createWorker();                               // 重建一个干净的新 Worker
+      setStatus('旧 Worker 已 terminate，新 Worker 就绪');
+      toast('Worker 已终止并重建');
+    };
+
+    /* ================================================================
+     * 5. 演示四：Worker 内部错误 → onerror
+     * ================================================================ */
+    document.getElementById('btn-err').onclick = function () {
+      log('发送 boom 任务：Worker 将在内部 throw', 't-sys');
+      worker.postMessage({ type: 'boom' });
+    };
+  </script>
+</body>
+
+</html>

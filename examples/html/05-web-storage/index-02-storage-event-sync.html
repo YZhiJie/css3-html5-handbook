@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 02：storage 事件跨标签页实时同步
+  ------------------------------------------------------------
+  【知识点】
+    1. storage 事件只在"同源的其他标签页"触发，本页自己写入不触发
+    2. 事件对象字段：key / oldValue / newValue / url / storageArea
+    3. 利用该事件实现跨标签页通信：主题同步、购物车角标、简易"聊天广播"
+    4. 写入端"只管写"，接收端"只管听"，双方约定 key 协议
+    5. 本页操作需要同时更新本页 UI（因为本页收不到自己的 storage 事件）
+
+  【运行方式】
+    双击打开本文件后，【再复制一个相同标签页】（或手动再开一个标签页打开同一文件），
+    在任一标签页操作，观察另一个标签页的实时变化。需要两个标签页并排查看。
+
+  【效果说明】
+    - 切换主题：另一标签页的背景/配色立即跟随切换；
+    - 购物车 +/-：另一标签页的角标数字实时增减；
+    - 发送消息：另一标签页的消息列表实时追加一条，并展示事件详情（key/old/new/url）。
+
+  【注意事项】
+    - 若在 file:// 下事件没有跨标签页触发（个别浏览器把本地文件按文件隔离），
+      请改用本地静态服务器（如 npx serve / python -m http.server）再试，http(s) 下同源规则标准。
+    - e.newValue / e.oldValue 都是字符串；复杂数据自行 JSON.parse。
+    - 提示信息一律使用页面内面板展示，不使用 alert/prompt。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web 存储 示例 02 · storage 事件跨标签页同步</title>
+  <style>
+    /* 主题通过 body 的 data-theme 属性切换，颜色全部走 CSS 变量，
+       这样 JS 只需要改一个属性，所有颜色联动——也方便被 storage 事件同步 */
+    body[data-theme="dark"] {
+      --bg: #0f172a;
+      --card: #16233c;
+      --line: #2b3c58;
+      --text: #dbe4f3;
+      --muted: #8aa0bd;
+      --accent: #38bdf8;
+    }
+    body[data-theme="light"] {
+      --bg: #eef2f7;
+      --card: #ffffff;
+      --line: #d8e0ea;
+      --text: #1e293b;
+      --muted: #64748b;
+      --accent: #2563eb;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      padding: 26px 16px 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      transition: background .3s, color .3s;   /* 主题切换时平滑过渡 */
+    }
+
+    h1 { font-size: 22px; }
+
+    .howto {
+      max-width: 680px;
+      font-size: 14px;
+      line-height: 1.8;
+      text-align: center;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 18px;
+    }
+    .howto b { color: var(--accent); }
+
+    .layout {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+      max-width: 860px;
+    }
+
+    .panel {
+      flex: 1;
+      min-width: 300px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px 18px;
+      transition: background .3s, border-color .3s;
+    }
+    .panel h2 { font-size: 15px; margin-bottom: 10px; color: var(--accent); }
+    .panel p.tip { font-size: 12.5px; color: var(--muted); line-height: 1.7; margin-bottom: 10px; }
+
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      margin: 0 6px 8px 0;
+    }
+    button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+    input[type="text"] {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 13px;
+      width: 200px;
+    }
+
+    /* 购物车角标 */
+    .cart {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      margin: 4px 0 12px;
+    }
+    .badge {
+      background: #ef4444;
+      color: #fff;
+      min-width: 26px;
+      height: 26px;
+      border-radius: 13px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    /* 消息列表 */
+    .msgs {
+      background: rgba(127, 127, 127, .08);
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      min-height: 120px;
+      max-height: 170px;
+      overflow: auto;
+      padding: 8px 10px;
+      font-size: 13px;
+      line-height: 1.9;
+    }
+    .msgs .from { color: var(--accent); }
+
+    /* 事件详情日志 */
+    .log {
+      background: #0b1322;
+      color: #9fb4d0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.8;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 220px;
+      overflow: auto;
+    }
+    .log b { color: #fbbf24; }
+  </style>
+</head>
+
+<body data-theme="dark">
+  <h1>storage 事件 · 跨标签页实时同步</h1>
+
+  <div class="howto">
+    请先 <b>复制本页标签页</b>（或新开标签页打开同一文件），得到两个标签页并排摆放。<br>
+    在 A 页点击任意操作，B 页会通过 <b>storage 事件</b>实时同步主题 / 购物车 / 消息——
+    这就是"零依赖跨标签页通信"。<b>本页自己的写入不会触发本页监听器</b>，所以下面 JS 里"写完顺手更新自己"。
+  </div>
+
+  <div class="layout">
+    <!-- ============ 操作面板（写入端） ============ -->
+    <div class="panel">
+      <h2>操作面板（写入 localStorage）</h2>
+      <p class="tip">每次操作 = 一次 setItem。写入瞬间浏览器向同源其他标签页广播 storage 事件。</p>
+
+      <div class="cart">🛒 购物车角标：<span class="badge" id="badge">0</span></div>
+      <button id="btn-theme">切换主题</button>
+      <button id="btn-add">购物车 +1</button>
+      <button id="btn-sub" class="ghost">购物车 -1</button>
+
+      <div style="margin-top:12px">
+        <input type="text" id="msg" placeholder="输入消息，回车发送" maxlength="30">
+        <button id="btn-send">发送</button>
+      </div>
+    </div>
+
+    <!-- ============ 接收面板（监听端） ============ -->
+    <div class="panel">
+      <h2>同步结果（storage 事件驱动）</h2>
+      <p class="tip">本面板 UI 不由点击直接驱动，而由 storage 事件 + "本页写入后的手动更新"共同驱动。</p>
+      <div class="msgs" id="msgs"><div style="color:#64748b">（消息列表，等待另一标签页发送…）</div></div>
+    </div>
+  </div>
+
+  <!-- ============ 事件详情日志 ============ -->
+  <div class="panel" style="max-width:860px">
+    <h2>storage 事件详情日志</h2>
+    <div class="log" id="log">（在本页收到的每一次 storage 事件都会打印在这里）</div>
+  </div>
+
+  <script>
+    /* ================================================================
+     * 约定的 key 协议：写入端与接收端只通过这三个 key 通信
+     * ================================================================ */
+    var KEY_THEME = 'demo-theme';      // 值：'dark' | 'light'
+    var KEY_CART  = 'demo-cart-count'; // 值：数字字符串
+    var KEY_MSG   = 'demo-last-msg';   // 值：JSON 字符串 {text, ts}
+
+    /* ================================================================
+     * 本页 UI 更新函数（被"本页写入后"与"收到 storage 事件"两个路径调用）
+     * ================================================================ */
+    var badge = document.getElementById('badge');
+    var msgs = document.getElementById('msgs');
+
+    function applyTheme(theme) {
+      // 主题只需要改 body 的 data-theme，颜色全部由 CSS 变量联动
+      document.body.dataset.theme = theme;
+    }
+
+    function applyCart(n) {
+      badge.textContent = n;
+    }
+
+    function appendMsg(text, ts) {
+      // 移除占位行
+      if (msgs.firstElementChild && msgs.firstElementChild.style.color) msgs.innerHTML = '';
+      var div = document.createElement('div');
+      div.innerHTML = '<span class="from">' + new Date(ts).toLocaleTimeString() + '</span> ：' + text;
+      msgs.appendChild(div);
+      msgs.scrollTop = msgs.scrollHeight;            // 自动滚到最新一条
+    }
+
+    // 页面初始化：先按 localStorage 里已有的值渲染（后来打开的标签页也能追上状态）
+    (function init() {
+      var theme = localStorage.getItem(KEY_THEME) || 'dark';
+      applyTheme(theme);
+      applyCart(localStorage.getItem(KEY_CART) || 0);
+    })();
+
+    /* ================================================================
+     * 核心：监听 storage 事件
+     * 注意：本页自己 setItem 不触发；只有【其他】同源标签页写入才触发
+     * ================================================================ */
+    window.addEventListener('storage', function (e) {
+      // e.key：变化的 key；e.oldValue/e.newValue：字符串旧值/新值（删除时 newValue 为 null）
+      // e.url：哪个页面写入的；e.storageArea：localStorage 本体
+      var t = new Date().toLocaleTimeString();
+      var line = '[' + t + '] key=' + JSON.stringify(e.key) +
+        '\n  oldValue: ' + JSON.stringify(e.oldValue) +
+        '\n  newValue: ' + JSON.stringify(e.newValue) +
+        '\n  来自: ' + (e.url || '').split('/').pop();
+      log(line);
+
+      // 根据 key 分发到对应的 UI 更新（相当于一个极简"消息路由"）
+      if (e.key === KEY_THEME && e.newValue) applyTheme(e.newValue);
+      if (e.key === KEY_CART) applyCart(e.newValue === null ? 0 : +e.newValue);
+      if (e.key === KEY_MSG && e.newValue) {
+        var m = JSON.parse(e.newValue);              // 存的时候 stringify 了，取的时候要 parse
+        appendMsg(m.text, m.ts);
+      }
+    });
+
+    var logEl = document.getElementById('log');
+    function log(text) {
+      // 保留最近 8 条事件日志，新的在上面
+      var sep = '\n────────────────\n';
+      logEl.textContent = text + sep + logEl.textContent.split(sep).slice(0, 8).join(sep);
+    }
+
+    /* ================================================================
+     * 写入端操作：写 localStorage + 手动更新本页（本页收不到自己的事件）
+     * ================================================================ */
+    document.getElementById('btn-theme').onclick = function () {
+      var next = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+      localStorage.setItem(KEY_THEME, next);         // 广播给其他标签页
+      applyTheme(next);                              // 自己也要变（自己的事件不会回来）
+    };
+
+    document.getElementById('btn-add').onclick = function () {
+      var n = (+localStorage.getItem(KEY_CART) || 0) + 1;
+      localStorage.setItem(KEY_CART, String(n));     // 存储只认字符串，数字要转
+      applyCart(n);
+    };
+
+    document.getElementById('btn-sub').onclick = function () {
+      var n = Math.max(0, (+localStorage.getItem(KEY_CART) || 0) - 1);
+      localStorage.setItem(KEY_CART, String(n));
+      applyCart(n);
+    };
+
+    function sendMsg() {
+      var input = document.getElementById('msg');
+      var text = input.value.trim();
+      if (!text) return;
+      var payload = JSON.stringify({ text: text, ts: Date.now() });
+      localStorage.setItem(KEY_MSG, payload);        // 复杂数据统一 JSON 序列化后再存
+      appendMsg(text, Date.now());                   // 本页列表同样手动更新
+      input.value = '';
+      input.focus();
+    }
+    document.getElementById('btn-send').onclick = sendMsg;
+    document.getElementById('msg').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') sendMsg();              // 回车快捷发送
+    });
+  </script>
+</body>
+
+</html>

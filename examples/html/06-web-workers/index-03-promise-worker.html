@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：主线程与 Worker 双向通信 Promise 化封装 + 批量任务
+  ------------------------------------------------------------
+  【知识点】
+    1. Promise 化封装：自增 id 关联"请求"与"响应"，invoke() 返回 Promise
+       —— 业务代码像调 async 函数一样用 Worker，完全感知不到消息细节
+    2. 消息协议设计：{id, payload} 出站 / {id, ok, data} 回站，ok=false 表示业务错误
+    3. 任务队列与状态管理：多个任务并发发出，回包乱序也能正确配对
+    4. 错误传递：Worker 内 throw → 封装层 reject → 业务层 try/catch 捕获
+    5. 超时保护：Promise.race 定时 + terminate 硬杀 + 自动重建 Worker
+    6. 典型 CPU 任务演示：20 万数排序 / 素数统计（都在后台线程完成）
+
+  【运行方式】
+    双击本文件直接打开。左上角旋转环始终用于探测主线程是否被阻塞。
+
+  【效果说明】
+    - 点"排序 20 万随机数"/"统计 200 万内素数"：任务卡片进入"运行中"，
+      完成后显示结果与耗时，期间动画流畅；
+    - 点"触发 Worker 错误"：Promise 被 reject，卡片显示红色错误信息；
+    - 点"超时任务（2 秒不回包）"：500ms 超时后被 terminate 硬杀、
+      Worker 自动重建，后续任务照常执行；
+    - 点"连发 5 个并行任务"：观察乱序回包如何与请求一一配对。
+
+  【注意事项】
+    - Worker 处理函数里的 sleep 用忙等模拟（演示超时杀线程用），真实业务不要这么写。
+    - importScripts() 只在 classic Worker 可用且需外部文件，本例单文件内联不涉及；
+      多文件拆分写法见文档 2.6 节（需本地静态服务器）。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Workers 示例 03 · Promise 化通信封装</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      background: #0f172a;
+      color: #cbd5e1;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      padding: 26px 16px 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    h1 {
+      color: #f1f5f9;
+      font-size: 22px;
+    }
+
+    p.desc {
+      max-width: 680px;
+      font-size: 14px;
+      line-height: 1.8;
+      text-align: center;
+    }
+
+    /* 顶部状态条 + 旋转探测环 */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #111c33;
+      border: 1px solid #24344d;
+      border-radius: 999px;
+      padding: 8px 18px 8px 10px;
+      font-size: 13px;
+    }
+
+    .ring {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 3px solid #1e3a5f;
+      border-top-color: #38bdf8;
+      animation: spin 1s linear infinite;
+      /* 主线程阻塞时会停转 */
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .panel {
+      width: 100%;
+      max-width: 780px;
+      background: #111c33;
+      border: 1px solid #24344d;
+      border-radius: 14px;
+      padding: 16px 18px;
+    }
+
+    .panel h2 {
+      color: #7dd3fc;
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+
+    .panel p.tip {
+      font-size: 12.5px;
+      color: #94a3b8;
+      line-height: 1.7;
+      margin-bottom: 10px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    button.ghost {
+      background: #1e293b;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+    }
+
+    button.danger {
+      background: #b91c1c;
+    }
+
+    button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    /* 任务卡片列表 */
+    .tasks {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .task {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      background: #0b1322;
+      border: 1px solid #334155;
+      border-left: 4px solid #64748b;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+
+    .task.running {
+      border-left-color: #38bdf8;
+    }
+
+    .task.ok {
+      border-left-color: #22c55e;
+    }
+
+    .task.err {
+      border-left-color: #ef4444;
+    }
+
+    .task .name {
+      flex: 1;
+    }
+
+    .task .meta {
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      color: #94a3b8;
+      text-align: right;
+    }
+
+    .task.ok .meta {
+      color: #4ade80;
+    }
+
+    .task.err .meta {
+      color: #f87171;
+    }
+
+    #toast {
+      position: fixed;
+      left: 50%;
+      bottom: 34px;
+      transform: translateX(-50%) translateY(20px);
+      background: #0ea5e9;
+      color: #04283a;
+      font-size: 13.5px;
+      padding: 10px 18px;
+      border-radius: 10px;
+      opacity: 0;
+      pointer-events: none;
+      transition: all .25s;
+      z-index: 99;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Web Workers 示例 03 · Promise 化通信封装</h1>
+  <p class="desc">
+    原生 Worker 是"事件回调"风格，业务里难以 await、难以配对请求与响应。本例封装了一个
+    <b>createPromiseWorker</b>：invoke() 直接返回 Promise，支持错误 reject、超时硬杀与并行任务配对。
+  </p>
+
+  <div class="topbar">
+    <div class="ring"></div>
+    <span>旋转探测环：所有任务执行期间它应持续旋转（计算在后台线程）</span>
+  </div>
+
+  <div class="panel">
+    <h2>任务控制台</h2>
+    <p class="tip">每个按钮 = 一次 pw.invoke(...) 调用。任务卡片实时展示运行中/成功/失败三种状态。</p>
+    <div class="row">
+      <button id="b-sort">排序 20 万随机数</button>
+      <button id="b-prime">统计 200 万内素数</button>
+      <button id="b-parallel" class="ghost">连发 5 个并行任务</button>
+      <button id="b-err" class="danger">触发 Worker 错误</button>
+      <button id="b-timeout" class="danger">超时任务（会被硬杀）</button>
+    </div>
+    <div class="tasks" id="tasks">
+      <div class="task"><span class="name">（还没有任务，点击上方按钮发起）</span></div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    /* ================================================================
+     * 0. 通用工具
+     * ================================================================ */
+    var toastEl = document.getElementById('toast'), toastTimer;
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2200);
+    }
+
+    /* ================================================================
+     * 1. Worker 代码（内联字符串）：实现 4 种任务 + 统一回包协议
+     * 回包协议统一为 {id, ok, data}：
+     *   ok=true  → 主线程 resolve(data)
+     *   ok=false → 主线程 reject(data)
+     * ================================================================ */
+    var workerCode = [
+      '// 根据消息 type 分发任务（Worker 保持无状态，一切输入来自 payload）',
+      'self.onmessage = function (e) {',
+      '  var id = e.data.id, p = e.data.payload;',
+      '  try {',
+      '    var result;',
+      '    if (p.type === "sort") {                      // 任务：数值排序',
+      '      var t0 = performance.now();',
+      '      result = { arr: p.data.slice().sort(function (a, b) { return a - b; }),',
+      '                 cost: performance.now() - t0 };',
+      '    } else if (p.type === "primes") {             // 任务：埃氏筛统计素数',
+      '      var n = p.n, sieve = new Uint8Array(n + 1), count = 0, t1 = performance.now();',
+      '      for (var i = 2; i <= n; i++) {',
+      '        if (!sieve[i]) {',
+      '          count++;',
+      '          for (var j = i * i; j <= n; j += i) sieve[j] = 1; // 标记合数',
+      '        }',
+      '      }',
+      '      result = { count: count, cost: performance.now() - t1 };',
+      '    } else if (p.type === "echo") {               // 任务：回声，用于并行配对演示',
+      '      result = { seq: p.seq, square: p.num * p.num };',
+      '    } else if (p.type === "boom") {               // 故意抛错 → reject 路径',
+      '      throw new Error("Worker 内部任务失败（模拟）");',
+      '    } else if (p.type === "slow") {               // 忙等 2 秒 → 触发超时硬杀',
+      '      var end = Date.now() + 2000;',
+      '      while (Date.now() < end) { /* 忙等，模拟长任务 */ }',
+      '      result = { done: true };',
+      '    } else {',
+      '      throw new Error("未知任务类型：" + p.type);',
+      '    }',
+      '    self.postMessage({ id: id, ok: true, data: result });',
+      '  } catch (err) {',
+      '    // Worker 内 try/catch 把业务错误按协议回传（比只靠 onerror 带更多信息）',
+      '    self.postMessage({ id: id, ok: false, data: String(err.message) });',
+      '  }',
+      '};'
+    ].join('\n');
+
+    /* ================================================================
+     * 2. Promise 化封装 createPromiseWorker
+     * 核心：用自增 id 把 postMessage 请求与 onmessage 响应配对，
+     *      把事件回调世界转换成 Promise 世界。
+     * ================================================================ */
+    var pw = null;                              // 全局唯一的 Promise 化 Worker 实例
+    function createPromiseWorker() {
+      var url = URL.createObjectURL(new Blob([workerCode], { type: 'text/javascript' }));
+      var w = new Worker(url);
+      var pending = new Map();                  // id → {resolve, reject}，等待回包的请求表
+
+      w.onmessage = function (e) {
+        var job = pending.get(e.data.id);       // 按回包里的 id 找到对应请求
+        if (!job) return;                       // 已超时任务的迟到回包：直接丢弃
+        pending.delete(e.data.id);
+        if (e.data.ok) job.resolve(e.data.data);
+        else job.reject(new Error(e.data.data));
+      };
+      w.onerror = function (e) {
+        // 没被 Worker 内 try/catch 接住的异常走这里：reject 所有 pending（避免永远挂起）
+        pending.forEach(function (job) { job.reject(new Error('Worker 异常：' + e.message)); });
+        pending.clear();
+      };
+
+      return {
+        invoke: function (payload) {            // 发请求，返回 Promise
+          return new Promise(function (resolve, reject) {
+            var id = Math.random().toString(36).slice(2);
+            pending.set(id, { resolve: resolve, reject: reject });
+            w.postMessage({ id: id, payload: payload });
+          });
+        },
+        kill: function () {                     // 硬杀当前 Worker（超时保护用）
+          w.terminate();
+          pending.forEach(function (job) { job.reject(new Error('任务超时，Worker 已被 terminate')); });
+          pending.clear();
+        }
+      };
+    }
+    function rebuildWorker() {                  // 杀旧建新，保证后续任务可用
+      if (pw) pw.kill();
+      pw = createPromiseWorker();
+    }
+    rebuildWorker();
+
+    /* ================================================================
+     * 3. 任务卡片 UI
+     * ================================================================ */
+    var tasksEl = document.getElementById('tasks');
+    function addTask(name) {
+      if (tasksEl.firstElementChild && tasksEl.firstElementChild.querySelector('.name').textContent.indexOf('还没有') > -1) {
+        tasksEl.innerHTML = '';                 // 移除占位行
+      }
+      var div = document.createElement('div');
+      div.className = 'task running';
+      div.innerHTML = '<span class="name"></span><span class="meta">运行中…</span>';
+      div.querySelector('.name').textContent = name;
+      tasksEl.insertBefore(div, tasksEl.firstChild);
+      return div;                               // 返回卡片引用，完成后更新状态
+    }
+    function doneTask(el, text, ok) {
+      el.className = 'task ' + (ok ? 'ok' : 'err');
+      el.querySelector('.meta').textContent = text;
+    }
+
+    // 通用执行器：invoke + 超时 race + 卡片状态更新
+    function run(name, payload, timeoutMs) {
+      var el = addTask(name);
+      var t0 = performance.now();
+      var job = pw.invoke(payload);
+      // 超时保护：Promise.race —— 超时就 kill 并 reject，避免 Promise 永远 pending
+      var timer = timeoutMs ? setTimeout(function () {
+        pw.kill();
+        rebuildWorker();                        // 立刻重建，后续任务不受影响
+        doneTask(el, '超时被硬杀，Worker 已重建', false);
+        toast('任务超时，Worker 已重建');
+      }, timeoutMs) : null;
+
+      job.then(function (data) {
+        if (timer) clearTimeout(timer);
+        var total = (performance.now() - t0).toFixed(0);
+        var brief;
+        if (data.arr) brief = '已排序，前5=' + data.arr.slice(0, 5).map(Math.round).join(',') + '，计算 ' + data.cost.toFixed(0) + 'ms';
+        else if (data.count) brief = '素数共 ' + data.count + ' 个，计算 ' + data.cost.toFixed(0) + 'ms';
+        else if (data.square !== undefined) brief = data.num + '² = ' + data.square;
+        else brief = JSON.stringify(data);
+        doneTask(el, brief + '（往返共 ' + total + 'ms）', true);
+      }).catch(function (err) {
+        if (timer) clearTimeout(timer);
+        doneTask(el, '失败：' + err.message, false);
+      });
+    }
+
+    /* ================================================================
+     * 4. 按钮绑定
+     * ================================================================ */
+    document.getElementById('b-sort').onclick = function () {
+      // 生成 20 万个随机数（生成很快，排序才慢——排序进 Worker）
+      var data = new Array(200000);
+      for (var i = 0; i < data.length; i++) data[i] = Math.random() * 1e6;
+      run('排序 20 万随机数', { type: 'sort', data: data });
+    };
+
+    document.getElementById('b-prime').onclick = function () {
+      run('统计 200 万内素数（埃氏筛）', { type: 'primes', n: 2000000 });
+    };
+
+    document.getElementById('b-parallel').onclick = function () {
+      // 连发 5 个：回包顺序与发送顺序无关，靠 id 配对——这正是封装的价值
+      for (var k = 1; k <= 5; k++) {
+        run('并行回声任务 #' + k, { type: 'echo', seq: k, num: k * k });
+      }
+    };
+
+    document.getElementById('b-err').onclick = function () {
+      run('触发 Worker 错误', { type: 'boom' });
+    };
+
+    document.getElementById('b-timeout').onclick = function () {
+      run('超时任务（Worker 忙等 2 秒）', { type: 'slow' }, 500); // 500ms 超时 → 硬杀重建
+    };
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 01：拖放事件流全记录 + dataTransfer 数据传递 + 自定义拖拽影像
+  ------------------------------------------------------------
+  【知识点】
+    1. draggable="true"：让元素可拖（div/span 默认不可拖）
+    2. 事件流：源端 dragstart → drag → dragend；
+       目标端 dragenter → dragover → (drop) → dragleave
+    3. 第一铁律：dragover 必须 preventDefault()，否则 drop 永远不触发
+    4. 第二铁律：drop 里也要 preventDefault()，阻止浏览器默认行为
+    5. dataTransfer：setData/dragstart 写入、getData/drop 读取、
+       types 只读类型列表、effectAllowed 与 dropEffect 取交集
+    6. setDragImage：用离屏 canvas 自定义拖拽影像
+
+  【运行方式】
+    双击本文件直接打开，用鼠标把"任务卡片"拖向下方三个投放区。
+
+  【效果说明】
+    - 日志面板按时间顺序打印每个事件（drag/dragover 高频事件做了节流采样）；
+    - A 区（允许投放）：drop 成功，展示读回的数据与 effect 交集；
+    - B 区（未放行对照）：没有 preventDefault，松手直接回弹，drop 不触发；
+    - C 区（copy 模式）：卡片被复制一份到区内；
+    - 勾选"自定义拖拽影像"后拖动，跟随指针的是蓝色 canvas 徽章而非原卡片快照。
+
+  【注意事项】
+    - 拖拽过程不会触发 click；拖出窗口松手只有 dragend（没有 drop）。
+    - 提示信息全部用日志面板/页面内元素展示，不使用 alert/prompt。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拖放 API 示例 01 · 事件流与 dataTransfer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: #0f172a;
+      color: #cbd5e1;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      padding: 26px 16px 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    h1 { color: #f1f5f9; font-size: 22px; }
+    p.desc { max-width: 700px; font-size: 14px; line-height: 1.8; text-align: center; }
+
+    /* 可拖卡片 */
+    .card {
+      width: 240px;
+      padding: 14px 16px;
+      background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+      color: #fff;
+      border-radius: 12px;
+      cursor: grab;                       /* grab 光标暗示可拖 */
+      user-select: none;                  /* 防止拖动时选中文本干扰 */
+      box-shadow: 0 8px 20px rgba(37, 99, 235, .35);
+    }
+    .card:active { cursor: grabbing; }
+    .card.dragging { opacity: .35; }      /* 拖动中半透明：视觉反馈"原件还在原地" */
+    .card b { display: block; font-size: 14px; margin-bottom: 2px; }
+    .card span { font-size: 12px; opacity: .85; }
+
+    /* 投放区三兄弟 */
+    .zones { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+    .zone {
+      width: 250px;
+      min-height: 150px;
+      border: 2px dashed #334155;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 13px;
+      color: #64748b;
+      transition: all .15s;
+    }
+    .zone h3 { font-size: 14px; margin-bottom: 6px; }
+    .zone p { font-size: 12px; line-height: 1.6; }
+    .zone.over {                          /* dragover 高亮：明确"可以放这里" */
+      border-color: #38bdf8;
+      background: rgba(56, 189, 248, .08);
+      color: #7dd3fc;
+    }
+    .zone .dropped {
+      margin-top: 8px;
+      background: rgba(34, 197, 94, .15);
+      border: 1px solid #166534;
+      color: #86efac;
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 12px;
+      word-break: break-all;
+    }
+
+    /* 日志面板 */
+    .panel { width: 100%; max-width: 800px; background: #111c33; border: 1px solid #24344d; border-radius: 14px; padding: 14px 18px; }
+    .panel h2 { color: #7dd3fc; font-size: 15px; margin-bottom: 8px; }
+    .check { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 8px; }
+    .log {
+      background: #0b1322;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.8;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 230px;
+      overflow: auto;
+    }
+    .log .ev-src { color: #fbbf24; }      /* 源端事件 */
+    .log .ev-dst { color: #38bdf8; }      /* 目标端事件 */
+    .log .ev-ok { color: #4ade80; }       /* 成功 */
+    .log .ev-warn { color: #f87171; }     /* 警示 */
+  </style>
+</head>
+
+<body>
+  <h1>拖放 API 示例 01 · 事件流与 dataTransfer</h1>
+  <p class="desc">
+    把下面的卡片拖到三个投放区对比：<b>A 区已 preventDefault 放行</b>（能接住）、
+    <b>B 区故意没放行</b>（松手回弹，drop 不触发）、<b>C 区 copy 模式</b>（复制一份）。
+    日志面板会实时记录完整事件流。
+  </p>
+
+  <div class="card" id="card" draggable="true" data-id="task-42">
+    <b>任务 #42 · 修复登录页样式</b>
+    <span>拖我试试：观察下方事件流日志（drag/dragover 已节流）</span>
+  </div>
+
+  <div class="zones">
+    <div class="zone" id="zone-a">
+      <h3>A 区 · 允许投放（move）</h3>
+      <p>dragover 已 preventDefault → drop 可以触发</p>
+    </div>
+    <div class="zone" id="zone-b">
+      <h3>B 区 · 对照组（未放行）</h3>
+      <p>故意不 preventDefault → 松手回弹，观察日志没有 drop</p>
+    </div>
+    <div class="zone" id="zone-c">
+      <h3>C 区 · 允许投放（copy）</h3>
+      <p>dropEffect=copy → 复制卡片进区，不清原件</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>事件流日志</h2>
+    <div class="check">
+      <input type="checkbox" id="custom-img" checked>
+      <label for="custom-img" style="cursor:pointer">自定义拖拽影像（离屏 canvas 徽章）</label>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <script>
+    /* ================================================================
+     * 0. 日志工具（drag/dragover 高频，用节流避免刷屏）
+     * ================================================================ */
+    var logEl = document.getElementById('log');
+    var lastTime = {};
+
+    function log(text, cls) {
+      var t = new Date().toLocaleTimeString();
+      var div = document.createElement('div');
+      div.className = cls || '';
+      div.textContent = '[' + t + '] ' + text;
+      logEl.insertBefore(div, logEl.firstChild);          // 新日志在顶部
+    }
+
+    // 高频事件节流：同类型事件 300ms 内只记录一条（并注明采样）
+    function logThrottled(text, cls) {
+      var now = Date.now();
+      if (lastTime[text] && now - lastTime[text] < 300) return;
+      lastTime[text] = now;
+      log(text + '（节流采样）', cls);
+    }
+
+    /* ================================================================
+     * 1. 源端：dragstart 写数据 + 可选自定义影像
+     * ================================================================ */
+    var card = document.getElementById('card');
+    var cardCount = 0;
+
+    card.addEventListener('dragstart', function (e) {
+      var dt = e.dataTransfer;
+
+      // 数据只在 dragstart 阶段可写：装进"信封"，drop 阶段才能拆
+      dt.setData('text/plain', card.dataset.id);                       // 通用类型：任何投放端都能读
+      dt.setData('application/x-task', JSON.stringify({                // 自定义类型：规范命名（小写+连字符）
+        id: card.dataset.id,
+        title: '修复登录页样式'
+      }));
+
+      // effectAllowed：源端声明允许的效果；最终效果与目标 dropEffect 取交集
+      dt.effectAllowed = 'copyMove';
+
+      // 自定义影像：用离屏 canvas 画一个徽章（比默认半透明快照更清晰）
+      if (document.getElementById('custom-img').checked) {
+        var c = document.createElement('canvas');
+        c.width = 180; c.height = 44;
+        var ctx = c.getContext('2d');
+        ctx.fillStyle = '#2563eb';
+        // roundRect 较新，兜底用普通矩形；不影响演示核心
+        if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(0, 0, 180, 44, 10); ctx.fill(); }
+        else { ctx.fillRect(0, 0, 180, 44); }
+        ctx.fillStyle = '#fff';
+        ctx.font = '14px sans-serif';
+        ctx.fillText('拖拽中：任务 #42', 14, 28);
+        dt.setDragImage(c, 90, 22);        // 第二三参数：影像锚点相对指针的偏移
+      }
+
+      card.classList.add('dragging');      // 半透明表示"原件"
+      log('dragstart：已写入 text/plain 与 application/x-task，effectAllowed=copyMove', 'ev-src');
+    });
+
+    // dragend：无论成功失败都触发（拖出窗口松手也只有它），清理状态必须在这里做
+    card.addEventListener('dragend', function () {
+      card.classList.remove('dragging');
+      log('dragend：拖拽结束，已清理 dragging 状态', 'ev-src');
+    });
+
+    // drag：拖动全程高频触发（相当于 mousemove），别做重活
+    card.addEventListener('drag', function () {
+      logThrottled('drag：拖动中…', 'ev-src');
+    });
+
+    /* ================================================================
+     * 2. 目标端：A 区（允许 move）—— 完整标准写法
+     * ================================================================ */
+    var zoneA = document.getElementById('zone-a');
+
+    zoneA.addEventListener('dragenter', function () {
+      log('dragenter：进入 A 区', 'ev-dst');
+    });
+    zoneA.addEventListener('dragover', function (e) {
+      e.preventDefault();                              // ★ 第一铁律：不放行就没有 drop
+      e.dataTransfer.dropEffect = 'move';              // 目标声明 move（与源 copyMove 交集=move）
+      zoneA.classList.add('over');                     // 高亮用 dragover 维护（比 dragleave 计数更稳）
+    });
+    zoneA.addEventListener('dragleave', function () {
+      zoneA.classList.remove('over');
+      log('dragleave：离开 A 区', 'ev-dst');
+    });
+    zoneA.addEventListener('drop', function (e) {
+      e.preventDefault();                              // ★ 第二铁律：阻止浏览器默认行为
+      zoneA.classList.remove('over');
+      // 自定义类型优先，读不到（个别浏览器对自定义类型保守）再回退 text/plain
+      var raw = e.dataTransfer.getData('application/x-task') || e.dataTransfer.getData('text/plain');
+      var info;
+      try { var obj = JSON.parse(raw); info = obj.title + '（id=' + obj.id + '）'; }
+      catch (x) { info = raw; }
+      var tag = document.createElement('div');
+      tag.className = 'dropped';
+      tag.textContent = '已接住：' + info + '，最终 dropEffect=' + e.dataTransfer.dropEffect;
+      zoneA.appendChild(tag);
+      log('drop：A 区收到数据 → ' + info, 'ev-ok');
+    });
+
+    /* ================================================================
+     * 3. 目标端：B 区（对照组：没有 preventDefault）
+     * ================================================================ */
+    var zoneB = document.getElementById('zone-b');
+    zoneB.addEventListener('dragenter', function () {
+      log('dragenter：进入 B 区（注意：本区没有 preventDefault）', 'ev-dst');
+    });
+    zoneB.addEventListener('dragover', function (e) {
+      // 故意【不】调用 e.preventDefault() —— 浏览器视为"禁止投放"
+      logThrottled('dragover：B 区悬停中（未放行）', 'ev-warn');
+    });
+    zoneB.addEventListener('drop', function (e) {
+      // 正常情况下永远走不到这里：未放行时浏览器不会派发 drop
+      log('drop：B 区竟然收到了？（浏览器未按预期拦截）', 'ev-warn');
+    });
+
+    /* ================================================================
+     * 4. 目标端：C 区（copy 模式，复制一份卡片）
+     * ================================================================ */
+    var zoneC = document.getElementById('zone-c');
+    zoneC.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';              // 目标选择 copy
+      zoneC.classList.add('over');
+    });
+    zoneC.addEventListener('dragleave', function () {
+      zoneC.classList.remove('over');
+    });
+    zoneC.addEventListener('drop', function (e) {
+      e.preventDefault();
+      zoneC.classList.remove('over');
+      // 复制一份新卡片放进 C 区（副本不可再拖，保持演示简单）
+      var clone = card.cloneNode(true);
+      clone.classList.remove('dragging');
+      clone.removeAttribute('draggable');              // 副本不再可拖
+      clone.style.cursor = 'default';
+      zoneC.appendChild(clone);
+      log('drop：C 区以 copy 模式复制了一份卡片，dropEffect=' + e.dataTransfer.dropEffect, 'ev-ok');
+    });
+
+    log('准备就绪：把上方卡片分别拖向 A / B / C 区，观察日志差异', 'ev-ok');
+  </script>
+</body>
+
+</html>

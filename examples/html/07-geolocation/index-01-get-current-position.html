@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 01：getCurrentPosition 单次定位（真实 + Mock 双路径）
+  ------------------------------------------------------------
+  【知识点】
+    1. getCurrentPosition(success, error, options) 单次定位全流程
+    2. Position 对象：latitude / longitude / accuracy / timestamp 的含义
+    3. https / localhost 限制：非安全上下文下 navigator.geolocation 不存在，
+       必须先特性检测（'geolocation' in navigator）
+    4. Mock 模式：不依赖真实权限，用模拟数据走通全部 UI 流程——
+       开发期/演示期/无权限环境的完整替代路径
+    5. 精度 accuracy 的可视化：误差圆半径直接画在坐标图上
+    6. WGS84 与国内 GCJ-02 偏移：把坐标丢给国内地图前必须转换
+
+  【运行方式】
+    双击本文件可打开并使用【Mock 模式】（推荐，无需任何权限）。
+    【真实定位】需要 https 或 localhost：请在项目根目录执行
+      npx serve . 或 python3 -m http.server
+      再通过 http://localhost:8000/... 访问本文件，并在浏览器弹窗中允许定位。
+    file:// 下真实定位行为因浏览器而异（常被拒绝授权），请勿依赖。
+
+  【效果说明】
+    - 打开 Mock 开关 → 点"开始定位"：600ms 模拟延迟后返回杭州西湖附近的
+      模拟坐标，结果面板 + SVG 坐标图（含误差圆）完整渲染；
+    - 关闭 Mock → 点"开始定位"：走真实授权流程（需 localhost/https）；
+    - "生成地图链接"按钮：演示与地图服务配合的思路——拼出高德 URI 并展示
+      （不实际跳转，保持零网络依赖），同时提示 WGS84→GCJ-02 转换的必要性。
+
+  【注意事项】
+    - 本页不使用 alert/prompt，所有状态与错误均用面板展示。
+    - Mock 坐标每次带随机抖动与精度（20~90m），观察误差圆变化即可理解 accuracy。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>地理定位 示例 01 · 单次定位（真实 + Mock 双路径）</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: #0f172a;
+      color: #cbd5e1;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      padding: 26px 16px 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    h1 { color: #f1f5f9; font-size: 22px; }
+    p.desc { max-width: 700px; font-size: 14px; line-height: 1.8; text-align: center; }
+
+    /* 环境检测横幅：展示协议 / 安全上下文 / API 可用性 */
+    .env-bar {
+      width: 100%;
+      max-width: 720px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 12.5px;
+      line-height: 1.8;
+      font-family: Consolas, monospace;
+    }
+    .env-bar .bad { color: #f87171; }
+    .env-bar .good { color: #4ade80; }
+
+    .layout { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 820px; }
+
+    .panel {
+      background: #111c33;
+      border: 1px solid #24344d;
+      border-radius: 14px;
+      padding: 16px 18px;
+    }
+    .panel.left { flex: 1; min-width: 300px; }
+    .panel.right { flex: 1; min-width: 320px; text-align: center; }
+    .panel h2 { color: #7dd3fc; font-size: 15px; margin-bottom: 8px; }
+    .panel p.tip { font-size: 12.5px; color: #94a3b8; line-height: 1.7; margin-bottom: 10px; text-align: left; }
+
+    /* Mock 开关：一个简单的拨动开关 */
+    .switch-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 14px; }
+    .switch {
+      position: relative;
+      width: 46px;
+      height: 24px;
+      background: #334155;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background .2s;
+      flex-shrink: 0;
+    }
+    .switch::after {          /* 圆形滑块 */
+      content: '';
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: #94a3b8;
+      transition: all .2s;
+    }
+    .switch.on { background: #0284c7; }
+    .switch.on::after { left: 25px; background: #fff; }
+
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 16px;
+      font-size: 13.5px;
+      cursor: pointer;
+    }
+    button:hover { background: #1d4ed8; }
+    button.ghost { background: #1e293b; color: #cbd5e1; border: 1px solid #334155; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+
+    /* 状态行 */
+    .status {
+      font-size: 13px;
+      background: #0b1322;
+      border-left: 3px solid #38bdf8;
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin: 10px 0;
+      line-height: 1.7;
+    }
+    .status.err { border-left-color: #ef4444; color: #fca5a5; }
+    .status.ok { border-left-color: #22c55e; color: #86efac; }
+
+    /* 结果字段表 */
+    .fields { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; text-align: left; font-family: Consolas, monospace; }
+    .fields .k { color: #94a3b8; }
+    .fields .v { color: #e2e8f0; word-break: break-all; }
+
+    /* SVG 坐标图容器 */
+    svg.map { background: #0b1322; border: 1px solid #334155; border-radius: 10px; }
+
+    .out {
+      margin-top: 10px;
+      background: #0b1322;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-family: Consolas, monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+      line-height: 1.7;
+      text-align: left;
+      color: #9fb4d0;
+    }
+
+    #toast {
+      position: fixed; left: 50%; bottom: 34px;
+      transform: translateX(-50%) translateY(20px);
+      background: #0ea5e9; color: #04283a;
+      font-size: 13.5px; padding: 10px 18px; border-radius: 10px;
+      opacity: 0; pointer-events: none; transition: all .25s; z-index: 99;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+
+<body>
+  <h1>地理定位 示例 01 · 单次定位（真实 + Mock）</h1>
+  <p class="desc">
+    真实定位只在 <b>https 或 localhost</b> 下可用（浏览器强制安全上下文）；本地双击 file:// 打开时请使用
+    <b>Mock 模式</b>——它用模拟数据走通与真实定位完全一致的 UI 流程，两条路径共用同一套渲染函数。
+  </p>
+
+  <!-- 环境检测：定位开发/演示能否走真实路径 -->
+  <div class="env-bar" id="env"></div>
+
+  <div class="layout">
+    <!-- ============ 左：控制与结果 ============ -->
+    <div class="panel left">
+      <h2>控制台</h2>
+      <p class="tip">Mock 开关打开时不会请求任何权限，直接返回模拟坐标（带随机抖动与精度）。</p>
+      <div class="switch-row">
+        <div class="switch" id="mock-switch"></div>
+        <span>Mock 模式（无需权限）</span>
+      </div>
+      <button id="btn-locate">开始定位</button>
+      <button id="btn-map" class="ghost">生成地图链接（思路演示）</button>
+      <div class="status" id="status">状态：等待定位。建议先开 Mock 体验完整流程。</div>
+      <div class="fields" id="fields" style="display:none">
+        <span class="k">纬度 lat</span><span class="v" id="f-lat">-</span>
+        <span class="k">经度 lng</span><span class="v" id="f-lng">-</span>
+        <span class="k">精度 accuracy</span><span class="v" id="f-acc">-</span>
+        <span class="k">时间戳</span><span class="v" id="f-ts">-</span>
+        <span class="k">定位耗时</span><span class="v" id="f-cost">-</span>
+        <span class="k">数据来源</span><span class="v" id="f-src">-</span>
+      </div>
+    </div>
+
+    <!-- ============ 右：SVG 坐标图 ============ -->
+    <div class="panel right">
+      <h2>坐标图（内联 SVG 自绘，无地图 SDK）</h2>
+      <!-- 网格 + 中心点 + 误差圆：accuracy 半径按比例可视化 -->
+      <svg class="map" id="map" width="300" height="300" viewBox="0 0 300 300">
+        <!-- 背景网格：每格代表 50 米（按 1px=1m 的局部比例） -->
+        <g stroke="#1e3a5f" stroke-width="1">
+          <line x1="0" y1="60" x2="300" y2="60"/><line x1="0" y1="120" x2="300" y2="120"/>
+          <line x1="0" y1="180" x2="300" y2="180"/><line x1="0" y1="240" x2="300" y2="240"/>
+          <line x1="60" y1="0" x2="60" y2="300"/><line x1="120" y1="0" x2="120" y2="300"/>
+          <line x1="180" y1="0" x2="180" y2="300"/><line x1="240" y1="0" x2="240" y2="300"/>
+        </g>
+        <!-- 十字准星 -->
+        <g stroke="#334155" stroke-width="1.5" stroke-dasharray="4 4">
+          <line x1="150" y1="0" x2="150" y2="300"/>
+          <line x1="0" y1="150" x2="300" y2="150"/>
+        </g>
+        <!-- 指北针 -->
+        <g transform="translate(272, 28)">
+          <polygon points="0,-12 5,6 0,2 -5,6" fill="#64748b"/>
+          <text x="0" y="20" text-anchor="middle" font-size="9" fill="#64748b">N</text>
+        </g>
+        <!-- 误差圆（accuracy 可视化）：半径由 JS 动态设置 -->
+        <circle id="acc-circle" cx="150" cy="150" r="0" fill="rgba(56,189,248,.15)" stroke="#38bdf8" stroke-dasharray="5 4"/>
+        <!-- 定位点：样式固定，位置固定在中心（单次定位场景） -->
+        <g id="pos-dot" style="display:none">
+          <circle cx="150" cy="150" r="7" fill="#ef4444" stroke="#fff" stroke-width="2"/>
+        </g>
+        <!-- 比例尺说明 -->
+        <text x="10" y="292" font-size="10" fill="#64748b">1 格 ≈ 50m（示意比例）</text>
+      </svg>
+      <div class="out" id="map-out">（误差圆半径 = accuracy 米数，超界则封顶显示）</div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    /* ================================================================
+     * 0. 通用工具
+     * ================================================================ */
+    var toastEl = document.getElementById('toast'), toastTimer;
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2200);
+    }
+    var statusEl = document.getElementById('status');
+    function setStatus(text, cls) {
+      statusEl.textContent = '状态：' + text;
+      statusEl.className = 'status' + (cls ? ' ' + cls : '');
+    }
+
+    /* ================================================================
+     * 1. 环境检测：https/localhost 限制说明
+     * ================================================================ */
+    (function detectEnv() {
+      var secure = window.isSecureContext;                 // 浏览器给出的安全上下文判定
+      var hasApi = 'geolocation' in navigator;             // API 是否存在（http 下为 false）
+      var el = document.getElementById('env');
+      var lines = [
+        '协议: ' + location.protocol + '   isSecureContext: ' + secure + '   geolocation API: ' + (hasApi ? '存在' : '不存在')
+      ];
+      if (secure && hasApi) {
+        lines.push('当前环境可发起真实定位（仍需用户授权）');
+        el.innerHTML = lines.join('\n');
+      } else if (hasApi) {
+        lines.push('<span class="warn">协议可疑：真实定位可能被拒绝授权，建议使用 Mock 模式</span>');
+        el.innerHTML = lines.join('\n').replace('warn', 'bad');
+      } else {
+        lines.push('<span class="bad">非安全上下文（http）：Geolocation API 已被浏览器移除，请用 localhost 服务器或 Mock 模式</span>');
+        el.innerHTML = lines.join('\n');
+      }
+    })();
+
+    /* ================================================================
+     * 2. Mock 开关
+     * ================================================================ */
+    var mockOn = true;                                     // 默认开启：保证双击 file:// 就能玩
+    var switchEl = document.getElementById('mock-switch');
+    switchEl.onclick = function () {
+      mockOn = !mockOn;
+      this.classList.toggle('on', mockOn);
+      toast(mockOn ? '已切换到 Mock 模式（无需权限）' : '已切换到真实定位（需 https/localhost 与授权）');
+    };
+    switchEl.classList.add('on');
+
+    /* ================================================================
+     * 3. 定位主逻辑：真实与 Mock 双路径，共用 onOk/onErr 渲染
+     * ================================================================ */
+    var locating = false;
+
+    document.getElementById('btn-locate').onclick = function () {
+      if (locating) return;
+      locating = true;
+      this.disabled = true;
+      setStatus('定位中…', '');
+      var t0 = performance.now();
+
+      // 统一的成功/错误回调：两条路径最终都走这两个函数
+      var onOk = function (pos, source) { renderPosition(pos, performance.now() - t0, source); locating = false; btn.disabled = false; };
+      var onErr = function (err, source) { renderError(err, source); locating = false; btn.disabled = false; };
+      var btn = this;
+
+      // —— 路径 A：Mock ——
+      if (mockOn) {
+        // 模拟 600ms 网络与卫星延迟，然后随机生成杭州西湖附近坐标
+        setTimeout(function () {
+          // 基准点：西湖（lat 30.2489, lng 120.1443），抖动 ±0.003 度（约 ±300m）
+          var lat = 30.2489 + (Math.random() - 0.5) * 0.006;
+          var lng = 120.1443 + (Math.random() - 0.5) * 0.006;
+          var accuracy = 20 + Math.random() * 70;          // 20~90 米随机精度
+          onOk({ coords: { latitude: lat, longitude: lng, accuracy: accuracy }, timestamp: Date.now() }, 'Mock');
+        }, 600);
+        return;
+      }
+
+      // —— 路径 B：真实定位 ——
+      // 特性检测：非安全上下文（http）下 navigator.geolocation 根本不存在
+      if (!('geolocation' in navigator)) {
+        onErr({ code: 2, message: '当前环境不支持 Geolocation（需 https/localhost），请开启 Mock 模式' }, '真实');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        function (pos) { onOk(pos, '真实 API'); },
+        function (err) { onErr(err, '真实 API'); },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }  // 三个参数都要给全
+      );
+    };
+
+    /* ================================================================
+     * 4. 渲染：结果面板 + SVG 误差圆
+     * ================================================================ */
+    function renderPosition(pos, costMs, source) {
+      var c = pos.coords;
+      document.getElementById('fields').style.display = 'grid';
+      document.getElementById('f-lat').textContent = c.latitude.toFixed(6) + '°';
+      document.getElementById('f-lng').textContent = c.longitude.toFixed(6) + '°';
+      document.getElementById('f-acc').textContent = '± ' + Math.round(c.accuracy) + ' 米';
+      document.getElementById('f-ts').textContent = new Date(pos.timestamp).toLocaleTimeString();
+      document.getElementById('f-cost').textContent = Math.round(costMs) + ' ms';
+      document.getElementById('f-src').textContent = source;
+
+      // 误差圆：1px ≈ 1m，超过画布半径就封顶（否则大误差时圆飞出画面）
+      var r = Math.min(Math.max(4, c.accuracy), 140);
+      var circle = document.getElementById('acc-circle');
+      circle.setAttribute('r', r);
+      document.getElementById('pos-dot').style.display = '';
+
+      document.getElementById('map-out').textContent =
+        '定位点在误差圆内（68% 置信）。accuracy=' + Math.round(c.accuracy) +
+        'm 表示"真实位置大概率在此半径内"。精度大于 200m 时该结果不宜用于精细场景。';
+
+      setStatus('定位成功（来源：' + source + '），精度 ±' + Math.round(c.accuracy) + ' 米', 'ok');
+      toast('定位成功');
+    }
+
+    function renderError(err, source) {
+      // 真实 err 用 err.code 判断；Mock 的 err 我们手工带 code 字段，逻辑一致
+      var nameMap = { 1: 'PERMISSION_DENIED（权限被拒）', 2: 'POSITION_UNAVAILABLE（位置不可用）', 3: 'TIMEOUT（超时）' };
+      var msg = nameMap[err.code] || ('未知错误 ' + err.code);
+      setStatus('定位失败：' + msg + ' — ' + (err.message || ''), 'err');
+      toast('定位失败：' + msg);
+    }
+
+    /* ================================================================
+     * 5. 与地图服务配合的"思路演示"：拼 URI 而不实际跳转
+     * 注意：API 返回 WGS84，国内地图需要 GCJ-02 偏移转换后才能准确落点，
+     * 这里只在文案中提示，转换逻辑见文档 4.4 节说明。
+     * ================================================================ */
+    document.getElementById('btn-map').onclick = function () {
+      var lat = document.getElementById('f-lat').textContent;
+      var lng = document.getElementById('f-lng').textContent;
+      if (lat === '-') return toast('请先完成一次定位');
+      var url = 'https://uri.amap.com/marker?position=' + lng + ',' + lat;
+      document.getElementById('map-out').textContent =
+        '生成的地图 URI（示意，未跳转以保持零网络依赖）：\n' + url +
+        '\n\n⚠ 注意：上面用的是 WGS84 原始坐标；国内地图（高德/腾讯用 GCJ-02、百度用 BD-09）' +
+        '直接使用会偏移几百米，真实项目应先做坐标系转换。';
+    };
+  </script>
+</body>
+
+</html>

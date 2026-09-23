@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：文件拖放（DataTransfer.files）+ FileReader 图片预览
+  ------------------------------------------------------------
+  【知识点】
+    1. 从桌面拖文件进网页：drop 事件的 e.dataTransfer.files（FileList）
+    2. 判断"拖的是文件"：e.dataTransfer.types 含 'Files' 才处理，
+       避免把页面内拖拽的文本误当文件
+    3. FileReader.readAsDataURL：把文件读成 data URL，img.src 直接可显示
+    4. 全窗口 dragover/drop preventDefault：防止文件被拖到区域外时
+       浏览器直接打开/下载它（默认行为很恼人）
+    5. 文件元信息：file.name / file.type / file.size 的展示与格式化
+    6. dropzone 高亮：dragenter/dragover 加类，drop/dragleave 摘类
+
+  【运行方式】
+    双击本文件直接打开，然后从桌面/文件夹拖图片文件到页面中央的投放区。
+
+  【效果说明】
+    - 拖图片文件进投放区：立即生成缩略图卡片（名称/类型/大小/读入耗时）；
+    - 拖非图片文件（如 .txt/.pdf）：显示占位图标与"不支持预览"提示；
+    - 一次拖入多个文件会逐个生成卡片；
+    - 把页面里的"文本卡片"拖进投放区：日志提示"不是文件，已忽略"；
+    - 点"清空"移除全部卡片。
+
+  【注意事项】
+    - file:// 双击打开时 FileReader 完全可用（无跨域问题）。
+    - 大文件 readAsDataURL 会占用内存（data URL 体积约为原文件 1.37 倍），
+      真实上传组件应使用 URL.createObjectURL 或直接上传，本例求简单直观。
+    - 提示信息全部用页面内 toast/日志展示，不使用 alert/prompt。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拖放 API 示例 03 · 文件拖放与图片预览</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: #0f172a;
+      color: #cbd5e1;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      padding: 26px 16px 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    h1 { color: #f1f5f9; font-size: 22px; }
+    p.desc { max-width: 700px; font-size: 14px; line-height: 1.8; text-align: center; }
+
+    /* 页面内可拖的"文本卡片"：用来对比 types 判断 */
+    .text-card {
+      padding: 10px 18px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      font-size: 13px;
+      cursor: grab;
+      user-select: none;
+    }
+
+    /* 投放区 */
+    .dropzone {
+      width: 100%;
+      max-width: 720px;
+      min-height: 170px;
+      border: 3px dashed #334155;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: #64748b;
+      font-size: 14px;
+      transition: all .15s;
+      text-align: center;
+      padding: 20px;
+    }
+    .dropzone .icon { font-size: 40px; }
+    .dropzone.over {                       /* 拖文件悬停时的醒目状态 */
+      border-color: #38bdf8;
+      background: rgba(56, 189, 248, .08);
+      color: #7dd3fc;
+      transform: scale(1.01);
+    }
+
+    /* 文件卡片网格 */
+    .grid {
+      width: 100%;
+      max-width: 720px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .fcard {
+      background: #111c33;
+      border: 1px solid #24344d;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .fcard .thumb {
+      height: 120px;
+      background: #0b1322;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #475569;
+    }
+    .fcard .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .fcard .meta { padding: 8px 10px; font-size: 12px; line-height: 1.7; }
+    .fcard .meta .name { color: #e2e8f0; word-break: break-all; font-weight: bold; }
+    .fcard .meta .row { color: #94a3b8; font-family: Consolas, monospace; font-size: 11.5px; }
+    .fcard .meta .row.err { color: #fbbf24; }
+
+    button {
+      background: #1e293b; color: #cbd5e1; border: 1px solid #334155;
+      border-radius: 8px; padding: 8px 16px; font-size: 13px; cursor: pointer;
+    }
+    button:hover { background: #334155; }
+
+    .log {
+      width: 100%;
+      max-width: 720px;
+      background: #0b1322; border: 1px solid #334155; border-radius: 8px;
+      padding: 10px 12px; font-family: Consolas, monospace; font-size: 12px;
+      line-height: 1.8; white-space: pre-wrap; word-break: break-all;
+      max-height: 160px; overflow: auto;
+    }
+    .log .ok { color: #4ade80; }
+    .log .warn { color: #fbbf24; }
+    .log .sys { color: #94a3b8; }
+
+    #toast {
+      position: fixed; left: 50%; bottom: 34px;
+      transform: translateX(-50%) translateY(20px);
+      background: #0ea5e9; color: #04283a;
+      font-size: 13.5px; padding: 10px 18px; border-radius: 10px;
+      opacity: 0; pointer-events: none; transition: all .25s; z-index: 99;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+
+<body>
+  <h1>拖放 API 示例 03 · 文件拖放与图片预览</h1>
+  <p class="desc">
+    从桌面把图片文件<b>拖进下方投放区</b>即可预览（支持多选一次拖多个）。
+    也可以把页面里的"文本卡片"拖进去——日志会演示 types 判断如何过滤非文件拖拽。
+  </p>
+
+  <!-- 页面内文本拖拽源：与文件拖放形成对照 -->
+  <div class="text-card" draggable="true" id="text-card">我只是页面内的文本卡片（拖进投放区会被 types 过滤）</div>
+
+  <!-- 投放区 -->
+  <div class="dropzone" id="zone">
+    <div class="icon">📂</div>
+    <div><b>把图片文件拖到这里</b></div>
+    <div>支持一次多个文件；图片生成预览，其他文件显示占位信息</div>
+  </div>
+
+  <button id="btn-clear">清空全部卡片</button>
+
+  <!-- 文件卡片网格 -->
+  <div class="grid" id="grid"></div>
+
+  <div class="log" id="log"></div>
+  <div id="toast"></div>
+
+  <script>
+    /* ================================================================
+     * 0. 通用工具
+     * ================================================================ */
+    var toastEl = document.getElementById('toast'), toastTimer;
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2200);
+    }
+    var logEl = document.getElementById('log');
+    function log(text, cls) {
+      var div = document.createElement('div');
+      div.className = cls || 'sys';
+      div.textContent = '[' + new Date().toLocaleTimeString() + '] ' + text;
+      logEl.insertBefore(div, logEl.firstChild);
+    }
+    // 文件大小格式化：B/KB/MB 自适应
+    function fmtSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+    }
+
+    /* ================================================================
+     * 1. 全窗口兜底：阻止浏览器默认的"打开/下载文件"行为
+     * 用户常把文件拖偏到投放区外，不拦截的话浏览器会直接打开文件，
+     * 用户操作全部丢失——附件类页面必须加这两行
+     * ================================================================ */
+    ['dragover', 'drop'].forEach(function (type) {
+      window.addEventListener(type, function (e) { e.preventDefault(); });
+    });
+
+    /* ================================================================
+     * 2. 页面内文本卡片：演示 types 过滤（它不是 Files）
+     * ================================================================ */
+    document.getElementById('text-card').addEventListener('dragstart', function (e) {
+      e.dataTransfer.setData('text/plain', this.textContent);
+      e.dataTransfer.effectAllowed = 'copy';
+    });
+
+    /* ================================================================
+     * 3. 投放区：高亮 + 接收文件
+     * ================================================================ */
+    var zone = document.getElementById('zone');
+    var grid = document.getElementById('grid');
+
+    zone.addEventListener('dragenter', function () { zone.classList.add('over'); });
+    zone.addEventListener('dragover', function (e) {
+      e.preventDefault();                       // ★ 不放行就没有 drop（第一铁律）
+      zone.classList.add('over');               // 高亮直接在 dragover 里维护最稳
+    });
+    zone.addEventListener('dragleave', function () { zone.classList.remove('over'); });
+
+    zone.addEventListener('drop', function (e) {
+      e.preventDefault();                       // ★ 阻止默认：否则浏览器可能直接打开文件
+      zone.classList.remove('over');
+
+      // 关键判断：types 里没有 'Files' 说明拖的不是文件（比如上面那个文本卡片）
+      var types = e.dataTransfer.types;
+      var isFiles = false;
+      for (var i = 0; i < types.length; i++) {
+        if (types[i] === 'Files') { isFiles = true; break; }
+      }
+      if (!isFiles) {
+        log('drop：types=' + Array.prototype.join.call(types, ',') + ' → 不是文件（页面内文本拖拽），已忽略', 'warn');
+        toast('这不是文件拖拽，已忽略');
+        return;
+      }
+
+      var files = e.dataTransfer.files;         // FileList：从 OS 拖进来的文件
+      log('drop：收到 ' + files.length + ' 个文件，开始逐个读取', 'ok');
+      Array.prototype.forEach.call(files, handleFile);
+    });
+
+    /* ================================================================
+     * 4. 单个文件处理：建卡片 + FileReader 预览
+     * ================================================================ */
+    function handleFile(file) {
+      var isImage = file.type.indexOf('image/') === 0;
+      log('读取：' + file.name + '（' + file.type + '，' + fmtSize(file.size) + '）');
+
+      // 先建卡片骨架（元信息立刻可见，图片区域等待读取结果）
+      var card = document.createElement('div');
+      card.className = 'fcard';
+      card.innerHTML =
+        '<div class="thumb">' + (isImage ? '读取中…' : '📄<br><small>不支持预览</small>') + '</div>' +
+        '<div class="meta">' +
+        '  <div class="name"></div>' +
+        '  <div class="row"></div>' +
+        '</div>';
+      card.querySelector('.name').textContent = file.name;
+      card.querySelector('.meta .row').textContent =
+        file.type + ' · ' + fmtSize(file.size) + ' · ' + new Date(file.lastModified).toLocaleString();
+      grid.insertBefore(card, grid.firstChild);
+
+      // FileReader 异步读取：onload 后把 data URL 塞给 img
+      if (isImage) {
+        var t0 = performance.now();
+        var reader = new FileReader();
+        reader.onload = function () {
+          var img = document.createElement('img');
+          img.src = reader.result;              // data:image/...;base64,... 直接可显示
+          img.alt = file.name;
+          var thumb = card.querySelector('.thumb');
+          thumb.innerHTML = '';
+          thumb.appendChild(img);
+          // 缩略图右上角补一条耗时信息
+          var row = card.querySelector('.meta .row');
+          row.textContent += ' · 读入 ' + Math.round(performance.now() - t0) + 'ms';
+          log('预览完成：' + file.name, 'ok');
+        };
+        reader.onerror = function () {
+          card.querySelector('.thumb').innerHTML = '读取失败';
+          card.querySelector('.meta .row').classList.add('err');
+          card.querySelector('.meta .row').textContent += ' · FileReader 出错';
+          log('读取失败：' + file.name, 'warn');
+        };
+        reader.readAsDataURL(file);            // 也可以 readAsArrayBuffer / readAsText
+      } else {
+        log('跳过预览：' + file.name + ' 不是图片（type=' + (file.type || '未知') + '）', 'warn');
+      }
+    }
+
+    /* ================================================================
+     * 5. 清空
+     * ================================================================ */
+    document.getElementById('btn-clear').onclick = function () {
+      grid.innerHTML = '';
+      log('已清空全部文件卡片');
+      toast('已清空');
+    };
+
+    log('就绪：请从桌面拖图片文件到投放区；也可把页面上方文本卡片拖入做对照实验');
+  </script>
+</body>
+
+</html>

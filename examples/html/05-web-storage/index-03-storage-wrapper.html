@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：生产级存储封装（命名空间 + 过期时间 + 降级 + 安全解析）
+  ------------------------------------------------------------
+  【知识点】
+    1. 命名空间前缀：多模块共用一个 localStorage 源时避免 key 冲突，
+       并可按前缀批量清理（绝不调用 clear() 误伤他人数据）
+    2. 过期时间（TTL）：Storage 原生没有过期概念，用 {v, expireAt} 包一层自己实现
+    3. 降级策略：隐私模式 / 配额满 / WebView 禁用时 try/catch 后退化为内存 Map
+    4. 安全 JSON：parse 全部包 try/catch，脏数据（手改/版本升级）按"不存在"处理
+    5. 过期清理：读到过期数据时顺带 removeItem，防止冷数据堆积占配额
+
+  【运行方式】
+    双击本文件直接打开即可。四个面板相互独立，建议按顺序体验。
+
+  【效果说明】
+    面板 1：两个不同命名空间的 SafeStorage 存同名 key，互不干扰；底层 key 带 app: 前缀；
+    面板 2：写入一条 3 秒过期的数据，倒计时内能读到，过期后读为 null 且条目被清理；
+    面板 3：模拟一个"坏掉的 Storage"（读写都抛异常），SafeStorage 自动降级内存仍可用；
+    面板 4：手工注入脏数据（非法 JSON），get 返回 null 而不是让页面崩溃。
+
+  【注意事项】
+    - 降级到内存后数据"当次会话可用、刷新即失"，真实项目应同时上报埋点。
+    - 提示信息全部用页面内面板/toast 展示，不使用 alert/prompt。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web 存储 示例 03 · 生产级封装工具函数</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: #0f172a;
+      color: #cbd5e1;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      padding: 26px 16px 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    h1 { color: #f1f5f9; font-size: 22px; }
+
+    p.desc {
+      max-width: 680px;
+      font-size: 14px;
+      line-height: 1.8;
+      text-align: center;
+    }
+
+    .panel {
+      width: 100%;
+      max-width: 780px;
+      background: #111c33;
+      border: 1px solid #24344d;
+      border-radius: 14px;
+      padding: 16px 18px;
+    }
+    .panel h2 { color: #7dd3fc; font-size: 15px; margin-bottom: 6px; }
+    .panel p.tip { font-size: 12.5px; color: #94a3b8; line-height: 1.7; margin-bottom: 10px; }
+
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+
+    input[type="text"] {
+      background: #0b1322;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 13px;
+      flex: 1;
+      min-width: 120px;
+    }
+
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    button:hover { background: #1d4ed8; }
+    button.ghost { background: #1e293b; color: #cbd5e1; border: 1px solid #334155; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+
+    /* 输出区：统一结果展示 */
+    .out {
+      background: #0b1322;
+      border-left: 3px solid #38bdf8;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 12.5px;
+      font-family: Consolas, monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+      line-height: 1.8;
+      max-height: 190px;
+      overflow: auto;
+    }
+    .out .err { color: #f87171; }
+    .out .ok { color: #4ade80; }
+    .out .warn { color: #fbbf24; }
+
+    /* 倒计时进度条 */
+    .bar-wrap { background: #0b1322; border-radius: 6px; height: 10px; overflow: hidden; margin: 8px 0; }
+    .bar { height: 100%; width: 100%; background: linear-gradient(90deg, #22c55e, #eab308, #ef4444); transition: width .1s linear; }
+
+    #toast {
+      position: fixed;
+      left: 50%;
+      bottom: 34px;
+      transform: translateX(-50%) translateY(20px);
+      background: #0ea5e9;
+      color: #04283a;
+      font-size: 13.5px;
+      padding: 10px 18px;
+      border-radius: 10px;
+      opacity: 0;
+      pointer-events: none;
+      transition: all .25s;
+      max-width: 86vw;
+      z-index: 99;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+
+<body>
+  <h1>Web 存储 示例 03 · 生产级封装</h1>
+  <p class="desc">
+    直接裸用 localStorage 会在真实项目里踩一堆坑：key 冲突、没有过期时间、隐私模式抛异常、脏数据解析崩溃。
+    本页演示一个 <b>SafeStorage</b> 封装如何一次性解决这四类问题——这也是文档第 2.5 节代码的可运行版本。
+  </p>
+
+  <!-- ================= 面板 1：命名空间隔离 ================= -->
+  <div class="panel">
+    <h2>面板 1 · 命名空间隔离</h2>
+    <p class="tip">两个模块各自 new 一个 SafeStorage（命名空间 cart / theme），用同名 key 存不同业务数据，互不覆盖；底层真实 key 是 "app:模块:key"。</p>
+    <div class="row">
+      <button id="w1">cart 模块写入 items</button>
+      <button id="w2">theme 模块写入 items</button>
+      <button id="r12" class="ghost">分别读取对比</button>
+    </div>
+    <div class="out" id="out1">（结果输出区）</div>
+  </div>
+
+  <!-- ================= 面板 2：过期时间 TTL ================= -->
+  <div class="panel">
+    <h2>面板 2 · 过期时间（3 秒 TTL）</h2>
+    <p class="tip">写入一条 3 秒后过期的数据：过期前读到正常值；过期后 get 自动返回 null 并顺带删除底层条目（防冷数据堆积）。</p>
+    <div class="bar-wrap"><div class="bar" id="ttl-bar"></div></div>
+    <div class="row">
+      <button id="btn-ttl">写入 token（3 秒过期）</button>
+      <button id="btn-read-ttl" class="ghost">立即读取</button>
+    </div>
+    <div class="out" id="out2">（结果输出区）</div>
+  </div>
+
+  <!-- ================= 面板 3：降级内存 ================= -->
+  <div class="panel">
+    <h2>面板 3 · 隐私模式降级（内存兜底）</h2>
+    <p class="tip">构造一个"读写都抛异常"的假 Storage 来模拟隐私模式被禁用。SafeStorage 探测失败后自动切到内存 Map：本会话内照常读写，但刷新即失（真实项目应上报埋点）。</p>
+    <div class="row">
+      <button id="btn-fb">用"坏 Storage"写入并读取</button>
+    </div>
+    <div class="out" id="out3">（结果输出区）</div>
+  </div>
+
+  <!-- ================= 面板 4：脏数据防护 ================= -->
+  <div class="panel">
+    <h2>面板 4 · 脏数据安全解析</h2>
+    <p class="tip">用户手动改过、版本升级、半截写入都可能产生非法 JSON。直接 JSON.parse 会抛错白屏；SafeStorage 把它收敛为"返回 null + 警告"。</p>
+    <div class="row">
+      <button id="btn-dirty">注入脏数据后尝试读取</button>
+      <button id="btn-clean2" class="ghost">恢复正常数据读取</button>
+    </div>
+    <div class="out" id="out4">（结果输出区）</div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    /* ================================================================
+     * 0. toast（代替 alert 的页面内提示）
+     * ================================================================ */
+    var toastEl = document.getElementById('toast'), toastTimer;
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2400);
+    }
+
+    /* ================================================================
+     * 1. SafeStorage 封装本体（与文档 2.5 节对应，注释解释"为什么"）
+     * ================================================================ */
+    function SafeStorage(ns, storage) {
+      this.ns = (ns || 'app') + ':';          // 命名空间前缀：多模块共存时防 key 冲突
+      this.mem = new Map();                   // 内存兜底存储：降级后数据放这里
+      this.storage = null;
+      try {
+        // 探针写入：确认 storage 真的可用。
+        // Safari 旧无痕模式会"写入静默失败/抛错"，仅判断 window.localStorage 存在是不够的
+        var probe = '__probe__' + Date.now();
+        storage.setItem(probe, '1');
+        storage.removeItem(probe);
+        this.storage = storage;
+      } catch (e) {
+        this.storage = null;                  // 不可用 → 全部走内存，页面功能不中断
+      }
+    }
+    SafeStorage.prototype._k = function (key) { return this.ns + key; }; // 拼前缀
+
+    SafeStorage.prototype.set = function (key, value, ttlMs) {
+      // 统一包一层 {v: 值, e: 过期时间戳}：值本身可以是任意可 JSON 化的类型
+      var payload = { v: value, e: ttlMs ? Date.now() + ttlMs : 0 };
+      var raw = JSON.stringify(payload);
+      if (!this.storage) { this.mem.set(this._k(key), raw); return true; }
+      try {
+        this.storage.setItem(this._k(key), raw);
+        return true;
+      } catch (e) {
+        // 配额满（QuotaExceededError）或中途被禁用：降级到内存而不是抛错打断业务
+        this.mem.set(this._k(key), raw);
+        return true;
+      }
+    };
+
+    SafeStorage.prototype.get = function (key) {
+      var raw = this.storage
+        ? this.storage.getItem(this._k(key))
+        : this.mem.get(this._k(key));
+      if (raw == null) return null;                       // 不存在（getItem 不存在返回 null）
+      try {
+        var p = JSON.parse(raw);
+        if (p.e && Date.now() > p.e) {                    // 已过期：删除条目并视为不存在
+          this.remove(key);
+          return null;
+        }
+        return p.v;
+      } catch (e) {
+        return null;                                      // 脏数据：按不存在处理，绝不让页面崩
+      }
+    };
+
+    SafeStorage.prototype.remove = function (key) {
+      this.mem.delete(this._k(key));
+      if (this.storage) this.storage.removeItem(this._k(key));
+    };
+
+    // 按前缀批量删除：替代 clear() 的安全做法，只清自己的数据
+    SafeStorage.prototype.removeByPrefix = function () {
+      var prefix = this.ns, i, k;
+      if (!this.storage) return;
+      var keys = [];
+      for (i = 0; i < this.storage.length; i++) {
+        k = this.storage.key(i);
+        if (k && k.indexOf(prefix) === 0) keys.push(k);
+      }
+      for (i = 0; i < keys.length; i++) this.storage.removeItem(keys[i]);
+      return keys.length;
+    };
+
+    var out1 = document.getElementById('out1');
+    var out2 = document.getElementById('out2');
+    var out3 = document.getElementById('out3');
+    var out4 = document.getElementById('out4');
+
+    /* ================================================================
+     * 2. 面板 1：命名空间隔离
+     * ================================================================ */
+    var cartStore = new SafeStorage('cart', localStorage);   // cart 模块自己的实例
+    var themeStore = new SafeStorage('theme', localStorage); // theme 模块自己的实例
+
+    document.getElementById('w1').onclick = function () {
+      cartStore.set('items', [{ id: 1, name: '键盘' }, { id: 2, name: '鼠标' }]);
+      toast('cart 模块已写入 items（真实 key = app:cart:items）');
+    };
+    document.getElementById('w2').onclick = function () {
+      themeStore.set('items', { mode: 'dark', fontSize: 16 }); // 同名 key，不同命名空间
+      toast('theme 模块已写入 items（真实 key = app:theme:items）');
+    };
+    document.getElementById('r12').onclick = function () {
+      out1.innerHTML =
+        'cartStore.get("items")  = <span class="ok">' + JSON.stringify(cartStore.get('items')) + '</span>' +
+        '\nthemeStore.get("items") = <span class="ok">' + JSON.stringify(themeStore.get('items')) + '</span>' +
+        '\n\n底层 localStorage 的真实 key 列表：\n  ' +
+        (function () { // 把带前缀的 key 打出来，直观看到命名空间的作用
+          var arr = [];
+          for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (k.indexOf('app:') === 0) arr.push(k);
+          }
+          return arr.join('\n  ') || '（无）';
+        })();
+    };
+
+    /* ================================================================
+     * 3. 面板 2：过期时间 TTL（3 秒）
+     * ================================================================ */
+    var ttlStore = new SafeStorage('tmp', localStorage);
+    var bar = document.getElementById('ttl-bar');
+    var ttlTick = null;
+
+    document.getElementById('btn-ttl').onclick = function () {
+      clearInterval(ttlTick);                       // 重复点击时先停掉上一次的倒计时
+      ttlStore.set('session-token', 'abc-123', 3000); // 3000ms 后过期
+      var start = Date.now();
+      out2.textContent = '已写入 session-token = "abc-123"，有效期 3 秒。';
+      // 用进度条直观展示 TTL 倒计时（纯演示用）
+      ttlTick = setInterval(function () {
+        var left = 1 - (Date.now() - start) / 3000;
+        bar.style.width = Math.max(0, left * 100) + '%';
+        if (left <= 0) {
+          clearInterval(ttlTick);
+          out2.innerHTML = '⏱ 3 秒已过。现在读取：' +
+            '<span class="warn">' + JSON.stringify(ttlStore.get('session-token')) + '</span>（null）' +
+            '\n并且底层条目已被自动 removeItem，不会留下过期冷数据。';
+        }
+      }, 100);
+    };
+
+    document.getElementById('btn-read-ttl').onclick = function () {
+      var v = ttlStore.get('session-token');
+      out2.textContent = v === null
+        ? '读取结果：null（未写入或已过期）'
+        : '读取结果：' + JSON.stringify(v) + '（仍在有效期内）';
+    };
+
+    /* ================================================================
+     * 4. 面板 3：坏 Storage 降级
+     * ================================================================ */
+    // 模拟"隐私模式禁用"的 Storage：任何读写都抛异常（真实 Safari 旧无痕模式就是这样）
+    var BrokenStorage = {
+      setItem: function () { throw new Error('QuotaExceededError（模拟）'); },
+      getItem: function () { throw new Error('Access denied（模拟）'); },
+      removeItem: function () { throw new Error('Access denied（模拟）'); },
+      key: function () { return null; },
+      length: 0
+    };
+
+    document.getElementById('btn-fb').onclick = function () {
+      var fb = new SafeStorage('private', BrokenStorage); // 构造时探针失败 → 自动切内存
+      fb.set('draft', '我在内存里，刷新就没了');
+      var v = fb.get('draft');
+      out3.innerHTML =
+        '<span class="warn">⚠ 探测结果：storage 不可用，已降级为内存 Map</span>' +
+        '\nfb.get("draft") = <span class="ok">' + JSON.stringify(v) + '</span>' +
+        '\n说明：当次会话一切功能照常；刷新页面后数据消失（内存兜底的固有代价），' +
+        '真实项目应同时上报埋点让运营知道有用户处于该状态。';
+      toast('降级生效：功能未中断，数据仅存于内存');
+    };
+
+    /* ================================================================
+     * 5. 面板 4：脏数据安全解析
+     * ================================================================ */
+    var dirtyStore = new SafeStorage('dirty', localStorage);
+
+    document.getElementById('btn-dirty').onclick = function () {
+      // 直接往底层塞非法 JSON，模拟用户手改/半截写入导致的脏数据
+      try {
+        localStorage.setItem(dirtyStore._k('profile'), '{"name": "小明", 这里是坏数据');
+      } catch (e) { /* 忽略 */ }
+      var v = dirtyStore.get('profile');
+      out4.innerHTML = '底层已注入非法 JSON：{"name": "小明", 这里是坏数据' +
+        '\ndirtyStore.get("profile") = <span class="warn">' + JSON.stringify(v) + '</span>（null，而不是抛错）' +
+        '\n结论：get 内部 try/catch 把异常收敛为 null，调用方拿默认值兜底即可，页面不会白屏。';
+    };
+
+    document.getElementById('btn-clean2').onclick = function () {
+      dirtyStore.set('profile', { name: '小明', age: 18 });   // 重新写入正常数据
+      var v = dirtyStore.get('profile');
+      out4.innerHTML = '恢复写入正常数据后读取：' +
+        '<span class="ok">' + JSON.stringify(v) + '</span>（typeof = ' + typeof v + '，是真正的对象）';
+      toast('已恢复正常数据');
+    };
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 02：Transferable（ArrayBuffer 转移所有权）+ 图片像素处理
+  ------------------------------------------------------------
+  【知识点】
+    1. postMessage 默认"结构化克隆"（深拷贝），大 buffer 拷贝开销可观
+    2. Transferable：postMessage(buf, [buf]) 转移所有权——零拷贝，
+       但主线程的 buffer.byteLength 立即变成 0（引用失效）
+    3. ImageData 像素数据处理：getImageData / putImageData 配合 Worker
+    4. Worker 内逐像素运算：灰度（加权平均 0.299/0.587/0.114）与反色
+    5. 程序化生成图像（内联 canvas 绘制），全程零网络依赖
+
+  【运行方式】
+    双击本文件直接打开。
+
+  【效果说明】
+    左边是程序化生成的彩色画布（渐变 + 图形），右边是处理结果：
+    - 点"灰度化"/"反色化"：像素 buffer 转移给 Worker 处理后转移回来渲染；
+    - "拷贝模式 vs 转移模式"按钮分别用两种方式传同一 buffer，
+      日志里对比传输耗时，并展示"转移后主线程 byteLength = 0"；
+    - 点"恢复原图"：用内存里留存的原始像素还原。
+
+  【注意事项】
+    - buffer 被转移后主线程不能再使用（byteLength=0），所以本例每次处理
+      都从当前画布重新 getImageData，且原始像素单独留了一份拷贝用于还原。
+    - Safari 16.4 之前不支持 OffscreenCanvas，因此"取像素/放像素"留在主线程、
+      只把纯计算放 Worker，是兼容性最好的写法。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Workers 示例 02 · Transferable 与像素处理</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: #0f172a;
+      color: #cbd5e1;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      padding: 26px 16px 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    h1 { color: #f1f5f9; font-size: 22px; }
+
+    p.desc { max-width: 680px; font-size: 14px; line-height: 1.8; text-align: center; }
+
+    .stage { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
+
+    .canvas-card {
+      background: #111c33;
+      border: 1px solid #24344d;
+      border-radius: 14px;
+      padding: 12px;
+      text-align: center;
+    }
+    .canvas-card h2 { font-size: 14px; color: #7dd3fc; margin-bottom: 8px; }
+    canvas {
+      border-radius: 8px;
+      display: block;
+      background: #fff;
+    }
+
+    .panel {
+      width: 100%;
+      max-width: 780px;
+      background: #111c33;
+      border: 1px solid #24344d;
+      border-radius: 14px;
+      padding: 16px 18px;
+    }
+    .panel h2 { color: #7dd3fc; font-size: 15px; margin-bottom: 8px; }
+    .panel p.tip { font-size: 12.5px; color: #94a3b8; line-height: 1.7; margin-bottom: 10px; }
+
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    button:hover { background: #1d4ed8; }
+    button.ghost { background: #1e293b; color: #cbd5e1; border: 1px solid #334155; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+
+    .log {
+      background: #0b1322;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.8;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 220px;
+      overflow: auto;
+    }
+    .log .t-worker { color: #4ade80; }
+    .log .t-warn { color: #fbbf24; }
+    .log .t-sys { color: #94a3b8; }
+
+    #toast {
+      position: fixed;
+      left: 50%;
+      bottom: 34px;
+      transform: translateX(-50%) translateY(20px);
+      background: #0ea5e9;
+      color: #04283a;
+      font-size: 13.5px;
+      padding: 10px 18px;
+      border-radius: 10px;
+      opacity: 0;
+      pointer-events: none;
+      transition: all .25s;
+      z-index: 99;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+
+<body>
+  <h1>Web Workers 示例 02 · Transferable 与图片像素处理</h1>
+  <p class="desc">
+    画布约 480×320 = 15 万像素 = 61 万字节的像素 buffer。点处理按钮后 buffer 会被送到 Worker
+    逐像素计算再送回来渲染。<b>注意日志里的"传输耗时"对比</b>：拷贝模式 vs 转移（Transferable）模式。
+  </p>
+
+  <div class="stage">
+    <div class="canvas-card">
+      <h2>原图（程序化生成）</h2>
+      <canvas id="src" width="480" height="320"></canvas>
+    </div>
+    <div class="canvas-card">
+      <h2>处理结果（Worker 输出）</h2>
+      <canvas id="dst" width="480" height="320"></canvas>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>控制台</h2>
+    <p class="tip">灰度/反色会走"转移模式"（零拷贝）；下面两个对比按钮专门演示拷贝与转移的传输开销差异。</p>
+    <div class="row">
+      <button id="btn-gray">灰度化</button>
+      <button id="btn-invert">反色化</button>
+      <button id="btn-reset" class="ghost">恢复原图</button>
+      <button id="btn-cmp-copy" class="ghost">对比：拷贝模式传输</button>
+      <button id="btn-cmp-move" class="ghost">对比：转移模式传输</button>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    /* ================================================================
+     * 0. 通用工具
+     * ================================================================ */
+    var toastEl = document.getElementById('toast'), toastTimer;
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2200);
+    }
+
+    var logEl = document.getElementById('log');
+    function log(html, cls) {
+      var t = new Date().toLocaleTimeString();
+      var div = document.createElement('div');
+      div.className = cls || 't-sys';
+      div.textContent = '[' + t + '] ' + html.replace(/<[^>]+>/g, '');
+      logEl.insertBefore(div, logEl.firstChild);
+    }
+
+    /* ================================================================
+     * 1. 程序化生成原图：不依赖任何网络图片（零依赖要求）
+     * ================================================================ */
+    var srcCv = document.getElementById('src');
+    var dstCv = document.getElementById('dst');
+    var sctx = srcCv.getContext('2d');
+    var dctx = dstCv.getContext('2d');
+    var W = srcCv.width, H = srcCv.height;
+
+    function paintOriginal() {
+      // 彩色对角渐变打底
+      var g = sctx.createLinearGradient(0, 0, W, H);
+      g.addColorStop(0, '#ef4444');
+      g.addColorStop(.35, '#f59e0b');
+      g.addColorStop(.65, '#22c55e');
+      g.addColorStop(1, '#3b82f6');
+      sctx.fillStyle = g;
+      sctx.fillRect(0, 0, W, H);
+      // 叠加几何图形制造明暗细节，让灰度/反色效果更直观
+      sctx.fillStyle = 'rgba(255,255,255,.85)';
+      sctx.beginPath(); sctx.arc(120, 110, 62, 0, Math.PI * 2); sctx.fill();
+      sctx.fillStyle = 'rgba(17,24,39,.85)';
+      sctx.beginPath(); sctx.moveTo(300, 40); sctx.lineTo(430, 250); sctx.lineTo(190, 250);
+      sctx.closePath(); sctx.fill();
+      sctx.strokeStyle = 'rgba(255,255,255,.9)';
+      sctx.lineWidth = 6;
+      for (var x = 20; x < W; x += 42) {           // 一组白色竖线
+        sctx.beginPath(); sctx.moveTo(x, H - 60); sctx.lineTo(x + 18, H - 12); sctx.stroke();
+      }
+    }
+    paintOriginal();
+
+    // 原始像素单独留一份深拷贝（Array.from 逐字节复制），用于"恢复原图"
+    var originalBuffer = sctx.getImageData(0, 0, W, H).data.slice().buffer;
+
+    // 把当前画布像素放进目标画布渲染：new ImageData 包装 TypedArray
+    function renderBuffer(buf) {
+      var img = new ImageData(new Uint8ClampedArray(buf), W, H);
+      dctx.putImageData(img, 0, 0);
+    }
+    renderBuffer(originalBuffer);                  // 初始状态两块画布一致
+
+    /* ================================================================
+     * 2. 内联 Worker：像素计算在后台线程
+     * ================================================================ */
+    var workerCode = [
+      '// Worker 收到 {buffer, mode}，按 mode 逐像素处理后原样转移回来',
+      'self.onmessage = function (e) {',
+      '  var buf = e.data.buffer;',
+      '  var mode = e.data.mode;',
+      '  var arr = new Uint8ClampedArray(buf);       // 直接在 buffer 上建视图，不复制',
+      '  var t0 = performance.now();',
+      '  for (var i = 0; i < arr.length; i += 4) {   // 每像素 4 字节：R G B A',
+      '    if (mode === "gray") {',
+      '      // 灰度 = 人眼感知加权平均（绿分量权重最高）',
+      '      var g = arr[i] * 0.299 + arr[i + 1] * 0.587 + arr[i + 2] * 0.114;',
+      '      arr[i] = arr[i + 1] = arr[i + 2] = g;',
+      '    } else if (mode === "invert") {',
+      '      arr[i] = 255 - arr[i];',
+      '      arr[i + 1] = 255 - arr[i + 1];',
+      '      arr[i + 2] = 255 - arr[i + 2];',
+      '    }',
+      '  }',
+      '  // 计算完把 buffer 再转移回主线程（回传也走零拷贝）',
+      '  self.postMessage({ buffer: buf, mode: mode, cost: performance.now() - t0 }, [buf]);',
+      '};'
+    ].join('\n');
+
+    var blobUrl = URL.createObjectURL(new Blob([workerCode], { type: 'text/javascript' }));
+    var worker = new Worker(blobUrl);
+
+    worker.onmessage = function (e) {
+      renderBuffer(e.data.buffer);               // 收到处理完的 buffer，渲染到目标画布
+      busy = false; setBusy(false);
+      log('Worker 完成像素运算（' + (e.data.mode === 'gray' ? '灰度' : '反色') +
+          '），纯计算耗时 ' + e.data.cost.toFixed(1) + 'ms，回传同样为转移模式', 't-worker');
+      toast('处理完成');
+    };
+    worker.onerror = function (e) {
+      busy = false; setBusy(false);
+      log('Worker 异常：' + e.message, 't-warn');
+    };
+
+    /* ================================================================
+     * 3. 转移模式处理：主线程 → Worker → 主线程
+     * ================================================================ */
+    var busy = false;
+    function setBusy(b) {
+      document.getElementById('btn-gray').disabled = b;
+      document.getElementById('btn-invert').disabled = b;
+    }
+
+    function processInWorker(mode) {
+      if (busy) return toast('上一次处理还没结束，请稍候');
+      busy = true; setBusy(true);
+
+      // 从"当前目标画布"取像素：这样连续点灰度/反色是叠加效果
+      var img = dctx.getImageData(0, 0, W, H);
+      var buf = img.data.buffer;                 // 注意：这是像素数据的底层 ArrayBuffer
+      var before = buf.byteLength;
+
+      log('发起 ' + (mode === 'gray' ? '灰度' : '反色') + '：buffer ' + before + ' 字节，转移所有权给 Worker', 't-sys');
+      log('转移后主线程 buffer.byteLength = ' + buf.byteLength +
+          ' ← 所有权已移走，主线程不能再读它！', 't-warn');
+
+      // 关键一行：第二个数组里的 buffer 表示"转移"而不是"拷贝"
+      worker.postMessage({ buffer: buf, mode: mode }, [buf]);
+    }
+
+    document.getElementById('btn-gray').onclick = function () { processInWorker('gray'); };
+    document.getElementById('btn-invert').onclick = function () { processInWorker('invert'); };
+
+    // 恢复原图：把留存的原始 buffer 复制一份渲染（复制 originalBuffer 以免被后续转移破坏）
+    document.getElementById('btn-reset').onclick = function () {
+      var copy = originalBuffer.slice(0);        // slice 复制一份，保护原始数据
+      renderBuffer(copy);
+      toast('已恢复原图');
+    };
+
+    /* ================================================================
+     * 4. 传输模式对比：拷贝 vs 转移（只测"送过去"的通信耗时）
+     * 用一个专用 Worker 收到后立即回 ack，不做事，纯测传输。
+     * ================================================================ */
+    var cmpCode = [
+      'self.onmessage = function (e) { self.postMessage({ ack: true, moved: e.data.buf.byteLength }); };'
+    ].join('\n');
+    var cmpUrl = URL.createObjectURL(new Blob([cmpCode], { type: 'text/javascript' }));
+    var cmpWorker = new Worker(cmpUrl);
+
+    function bench(transfer) {
+      if (busy) return toast('请等当前处理结束');
+      busy = true; setBusy(true);
+      var buf = dctx.getImageData(0, 0, W, H).data.buffer;
+      var sizeMB = (buf.byteLength / 1024 / 1024).toFixed(2);
+
+      var t0 = performance.now();
+      var onAck = function (e) {
+        var ms = performance.now() - t0;
+        var label = transfer ? '转移模式（Transferable）' : '拷贝模式（结构化克隆）';
+        log(label + '：传输 ' + sizeMB + 'MB 耗时 ' + ms.toFixed(2) + 'ms；' +
+            'Worker 收到 byteLength = ' + e.data.moved, transfer ? 't-worker' : 't-warn');
+        if (!transfer) {
+          log('拷贝模式下主线程 buffer 仍在（byteLength = ' + buf.byteLength + '），但复制过程耗时且占内存', 't-warn');
+        }
+        cmpWorker.removeEventListener('message', onAck);
+        busy = false; setBusy(false);
+      };
+      cmpWorker.addEventListener('message', onAck);
+
+      // 差别只在第二个参数：传 [buf] = 转移所有权；不传 = 结构化克隆拷贝
+      if (transfer) {
+        cmpWorker.postMessage({ buf: buf }, [buf]);
+      } else {
+        cmpWorker.postMessage({ buf: buf });
+      }
+    }
+
+    document.getElementById('btn-cmp-copy').onclick = function () { bench(false); };
+    document.getElementById('btn-cmp-move').onclick = function () { bench(true); };
+
+    log('提示：先分别点两个"对比"按钮看传输耗时，再体验灰度/反色', 't-sys');
+  </script>
+</body>
+
+</html>
