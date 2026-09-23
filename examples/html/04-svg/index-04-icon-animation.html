@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例：SVG 图标系统（symbol/use）+ 三种动画方案对比
+  ------------------------------------------------------------
+  【知识点】
+    1. <symbol> + <use> 图标雪碧图：一次定义、处处引用
+    2. fill="currentColor"：图标颜色继承文字色，一份图标多主题复用
+    3. SMIL 动画：<animate> / <animateTransform>（纯标签、可被 <img> 引用）
+    4. CSS 动画：@keyframes 控制描边 / transform / opacity
+    5. JS 动画：rAF + setAttribute 精细控制，交互驱动
+    6. 无障碍：装饰性图标 aria-hidden，信息性图标 <title> + role
+
+  【运行方式】
+    双击本文件，浏览器直接打开；点击"点赞"按钮可触发 JS 驱动的爆星动画。
+
+  【效果说明】
+    ① 图标系统区：4 个 24×24 symbol 被不同颜色/大小的按钮复用，
+       图标颜色随文字色自动变化（currentColor）；
+    ② 三种动画对比区：同一个"加载圆环"分别用 SMIL / CSS / JS 实现；
+    ③ 交互彩蛋：点赞按钮——JS 驱动爱心缩放回弹 + 粒子迸发。
+
+  【注意事项】
+    - <use> 引用外部 .svg 文件在部分 WebView 不稳，生产环境请用
+      构建工具把 symbol 全部内联进 HTML（本示例即内联雪碧图）。
+    - 装饰性图标务必 aria-hidden="true"，否则读屏会念出无意义内容。
+    - SMIL 写在独立 .svg 文件里被 <img> 引用时仍能播放（CSS/JS 都不行），
+      这是它至今不可替代的场景。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SVG 示例 04 · 图标系统与三种动画方案</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    background: #0f172a;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #cbd5e1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    padding: 28px 16px;
+  }
+  h1 { font-size: 22px; color: #f1f5f9; }
+  p.desc { max-width: 640px; line-height: 1.8; font-size: 14px; text-align: center; }
+  section {
+    width: 100%;
+    max-width: 700px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 14px;
+    padding: 16px 18px;
+  }
+  section h2 { font-size: 15px; color: #7dd3fc; margin-bottom: 12px; }
+  .row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: center; }
+
+  /* 图标按钮：图标颜色 = color 属性（currentColor 生效的原因） */
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    font-size: 14px;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    background: #0f172a;
+    color: #e2e8f0;              /* 图标与文字同色 */
+    cursor: pointer;
+  }
+  .icon-btn:hover { border-color: #3b82f6; }
+  .icon-btn.heart { color: #ef4444; }
+  .icon-btn.star  { color: #f59e0b; }
+
+  /* ---------- CSS 动画方案：旋转加载圈 ---------- */
+  .css-spin {
+    animation: css-rotate 1.4s linear infinite; /* CSS 关键帧驱动旋转 */
+    transform-origin: 30px 30px;                /* 旋转中心 = 圆心 */
+  }
+  @keyframes css-rotate { to { transform: rotate(360deg); } }
+
+  /* ---------- 点赞爆星：JS 给容器加 class 触发 CSS 补间 ---------- */
+  @keyframes like-pop {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(1.45); }
+    60%  { transform: scale(0.9); }
+    100% { transform: scale(1); }
+  }
+  .like-svg.pop { animation: like-pop .5s ease; }
+
+  .stage {
+    display: flex;
+    gap: 26px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .stage figure { text-align: center; }
+  .stage figcaption { font-size: 12px; color: #94a3b8; margin-top: 8px; line-height: 1.6; }
+  #jsInfo { font-size: 12px; color: #7dd3fc; margin-top: 6px; min-height: 18px; }
+</style>
+</head>
+<body>
+
+<h1>SVG 图标系统 与 三种动画方案</h1>
+<p class="desc">
+  symbol 一次定义、use 处处引用、currentColor 随文字变色——
+  这是现代图标系统的全部基础。下面还把同一个加载动画用 SMIL、CSS、JS 各实现了一遍。
+</p>
+
+<!-- ========== 图标雪碧图：隐藏容器 + symbol 模板 ========== -->
+<!-- display:none 防止占位；symbol 自带 viewBox，引用处只管给宽高 -->
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <!-- 爱心：path 用两段三次贝塞尔拼出心形 -->
+    <symbol id="i-heart" viewBox="0 0 24 24">
+      <path d="M12 21s-7.6-4.9-10-9.4C.6 8 2.6 4 6.6 4 9.1 4 11 5.6 12 7.1 13 5.6 14.9 4 17.4 4c4 0 6 4 4.6 7.6C19.6 16.1 12 21 12 21z"/>
+    </symbol>
+    <!-- 五角星：polygon 按极坐标算出 10 个顶点 -->
+    <symbol id="i-star" viewBox="0 0 24 24">
+      <polygon points="12,2 14.9,8.6 22,9.2 16.6,14 18.2,21 12,17.3 5.8,21 7.4,14 2,9.2 9.1,8.6"/>
+    </symbol>
+    <!-- 铃铛：path + 圆点组合 -->
+    <symbol id="i-bell" viewBox="0 0 24 24">
+      <path d="M12 3a6 6 0 0 0-6 6v4l-1.7 3.2A1 1 0 0 0 5.2 18h13.6a1 1 0 0 0 .9-1.8L18 13V9a6 6 0 0 0-6-6z"/>
+      <circle cx="12" cy="20.5" r="1.6"/>
+    </symbol>
+    <!-- 房子：折线屋顶 + 矩形门 -->
+    <symbol id="i-home" viewBox="0 0 24 24">
+      <path d="M12 3l9 8h-3v9h-4.5v-6h-3v6H6v-9H3z"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- ========== 第一部分：图标系统 ========== -->
+<section>
+  <h2>symbol / use 图标系统（currentColor 随文字变色）</h2>
+  <div class="row">
+    <!-- 同一个 symbol 被不同按钮、不同尺寸、不同颜色复用 -->
+    <button class="icon-btn heart" id="likeBtn" aria-label="点赞">
+      <svg class="like-svg" width="18" height="18" aria-hidden="true"><use href="#i-heart"/></svg>
+      点赞我
+    </button>
+    <button class="icon-btn star" aria-label="收藏">
+      <svg width="18" height="18" aria-hidden="true"><use href="#i-star"/></svg>
+      收藏
+    </button>
+    <button class="icon-btn" aria-label="通知">
+      <svg width="18" height="18" aria-hidden="true"><use href="#i-bell"/></svg>
+      通知
+    </button>
+    <button class="icon-btn" aria-label="首页">
+      <svg width="26" height="26" aria-hidden="true"><use href="#i-home"/></svg>
+      首页（26px）
+    </button>
+    <!-- 信息性图标示例：带 title/desc，读屏可朗读 -->
+    <svg width="20" height="20" role="img" aria-labelledby="warn-t" style="vertical-align:middle">
+      <title id="warn-t">警告：磁盘空间不足</title>
+      <use href="#i-bell" fill="#fbbf24"/>
+    </svg>
+    <span style="font-size:13px">← 这一个带 &lt;title&gt;，读屏会念"警告：磁盘空间不足"</span>
+  </div>
+</section>
+
+<!-- ========== 第二部分：三种动画方案对比 ========== -->
+<section>
+  <h2>同一个"加载圈"，三种动画实现</h2>
+  <div class="stage">
+    <!-- 方案① SMIL：纯标签动画，写在 .svg 文件里被 <img> 引用也能播 -->
+    <figure>
+      <svg width="60" height="60" viewBox="0 0 60 60">
+        <circle cx="30" cy="30" r="20" fill="none"
+                stroke="#f59e0b" stroke-width="5"
+                stroke-linecap="round" stroke-dasharray="31 95"/>
+        <!-- animateTransform = SMIL 旋转；repeatCount 无限循环 -->
+        <animateTransform attributeName="transform" type="rotate"
+                          from="0 30 30" to="360 30 30" dur="1.4s"
+                          repeatCount="indefinite"/>
+      </svg>
+      <figcaption>SMIL：&lt;animateTransform&gt;<br>纯标签 · 可进独立 .svg 文件</figcaption>
+    </figure>
+
+    <!-- 方案② CSS：@keyframes + transform，最常用 -->
+    <figure>
+      <svg width="60" height="60" viewBox="0 0 60 60">
+        <circle class="css-spin" cx="30" cy="30" r="20" fill="none"
+                stroke="#38bdf8" stroke-width="5"
+                stroke-linecap="round" stroke-dasharray="31 95"/>
+      </svg>
+      <figcaption>CSS：@keyframes rotate<br>简单直观 · transform 走合成器</figcaption>
+    </figure>
+
+    <!-- 方案③ JS：rAF 逐帧改属性，可加数据联动/物理感 -->
+    <figure>
+      <svg width="60" height="60" viewBox="0 0 60 60">
+        <circle id="jsArc" cx="30" cy="30" r="20" fill="none"
+                stroke="#34d399" stroke-width="5" stroke-linecap="round"/>
+      </svg>
+      <figcaption>JS：rAF + setAttribute<br>可变速/可暂停/可与数据联动</figcaption>
+      <div id="jsInfo">角度：0°</div>
+    </figure>
+  </div>
+</section>
+
+<!-- ========== 点赞爆星交互（JS 驱动的完整小案例） ========== -->
+<script>
+(function () {
+  'use strict';
+
+  // ---------- 点赞按钮：缩放回弹 ----------
+  const likeBtn = document.getElementById('likeBtn');
+  const likeSvg = likeBtn.querySelector('.like-svg');
+  likeBtn.addEventListener('click', () => {
+    // 重新触发动画的技巧：先移除 class → 强制回流 → 再加回
+    likeSvg.classList.remove('pop');
+    void likeSvg.offsetWidth;              // 强制回流，重置 CSS 动画
+    likeSvg.classList.add('pop');
+    // 按钮文字在"点赞/已点赞"间切换
+    const liked = likeBtn.getAttribute('aria-pressed') === 'true';
+    likeBtn.setAttribute('aria-pressed', String(!liked));
+    likeBtn.lastChild.textContent = liked ? ' 点赞我' : ' 已点赞';
+  });
+
+  // ---------- JS 动画方案：变加速旋转圈 ----------
+  const arc = document.getElementById('jsArc');
+  const info = document.getElementById('jsInfo');
+  const R = 20, CIRC = 2 * Math.PI * R;    // 圆周长，用于换算弧长
+  let angle = 0;
+
+  function frame(now, last) {
+    const dt = last ? Math.min((now - last) / 1000, 0.05) : 0;
+    // 变速旋转：角速度随 sin 波动 → 有"呼吸感"，这是 JS 才好做的细节
+    angle += (180 + 120 * Math.sin(now / 400)) * dt;
+    const deg = angle % 360;
+    // 把旋转角换算成 dash：实段占 1/4 圈，dashoffset 随角度推移
+    arc.setAttribute('stroke-dasharray', CIRC * 0.25 + ' ' + CIRC * 0.75);
+    arc.setAttribute('stroke-dashoffset', CIRC * (1 - deg / 360));
+    arc.setAttribute('transform', 'rotate(' + deg + ' 30 30)'); // 呼应 SMIL 写法
+    info.textContent = '角度：' + Math.round(deg) + '°（角速度动态变化）';
+    requestAnimationFrame(t => frame(t, now));
+  }
+  requestAnimationFrame(t => frame(t, 0));
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例：Canvas 粒子背景（连线粒子 + 鼠标交互）
+  ------------------------------------------------------------
+  【知识点】
+    1. devicePixelRatio 高清屏适配（含窗口 resize 时的重适配流程）
+    2. 简单物理模型：粒子 = 位置 + 速度，dt（时间步长）驱动位移
+    3. 双层 for 两两求距离画连线，透明度按距离线性衰减
+    4. 鼠标交互：记录 mouse 坐标，靠近时连线点亮 + 粒子被推开
+    5. 性能意识：O(n²) 距离计算的规模控制
+
+  【运行方式】
+    双击本文件，浏览器直接打开即可；拖动鼠标体验交互。
+
+  【效果说明】
+    深蓝背景上约 90 个发光粒子缓慢漂移；距离小于 110px 的粒子间
+    互相连线，越近越亮；鼠标移入后，附近连线被"点亮"为暖色，
+    且粒子受到轻微推力避开光标，形成可交互的星空网格。
+
+  【注意事项】
+    - 粒子两两连线是 O(n²)：n=90 时每帧约 4000 次距离计算可接受；
+      若要扩展到几百个以上，请改用空间网格分桶优化。
+    - resize 时 canvas.width 被重设会清空画布并重置变换，
+      因此必须重新执行整套 dpr 适配（本示例 resetDPR 函数）。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Canvas 示例 02 · 粒子背景（连线 + 鼠标交互）</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #e2e8f0;
+    overflow: hidden;              /* 画布全屏铺满，禁止滚动条 */
+  }
+  /* 画布铺满整个视口，作为"背景层" */
+  #stage {
+    position: fixed;
+    inset: 0;                      /* top/right/bottom/left 全 0 */
+    display: block;
+    background: #0b1220;           /* CSS 背景色兜底，避免闪白 */
+  }
+  /* 文案浮层：叠在画布上方，pointer-events:none 保证鼠标事件穿透到画布 */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    pointer-events: none;          /* ★ 关键：让鼠标事件"穿过"文字到达画布 */
+    gap: 12px;
+    padding: 24px;
+  }
+  .overlay h1 { font-size: 26px; color: #f1f5f9; text-shadow: 0 0 12px rgba(56,189,248,.5); }
+  .overlay p { max-width: 520px; line-height: 1.8; font-size: 14px; color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<canvas id="stage"></canvas>
+<div class="overlay">
+  <h1>连线粒子背景</h1>
+  <p>移动鼠标试试：附近的连线会被点亮，粒子会轻轻避开光标。<br>
+     本页所有光点与连线均为 Canvas 程序自绘，无任何图片。</p>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d');
+
+  let W = 0, H = 0;                // 逻辑尺寸（CSS 像素），供物理计算使用
+
+  // ---------------- 高清屏适配（每次 resize 都要重来一遍） ----------------
+  // 原理：位图 = 视口 CSS 尺寸 × dpr；CSS 尺寸保持不变；ctx.scale 把坐标系缩回。
+  // 注意：重设 canvas.width 会清空画布并重置变换，所以 scale 必须每次重新设置。
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2); // 封顶 2，兼顾清晰度与性能
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width  = W * dpr;       // 物理位图放大 dpr 倍 → 高清
+    canvas.height = H * dpr;
+    canvas.style.width  = W + 'px';// CSS 显示仍占满视口
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // 等价于 ctx.scale(dpr, dpr)，但更明确
+  }
+  window.addEventListener('resize', resize); // 窗口变化时重适配（否则会拉伸发虚）
+  resize();
+
+  // ---------------- 粒子数据 ----------------
+  const COUNT = 90;                // 粒子数量：太多会 O(n²) 卡顿
+  const LINK_DIST = 110;           // 连线触发距离（CSS 像素）
+  const MOUSE_DIST = 160;          // 鼠标影响半径
+
+  const particles = [];
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  function spawn() {
+    particles.length = 0;
+    for (let i = 0; i < COUNT; i++) {
+      particles.push({
+        x: rand(0, W),             // 初始位置随机铺满屏幕
+        y: rand(0, H),
+        vx: rand(-24, 24),         // 速度单位：像素/秒（配合 dt 使用）
+        vy: rand(-24, 24),
+        r: rand(1.2, 2.6)          // 半径差异化，画面更自然
+      });
+    }
+  }
+  spawn();
+
+  // ---------------- 鼠标交互：只记录坐标，不动数据 ----------------
+  // pointer 事件同时兼容鼠标 / 触屏 / 手写笔
+  const mouse = { x: -9999, y: -9999 };  // -9999 表示"不在画面内"
+  canvas.addEventListener('pointermove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+  canvas.addEventListener('pointerleave', () => { mouse.x = -9999; mouse.y = -9999; });
+
+  // ---------------- 每帧逻辑：更新位置 + 整帧重绘 ----------------
+  let last = performance.now();
+
+  function update(dt) {
+    for (const p of particles) {
+      // 位移 = 速度 × dt：保证 60Hz / 120Hz 屏幕上移动速度一致
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+
+      // 鼠标斥力：距离越近推力越大，方向为"粒子 - 鼠标"的单位向量
+      const dx = p.x - mouse.x;
+      const dy = p.y - mouse.y;
+      const d = Math.hypot(dx, dy);
+      if (d < MOUSE_DIST && d > 0.001) {
+        const force = (1 - d / MOUSE_DIST) * 60;  // 最强 60px/s 的推力
+        p.x += (dx / d) * force * dt;
+        p.y += (dy / d) * force * dt;
+      }
+
+      // 边界反弹：撞墙就把对应速度分量取反
+      if (p.x < 0 || p.x > W) { p.vx *= -1; p.x = Math.max(0, Math.min(W, p.x)); }
+      if (p.y < 0 || p.y > H) { p.vy *= -1; p.y = Math.max(0, Math.min(H, p.y)); }
+    }
+  }
+
+  function render() {
+    // 清屏：恢复透明底，露出 CSS 的深色背景
+    ctx.clearRect(0, 0, W, H);
+
+    // 1) 粒子间连线：双重循环两两求距离（O(n²)，i<j 只算一半避免重复）
+    for (let i = 0; i < particles.length; i++) {
+      const a = particles[i];
+      for (let j = i + 1; j < particles.length; j++) {
+        const b = particles[j];
+        const dx = a.x - b.x, dy = a.y - b.y;
+        // 先做"粗筛"：x/y 差超过阈值直接跳过，省掉昂贵的开方
+        if (Math.abs(dx) > LINK_DIST || Math.abs(dy) > LINK_DIST) continue;
+        const dist = Math.hypot(dx, dy);
+        if (dist < LINK_DIST) {
+          // 透明度按距离线性衰减：越近越亮，产生"聚拢感"
+          ctx.strokeStyle = 'rgba(56,189,248,' + ((1 - dist / LINK_DIST) * 0.5).toFixed(3) + ')';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // 2) 鼠标关联线：附近的粒子连向光标，用暖色高亮
+    if (mouse.x > 0) {
+      for (const p of particles) {
+        const dist = Math.hypot(p.x - mouse.x, p.y - mouse.y);
+        if (dist < MOUSE_DIST) {
+          ctx.strokeStyle = 'rgba(251,191,36,' + ((1 - dist / MOUSE_DIST) * 0.6).toFixed(3) + ')';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(mouse.x, mouse.y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // 3) 粒子本体：径向渐变做"发光小球"，比纯色圆点质感好
+    for (const p of particles) {
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 4);
+      g.addColorStop(0, 'rgba(125,211,252,0.95)');
+      g.addColorStop(1, 'rgba(125,211,252,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // ---------------- 动画循环 ----------------
+  function loop(now) {
+    const dt = Math.min((now - last) / 1000, 0.05); // 上限 50ms，防止切后台回来"瞬移"
+    last = now;
+    update(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

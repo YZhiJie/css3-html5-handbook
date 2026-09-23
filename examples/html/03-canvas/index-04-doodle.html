@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例：Canvas 鼠标涂鸦板（pointer 事件 + 撤销/重做）
+  ------------------------------------------------------------
+  【知识点】
+    1. devicePixelRatio 高清屏适配（动态读取画布 CSS 尺寸的通用写法）
+    2. pointerdown / pointermove / pointerup 事件（兼容鼠标+触屏+笔）
+    3. setPointerCapture：拖出画布边界仍能持续接收 move
+    4. "数据驱动"状态管理：每一笔是数据对象，撤销 = 弹栈后整帧重放
+    5. 增量绘制 vs 全帧重放的性能取舍
+    6. 坐标换算：clientX/Y 减去画布偏移 = 画布内坐标
+
+  【运行方式】
+    双击本文件，浏览器直接打开；按住鼠标（或手指）在画布上拖动即可涂鸦。
+
+  【效果说明】
+    一块可自由涂鸦的画布：5 种颜色、3 种线宽可切换；
+    按住拖动即画圆头线条；工具栏提供 撤销 / 重做 / 清空 三个操作，
+    全部基于"笔画数据重放"实现，窗口缩放后图形也不会丢失。
+
+  【注意事项】
+    - 每笔画线时用"增量绘制"（只画新增线段）保证流畅；
+      撤销/重做/resize 时才"整帧重放"，这是性能与正确的平衡点。
+    - 坐标必须用 getBoundingClientRect 换算，画布在页面中的偏移
+      不一定为 0（本页有工具栏占位）。
+    - 用 e.pointerType 可区分鼠标/触摸，本示例未区分，统一处理。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Canvas 示例 04 · 鼠标涂鸦板</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    background: #0f172a;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #cbd5e1;
+    padding: 24px 16px;
+  }
+  h1 { font-size: 22px; color: #f1f5f9; }
+  p.desc { max-width: 560px; line-height: 1.8; font-size: 14px; text-align: center; }
+
+  /* 工具栏：颜色 / 线宽 / 操作按钮 */
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .swatch {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 3px solid transparent;   /* 未选中时透明描边占位，避免跳动 */
+    cursor: pointer;
+    transition: transform .15s;
+  }
+  .swatch:hover { transform: scale(1.1); }
+  .swatch.active { border-color: #f8fafc; }   /* 选中色板加白圈 */
+  .size-btn {
+    min-width: 44px;
+    padding: 6px 10px;
+    font-size: 13px;
+    color: #e2e8f0;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .size-btn.active { background: #2563eb; border-color: #3b82f6; }
+  .act-btn {
+    padding: 7px 16px;
+    font-size: 13px;
+    color: #f1f5f9;
+    background: #334155;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .act-btn:hover { background: #475569; }
+  .act-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* 画布：白色画纸，用圆角与阴影做成"卡片" */
+  #board {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(2, 6, 23, .45);
+    touch-action: none;              /* ★ 触屏拖动时不滚动页面，交给画笔 */
+    cursor: crosshair;
+  }
+</style>
+</head>
+<body>
+
+<h1>Canvas 涂鸦板</h1>
+<p class="desc">
+  按住鼠标在白纸上拖动即可作画。每一笔被记录为"点序列 + 颜色 + 线宽"的数据，
+  撤销/重做/清空全部是对这份数据做增删，再整帧重放——这是 Canvas 实现
+  历史记录功能的标准解法，比逐帧保存位图快照省内存得多。
+</p>
+
+<div class="toolbar" id="toolbar">
+  <!-- 色板：data-color 存颜色值，JS 统一绑定事件 -->
+  <div class="swatch active" data-color="#1f2937" style="background:#1f2937" title="墨黑"></div>
+  <div class="swatch" data-color="#ef4444" style="background:#ef4444" title="红色"></div>
+  <div class="swatch" data-color="#22c55e" style="background:#22c55e" title="绿色"></div>
+  <div class="swatch" data-color="#3b82f6" style="background:#3b82f6" title="蓝色"></div>
+  <div class="swatch" data-color="#f59e0b" style="background:#f59e0b" title="橙色"></div>
+  <!-- 线宽 -->
+  <button class="size-btn" data-w="3">细</button>
+  <button class="size-btn active" data-w="6">中</button>
+  <button class="size-btn" data-w="12">粗</button>
+  <!-- 操作 -->
+  <button class="act-btn" id="undo" disabled>撤销</button>
+  <button class="act-btn" id="redo" disabled>重做</button>
+  <button class="act-btn" id="clear">清空</button>
+</div>
+
+<canvas id="board"></canvas>
+
+<script>
+(function () {
+  'use strict';
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const undoBtn = document.getElementById('undo');
+  const redoBtn = document.getElementById('redo');
+  const clearBtn = document.getElementById('clear');
+
+  // ---------------- 高清屏适配（通用写法：以元素 CSS 尺寸为准） ----------------
+  // 这次不写死尺寸，而是读 canvas 的 CSS 实际渲染尺寸来建位图，
+  // 因此改样式就能改大小，适配逻辑不用动——实际项目推荐这种写法。
+  const CSS_W = 560, CSS_H = 360;
+  canvas.style.width  = CSS_W + 'px';
+  canvas.style.height = CSS_H + 'px';
+  const dpr = Math.min(window.devicePixelRatio || 1, 2); // 高分屏封顶 2
+  canvas.width  = CSS_W * dpr;   // 位图物理像素放大 dpr 倍
+  canvas.height = CSS_H * dpr;
+  ctx.scale(dpr, dpr);           // ★ 坐标系缩回 CSS 像素，之后按 CSS 坐标画
+
+  const W = CSS_W, H = CSS_H;    // 逻辑宽高别名
+
+  // ---------------- 状态管理：笔画数据 ----------------
+  // 一笔 = { color, width, points:[{x,y},...] }；撤销/重做都是操作这两个栈
+  let strokes = [];              // 已提交的笔画
+  let redoStack = [];            // 被撤销的笔画（供重做恢复）
+  let curColor = '#1f2937';
+  let curWidth = 6;
+  let drawing = false;           // 是否正在落笔
+
+  // clientX/Y 是相对视口的，减去画布左上角偏移才是画布内坐标
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  // ---------------- 整帧重放：把 strokes 数组画一遍 ----------------
+  function redrawAll() {
+    ctx.clearRect(0, 0, W, H);   // 清屏（透明底露出白纸背景）
+    for (const s of strokes) {
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = s.width;
+      ctx.lineCap = 'round';     // 圆头让转折更平滑
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      // 只有 1 个点时也要能"点出圆点"：画一段极短线段配合圆头
+      ctx.moveTo(s.points[0].x, s.points[0].y);
+      if (s.points.length === 1) {
+        ctx.lineTo(s.points[0].x + 0.1, s.points[0].y);
+      } else {
+        for (let i = 1; i < s.points.length; i++) {
+          ctx.lineTo(s.points[i].x, s.points[i].y);
+        }
+      }
+      ctx.stroke();
+    }
+  }
+
+  // ---------------- pointer 事件：down 记笔，move 增量画，up 提交 ----------------
+  canvas.addEventListener('pointerdown', e => {
+    drawing = true;
+    redoStack = [];              // 新笔画会分叉历史，重做栈作废（与编辑器惯例一致）
+    strokes.push({ color: curColor, width: curWidth, points: [getPos(e)] });
+    canvas.setPointerCapture(e.pointerId); // ★ 拖出画布也继续收 move，不断线
+    updateButtons();
+  });
+
+  canvas.addEventListener('pointermove', e => {
+    if (!drawing) return;
+    const s = strokes[strokes.length - 1];
+    const pos = getPos(e);
+    const prev = s.points[s.points.length - 1];
+    s.points.push(pos);
+    // 增量绘制：只画"上一段线"而不重放整笔，拖动始终流畅
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = s.width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(prev.x, prev.y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+  });
+
+  function endStroke() { drawing = false; updateButtons(); }
+  canvas.addEventListener('pointerup', endStroke);
+  canvas.addEventListener('pointercancel', endStroke); // 触屏被打断也要收尾
+
+  // ---------------- 工具栏交互 ----------------
+  // 色板：点击换颜色 + 高亮（事件委托，一个监听器管所有色块）
+  document.getElementById('toolbar').addEventListener('click', e => {
+    const sw = e.target.closest('.swatch');
+    if (sw) {
+      curColor = sw.dataset.color;
+      document.querySelectorAll('.swatch').forEach(el => el.classList.toggle('active', el === sw));
+    }
+    const sz = e.target.closest('.size-btn');
+    if (sz) {
+      curWidth = Number(sz.dataset.w);
+      document.querySelectorAll('.size-btn').forEach(el => el.classList.toggle('active', el === sz));
+    }
+  });
+
+  // 撤销：把最后一笔移入重做栈，然后整帧重放
+  undoBtn.addEventListener('click', () => {
+    if (!strokes.length) return;
+    redoStack.push(strokes.pop());
+    redrawAll();
+    updateButtons();
+  });
+
+  // 重做：从重做栈取回最后一笔
+  redoBtn.addEventListener('click', () => {
+    if (!redoStack.length) return;
+    strokes.push(redoStack.pop());
+    redrawAll();
+    updateButtons();
+  });
+
+  // 清空：等价于撤销所有笔画，但历史不可恢复
+  clearBtn.addEventListener('click', () => {
+    strokes = [];
+    redoStack = [];
+    redrawAll();
+    updateButtons();
+  });
+
+  // 按钮可用性跟随栈状态（禁用态比点击后无反馈体验好）
+  function updateButtons() {
+    undoBtn.disabled = strokes.length === 0;
+    redoBtn.disabled = redoStack.length === 0;
+  }
+})();
+</script>
+</body>
+</html>

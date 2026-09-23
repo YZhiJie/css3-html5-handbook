@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例：SVG 渐变（linearGradient / radialGradient）与 filter 滤镜
+  ------------------------------------------------------------
+  【知识点】
+    1. <defs> 定义区：内部元素不直接渲染，供 fill="url(#id)" 引用
+    2. linearGradient：x1/y1/x2/y2 定义方向，<stop> 定义色标
+    3. radialGradient：中心光点模拟球体高光 / 光晕
+    4. 滤镜原语链：feGaussianBlur / feOffset / feFlood / feComposite
+       / feMerge，in 与 result 构成"数据处理管道"
+    5. filter 区域裁切问题：默认 ±10%，必须放大 x/y/width/height
+    6. gradientUnits="userSpaceOnUse" 与默认 objectBoundingBox 的区别
+
+  【运行方式】
+    双击本文件，浏览器直接打开即可；部分图形带 CSS hover 联动动画。
+
+  【效果说明】
+    四个演示卡片：① 渐变按钮与渐变文字（多方向线性渐变）；
+    ② 径向渐变球体（高光偏上更立体）；③ 霓虹发光圆（blur+merge）；
+    ④ 投影方块（blur+offset+flood+composite 完整阴影管道）。
+    悬停按钮会切换渐变色标（CSS 控制 SVG 渐变 stop-color）。
+
+  【注意事项】
+    - 滤镜默认作用区域是元素包围盒外扩 10%，模糊/阴影稍大就会被"切平"，
+      必须给 <filter> 放大区域（本示例的 x=-50% y=-50% width=200% height=200%）。
+    - 渐变端点若写像素值而未设 gradientUnits="userSpaceOnUse"，
+      会被解释为"包围盒比例"以外坐标，画不出预期渐变。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SVG 示例 03 · 渐变与滤镜</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    background: #0f172a;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #cbd5e1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    padding: 28px 16px;
+  }
+  h1 { font-size: 22px; color: #f1f5f9; }
+  p.desc { max-width: 640px; line-height: 1.8; font-size: 14px; text-align: center; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    width: 100%;
+    max-width: 900px;
+  }
+  .card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 14px;
+    padding: 14px 16px;
+  }
+  .card h2 { font-size: 14px; color: #7dd3fc; margin-bottom: 8px; }
+  .card svg { display: block; margin: 0 auto; background: #0b1220; border-radius: 10px; }
+  .card p { font-size: 12.5px; line-height: 1.7; color: #94a3b8; margin-top: 8px; }
+
+  /* hover 联动：CSS 直接改 SVG 内部渐变 stop 的颜色（内联 SVG 才可行） */
+  #btnSvg:hover .stop-a { stop-color: #f59e0b; }
+  #btnSvg:hover .stop-b { stop-color: #ef4444; }
+  .stop-a, .stop-b { transition: stop-color .4s; } /* stop-color 可平滑过渡 */
+</style>
+</head>
+<body>
+
+<h1>SVG 渐变与滤镜</h1>
+<p class="desc">
+  渐变定义在 &lt;defs&gt; 里、用 fill="url(#id)" 引用；滤镜是 fe 原语组成的
+  "数据处理管道"，in/result 就是管道里的变量名。悬停第一个按钮试试 CSS 联动。
+</p>
+
+<!-- ========== 全局 defs：所有渐变与滤镜定义一次、全页复用 ========== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- 线性渐变：默认 objectBoundingBox 单位，x1y1x2y2 是"包围盒比例"
+         0%→100% 表示自左向右水平过渡 -->
+    <linearGradient id="gradBtn" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop class="stop-a" offset="0%" stop-color="#3b82f6"/>
+      <stop class="stop-b" offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+
+    <!-- 对角线渐变：x1y1 左上 → x2y2 右下 -->
+    <linearGradient id="gradDiag" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="50%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#ef4444"/>
+    </linearGradient>
+
+    <!-- 径向渐变：cx/cy 把高光点放在 35% 高度处，球体更立体 -->
+    <radialGradient id="gradBall" cx="35%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#f8fafc"/>   <!-- 高光近白 -->
+      <stop offset="35%" stop-color="#60a5fa"/>
+      <stop offset="100%" stop-color="#1e3a8a"/> <!-- 边缘深蓝 -->
+    </radialGradient>
+
+    <!-- 滤镜①：霓虹发光。原理 = 模糊副本垫底 + 原图叠上 -->
+    <!-- ★ filter 区域默认只覆盖包围盒 ±10%，光晕会被切平，必须放大 -->
+    <filter id="fxGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>            <!-- 先画模糊层（底层光晕） -->
+        <feMergeNode in="SourceGraphic"/>   <!-- 再画原图（清晰主体） -->
+      </feMerge>
+    </filter>
+
+    <!-- 滤镜②：完整投影管道。fe 原语用 in/result 串成数据流 -->
+    <filter id="fxShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="5" result="soft"/>
+      <!--  SourceAlpha = 只取形状的黑色剪影，比模糊全图便宜 -->
+      <feOffset in="soft" dx="4" dy="6" result="moved"/>
+      <feFlood flood-color="#020617" flood-opacity="0.55" result="ink"/>
+      <feComposite in="ink" in2="moved" operator="in" result="shadow"/>
+      <!--  operator="in"：用 moved 的形状裁剪 ink 的颜色 → 得到半透明阴影 -->
+      <feMerge>
+        <feMergeNode in="shadow"/>          <!-- 阴影在下 -->
+        <feMergeNode in="SourceGraphic"/>   <!-- 主体在上 -->
+      </feMerge>
+    </filter>
+  </defs>
+</svg>
+
+<div class="grid">
+  <!-- ========== 卡片①：线性渐变按钮与渐变文字 ========== -->
+  <div class="card">
+    <h2>① 线性渐变（hover 换色联动）</h2>
+    <svg id="btnSvg" width="240" height="120" viewBox="0 0 240 120">
+      <!-- 渐变按钮：fill 引用 defs 里的 gradBtn -->
+      <rect x="45" y="20" width="150" height="44" rx="22" fill="url(#gradBtn)"/>
+      <text x="120" y="48" text-anchor="middle" fill="#fff"
+            font-size="15" font-family="sans-serif">渐变按钮</text>
+      <!-- 渐变文字：fill 同样可用渐变 -->
+      <text x="120" y="100" text-anchor="middle" font-size="24" font-weight="700"
+            font-family="sans-serif" fill="url(#gradDiag)">渐变文字</text>
+    </svg>
+    <p>悬停整块 SVG：CSS 修改 stop-color，渐变整体平滑变色——
+       内联 SVG 的 stop 是 DOM 节点，可直接被 CSS 控制。</p>
+  </div>
+
+  <!-- ========== 卡片②：径向渐变球体 ========== -->
+  <div class="card">
+    <h2>② 径向渐变球体</h2>
+    <svg width="240" height="140" viewBox="0 0 240 140">
+      <!-- 高光点 cx=35% cy=30% 偏左上 → 模拟左上打光的立体球 -->
+      <circle cx="120" cy="70" r="52" fill="url(#gradBall)"/>
+    </svg>
+    <p>radialGradient 的 cx/cy/r 全是"包围盒百分比"；
+       把中心移出正中即可制造打光角度，这是画"球"最省事的办法。</p>
+  </div>
+
+  <!-- ========== 卡片③：霓虹发光 ========== -->
+  <div class="card">
+    <h2>③ 霓虹发光（blur + merge）</h2>
+    <svg width="240" height="140" viewBox="0 0 240 140">
+      <!-- 发光圆：滤镜把模糊副本垫在原图下面形成光晕 -->
+      <circle cx="80" cy="70" r="30" fill="#38bdf8" filter="url(#fxGlow)"/>
+      <!-- 对比：无滤镜的纯色圆 -->
+      <circle cx="170" cy="70" r="30" fill="#334155"/>
+      <text x="170" y="120" text-anchor="middle" fill="#64748b"
+            font-size="11" font-family="sans-serif">无滤镜对照</text>
+    </svg>
+    <p>发光 = feGaussianBlur 模糊 + feMerge 把模糊层和原图叠放。
+       注意 filter 区域已放大到 260%，否则光晕会被裁成方块。</p>
+  </div>
+
+  <!-- ========== 卡片④：完整投影管道 ========== -->
+  <div class="card">
+    <h2>④ 投影（四段滤镜管道）</h2>
+    <svg width="240" height="140" viewBox="0 0 240 140">
+      <rect x="70" y="34" width="100" height="72" rx="10"
+            fill="#22c55e" filter="url(#fxShadow)"/>
+    </svg>
+    <p>管道：SourceAlpha 模糊 → 偏移 → feFlood 灌色 → composite 裁形 → merge 叠放。
+       比 CSS box-shadow 繁琐，但每个环节都可自定义。</p>
+  </div>
+</div>
+
+</body>
+</html>

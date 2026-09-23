@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例：SVG 基本形状与 path 指令逐个演示
+  ------------------------------------------------------------
+  【知识点】
+    1. 六种基本形状：rect / circle / ellipse / line / polyline / polygon
+    2. path 指令详解：M(移动) L(直线) H/V(水平垂直) Q(二次贝塞尔)
+       C(三次贝塞尔) S(平滑续接) A(圆弧) Z(闭合)
+    3. fill 默认黑色、stroke 默认 none 的坑
+    4. 大写=绝对坐标 / 小写=相对坐标
+    5. aria-label 与 role 的无障碍标注
+
+  【运行方式】
+    双击本文件，浏览器直接打开即可；鼠标悬停每个图形可高亮并显示指令说明。
+
+  【效果说明】
+    分两块画布：上半部分是六种基本形状的对照表；
+    下半部分把 M/L/Q/C/S/A/Z 指令各画一条示例曲线，
+    悬停任意图形会出现描边高亮 + 底部说明文字切换。
+
+  【注意事项】
+    - 本页所有 SVG 均为内联方式，因此可以被页面 CSS 控制（hover 效果）；
+      若用 <img> 外链或 background 引入，这些 CSS 交互将全部失效。
+    - 想只要描边必须显式 fill="none"，否则默认黑色填充会盖住线条。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SVG 示例 01 · 基本形状与 path 指令</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      background: #0f172a;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: #cbd5e1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      padding: 28px 16px;
+    }
+
+    h1 {
+      font-size: 22px;
+      color: #f1f5f9;
+    }
+
+    p.desc {
+      max-width: 620px;
+      line-height: 1.8;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    /* 每个演示区是一张浅色"卡片"，里面放内联 SVG */
+    .panel {
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 10px 14px 4px;
+      box-shadow: 0 10px 28px rgba(2, 6, 23, .4);
+    }
+
+    .panel h2 {
+      font-size: 14px;
+      color: #475569;
+      padding: 6px 4px 0;
+    }
+
+    /* hover 高亮：SVG 是 DOM，可直接用 CSS 选择器控制（Canvas 做不到） */
+    .demo path,
+    .demo rect,
+    .demo circle,
+    .demo ellipse,
+    .demo line,
+    .demo polyline,
+    .demo polygon {
+      transition: opacity .2s, stroke-width .2s;
+      /* 平滑过渡高亮效果 */
+    }
+
+    .demo .hit:hover {
+      opacity: 1;
+    }
+
+    /* 底部说明条：悬停图形时 JS 更新其内容 */
+    #tip {
+      min-height: 44px;
+      max-width: 640px;
+      width: 100%;
+      padding: 10px 16px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #7dd3fc;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>SVG 基本形状与 path 指令</h1>
+  <p class="desc">
+    SVG 图形就是 DOM 节点：可以用 CSS 加 hover、用 JS 绑事件。
+    把鼠标悬停到下面任意图形上，试试说明条的变化。
+  </p>
+
+  <!-- ========== 第一块：六种基本形状 ========== -->
+  <div class="panel">
+    <h2>基本形状对照表</h2>
+    <svg class="demo" viewBox="0 0 420 120" width="420" role="img" aria-label="六种 SVG 基本形状">
+      <!-- rect：x/y 左上角坐标，rx 圆角半径。fill 默认黑色，务必显式给色 -->
+      <rect class="hit" x="16" y="20" width="70" height="44" rx="8" fill="#3b82f6"
+        data-tip="rect：x=16 y=20 w=70 h=44 rx=8（圆角矩形）" />
+      <!-- circle：cx/cy 圆心，r 半径 -->
+      <circle class="hit" cx="145" cy="42" r="24" fill="#ef4444" data-tip="circle：cx=145 cy=42 r=24（由圆心+半径定义）" />
+      <!-- ellipse：rx/ry 两个半径，"压扁的圆" -->
+      <ellipse class="hit" cx="225" cy="42" rx="30" ry="15" fill="#22c55e"
+        data-tip="ellipse：cx=225 cy=42 rx=30 ry=15（横放的椭圆）" />
+      <!-- line：只有描边有意义，fill 无效 -->
+      <line class="hit" x1="280" y1="18" x2="360" y2="66" stroke="#111827" stroke-width="3"
+        data-tip="line：两点一线，fill 无效、只看 stroke" />
+      <!-- polyline：折线不闭合；points 是 "x,y x,y ..." 序列 -->
+      <polyline class="hit" points="300,90 320,105 340,85 360,100" fill="none" stroke="#f59e0b" stroke-width="3"
+        data-tip="polyline：折线，不自动闭合（首尾不相连）" />
+      <!-- polygon：多边形，自动闭合回到起点 -->
+      <polygon class="hit" points="380,75 410,95 395,112" fill="#8b5cf6" data-tip="polygon：多边形，最后自动连回起点闭合" />
+    </svg>
+  </div>
+
+  <!-- ========== 第二块：path 指令逐个演示 ========== -->
+  <div class="panel">
+    <h2>path 指令速览（大写=绝对坐标）</h2>
+    <svg class="demo" viewBox="0 0 420 200" width="420" role="img" aria-label="path 指令演示">
+      <!-- 浅色参考网格：帮助理解坐标（纯装饰，aria-hidden） -->
+      <g aria-hidden="true" stroke="#e2e8f0" stroke-width="1">
+        <line x1="0" y1="50" x2="420" y2="50" />
+        <line x1="0" y1="100" x2="420" y2="100" />
+        <line x1="0" y1="150" x2="420" y2="150" />
+      </g>
+
+      <!-- M + L + Z：抬笔 → 三条直线 → 闭合，得到三角形 -->
+      <path class="hit" d="M 20,60 L 70,60 L 45,20 Z" fill="#3b82f6"
+        data-tip="M/L/Z：moveTo 抬笔、lineTo 直线、closePath 闭合回起点 → 三角形" />
+
+      <!-- C：三次贝塞尔，2 个控制点"拉扯"曲线 -->
+      <path class="hit" d="M 100,60 C 115,20 135,20 150,60" fill="none" stroke="#ef4444" stroke-width="2.5"
+        data-tip="C：三次贝塞尔 c1 c2 end，两个控制点决定弯曲方向与力度" />
+
+      <!-- S：续接平滑曲线，第一个控制点自动镜像上一个 -->
+      <path class="hit" d="M 100,60 C 115,20 135,20 150,60 S 195,100 210,60" fill="none" stroke="#fb7185"
+        stroke-width="2.5" data-tip="S：续接三次贝塞尔，首控制点自动镜像 → 连续波浪" />
+
+      <!-- Q：二次贝塞尔，1 个控制点，弧度更"硬" -->
+      <path class="hit" d="M 230,60 Q 265,10 300,60" fill="none" stroke="#22c55e" stroke-width="2.5"
+        data-tip="Q：二次贝塞尔 ctrl end，一个控制点 → 抛物拱" />
+
+      <!-- A：圆弧。rx ry rot large-arc sweep x y -->
+      <!-- 0 0 1 = 小弧 + 顺时针 → 向上的半圆拱；两个 flag 决定 4 种可能弧中选哪个 -->
+      <path class="hit" d="M 320,60 A 42,42 0 0 1 404,60" fill="none" stroke="#8b5cf6" stroke-width="2.5"
+        data-tip="A：椭圆弧 rx ry rot large-arc sweep x y（小弧+顺时针=上拱）" />
+
+      <!-- H/V：水平/垂直简写线 -->
+      <path class="hit" d="M 60,110 H 180 V 150 H 60 Z" fill="none" stroke="#0ea5e9" stroke-width="2.5"
+        data-tip="H/V：水平线 / 垂直线简写，只带一个坐标，长路径更好写" />
+
+      <!-- 相对指令（小写）：l 相对上一个点画线，适合程序拼接 -->
+      <path class="hit" d="M 220,110 l 30,0 l 0,40 l -60,0 l 0,-40 Z" fill="none" stroke="#f59e0b" stroke-width="2.5"
+        data-tip="小写=相对坐标：l 30,0 表示『相对上一点』向右 30 → 适合程序拼路径" />
+    </svg>
+  </div>
+
+  <div id="tip">把鼠标悬停到任意图形上查看它的指令说明（SVG 即 DOM，hover 由 CSS + JS 轻松实现）。</div>
+
+  <script>
+    (function () {
+      'use strict';
+      const tip = document.getElementById('tip');
+      const DEFAULT_TEXT = tip.textContent; // 记住默认文案，移出时恢复
+
+      // 事件委托：监听两个面板的 mouseover/mouseout，按 data-tip 属性切换说明
+      document.querySelectorAll('svg.demo').forEach(svg => {
+        svg.addEventListener('mouseover', e => {
+          const el = e.target.closest('[data-tip]');
+          // closest 找不到说明只在离开图形时发生，直接忽略
+          if (el) tip.textContent = el.getAttribute('data-tip');
+        });
+        svg.addEventListener('mouseout', e => {
+          const el = e.target.closest('[data-tip]');
+          if (el) tip.textContent = DEFAULT_TEXT;
+        });
+      });
+    })();
+  </script>
+</body>
+
+</html>

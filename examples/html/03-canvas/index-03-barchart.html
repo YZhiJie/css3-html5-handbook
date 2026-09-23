@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例：Canvas 动态柱状图（数据驱动 + 缓动动画过渡）
+  ------------------------------------------------------------
+  【知识点】
+    1. devicePixelRatio 高清屏适配（固定逻辑尺寸方案）
+    2. "数值插值"动画思想：每根柱子持有 from/to/current 三个值
+    3. 缓动函数 easeOutCubic（先快后慢），比线性观感自然
+    4. 数据驱动布局：柱宽、间距、Y 轴刻度全部由数据计算得出
+    5. 文本绘制：font / textAlign / textBaseline / measureText
+
+  【运行方式】
+    双击本文件，浏览器直接打开即可；点击"换一组数据"按钮体验过渡动画。
+
+  【效果说明】
+    8 根蓝色渐变柱状图，带 Y 轴刻度线、顶部数值、底部类目名。
+    点击按钮随机生成新数据，柱子以先快后慢的缓动节奏从旧高度
+    生长到新高度，同时 Y 轴最大刻度平滑更新。
+
+  【注意事项】
+    - 动画时长基于 performance.now() 时间差计算，与刷新率无关。
+    - 所有坐标基于"CSS 像素"设计尺寸书写，dpr 适配交给 ctx.scale。
+    - 渐变对象在每帧重建成本可接受；若柱数巨大，可缓存渐变复用。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Canvas 示例 03 · 动态柱状图</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    background: #0f172a;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #cbd5e1;
+    padding: 24px;
+  }
+  h1 { font-size: 22px; color: #f1f5f9; }
+  p.desc { max-width: 560px; line-height: 1.8; font-size: 14px; text-align: center; }
+  /* 画布容器：白色圆角卡片，让图表更像"产品里的图" */
+  .card {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: 0 12px 32px rgba(2, 6, 23, .45);
+  }
+  button {
+    padding: 9px 22px;
+    font-size: 14px;
+    color: #f8fafc;
+    background: #2563eb;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  button:hover { background: #3b82f6; }
+  /* 动画期间禁用按钮，防止连点导致插值混乱 */
+  button:disabled { background: #475569; cursor: wait; }
+</style>
+</head>
+<body>
+
+<h1>Canvas 动态柱状图</h1>
+<p class="desc">
+  图表完全由 Canvas 自绘（含坐标轴、刻度与数值标签）。
+  点击按钮后柱子会"生长"到新数据高度——本质是在每根柱子的
+  旧值与新值之间按缓动函数做时间插值，这是所有图表动画的通用套路。
+</p>
+<div class="card"><canvas id="chart"></canvas></div>
+<button id="regen">换一组数据</button>
+
+<script>
+(function () {
+  'use strict';
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+  const btn = document.getElementById('regen');
+
+  // ---------------- 高清屏适配（关键坑） ----------------
+  // 逻辑设计尺寸 640×360；位图放大 dpr 倍后，ctx.scale 把坐标系缩回，
+  // 之后全部代码都按 CSS 像素书写，与"是否会发虚"彻底解耦。
+  const W = 640, H = 360;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.scale(dpr, dpr);   // ★ 必须在所有绘制之前调用一次
+
+  // ---------------- 数据模型 ----------------
+  // 每根柱子保存 from（旧值）/ to（目标值）/ current（当前显示值）
+  // 动画 = 不断把 current 往 to 推进，画 current
+  const CATEGORIES = ['京', '沪', '广', '深', '杭', '蓉', '汉', '宁'];
+  const bars = [];
+  const ANIM_DURATION = 900;     // 动画时长（毫秒）
+
+  function randomData() {
+    for (let i = 0; i < CATEGORIES.length; i++) {
+      const v = Math.round(30 + Math.random() * 270); // 30~300 之间的随机指标值
+      if (bars[i]) {
+        bars[i].from = bars[i].current;  // 旧动画的当前值作为起点（中断也平滑）
+        bars[i].to = v;
+      } else {
+        bars[i] = { from: 0, to: v, current: 0 };  // 首次从 0 长起
+      }
+    }
+  }
+
+  // ---------------- 布局计算（数据驱动） ----------------
+  const PAD = { top: 30, right: 20, bottom: 34, left: 44 }; // 内边距：给刻度和标签留位
+  const plotW = W - PAD.left - PAD.right;    // 绘图区可用宽度
+  const plotH = H - PAD.top - PAD.bottom;    // 绘图区可用高度
+
+  // 求当前所有柱子的最大值 → 决定 Y 轴刻度（向上取整到 50 的倍数更好看）
+  function niceMax() {
+    const m = Math.max(...bars.map(b => b.to));
+    return Math.ceil(m / 50) * 50;
+  }
+
+  // ---------------- 绘制 ----------------
+  function render(progress) {
+    ctx.clearRect(0, 0, W, H);   // 清屏恢复透明底
+
+    const maxV = niceMax();
+
+    // 1. Y 轴横向网格线 + 刻度值：5 条均分
+    ctx.font = '11px "PingFang SC", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i <= 5; i++) {
+      const y = PAD.top + plotH - (plotH * i / 5);
+      ctx.strokeStyle = '#e2e8f0';           // 浅灰网格
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(PAD.left, y);
+      ctx.lineTo(PAD.left + plotW, y);
+      ctx.stroke();
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(String(Math.round(maxV * i / 5)), PAD.left - 8, y);
+    }
+
+    // 2. 柱子：柱宽 = 可用宽 ÷ 根数 × 0.6，剩余 0.4 自动成为间隙
+    const slot = plotW / bars.length;
+    const barW = slot * 0.6;
+    bars.forEach((b, i) => {
+      // 动画插值：progress ∈ [0,1]，easeOutCubic 先快后慢，观感自然
+      const t = Math.min(1, progress);
+      const ease = 1 - Math.pow(1 - t, 3);   // ★ 经典缓出曲线
+      b.current = b.from + (b.to - b.from) * ease;
+
+      const h = (b.current / maxV) * plotH;  // 值 → 像素高度
+      const x = PAD.left + i * slot + (slot - barW) / 2;
+      const y = PAD.top + plotH - h;
+
+      // 每根柱子的垂直线性渐变：顶部亮、底部深，增强立体感
+      const g = ctx.createLinearGradient(0, y, 0, y + h);
+      g.addColorStop(0, '#60a5fa');
+      g.addColorStop(1, '#1d4ed8');
+      ctx.fillStyle = g;
+      ctx.fillRect(x, y, barW, h);           // fillRect 直接画实心矩形
+
+      // 柱顶数值：跟随柱子生长实时更新
+      ctx.fillStyle = '#1e3a8a';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(String(Math.round(b.current)), x + barW / 2, y - 4);
+
+      // 底部类目名
+      ctx.fillStyle = '#64748b';
+      ctx.textBaseline = 'top';
+      ctx.fillText(CATEGORIES[i], x + barW / 2, PAD.top + plotH + 8);
+    });
+
+    // 3. X 轴基线：画在最下面，压住柱底
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(PAD.left, PAD.top + plotH);
+    ctx.lineTo(PAD.left + plotW, PAD.top + plotH);
+    ctx.stroke();
+  }
+
+  // ---------------- 动画调度：只用一个 rAF 循环，无动画时低频刷新 ----------------
+  let animStart = null;          // 本次动画的开始时间戳；null 表示无动画
+  const MAX_TICK = 1000000;      // 空闲刷新上限保护
+
+  function loop(now) {
+    if (animStart !== null) {
+      const p = (now - animStart) / ANIM_DURATION;
+      render(p);
+      if (p >= 1) {              // 动画结束：终点定格 + 解锁按钮
+        render(1);
+        animStart = null;
+        btn.disabled = false;
+      }
+    } else {
+      render(1);                 // 空闲时也要画最终状态（首屏就靠这里渲染）
+    }
+    requestAnimationFrame(loop);
+  }
+
+  // ---------------- 交互：换数据 + 触发过渡动画 ----------------
+  btn.addEventListener('click', () => {
+    btn.disabled = true;         // 动画期间禁点，避免插值起点混乱
+    randomData();
+    animStart = performance.now();
+  });
+
+  // 启动：先生成首组数据（从 0 生长入场），再进入循环
+  randomData();
+  animStart = performance.now();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

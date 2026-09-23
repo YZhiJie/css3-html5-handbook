@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例：viewBox 缩放原理 + stroke 描边动画（进度环/折线/流水灯）
+  ------------------------------------------------------------
+  【知识点】
+    1. viewBox（逻辑坐标系）与 width/height（视口）的关系
+    2. preserveAspectRatio 三种策略：meet(完整留白) / slice(铺满裁切) / none(拉伸)
+    3. stroke-dasharray / stroke-dashoffset 描边动画原理
+    4. getTotalLength() 精确获取路径总长（JS 版描边动画配方）
+    5. CSS 动画与 JS(rAF) 驱动描边动画两种写法
+
+  【运行方式】
+    双击本文件，浏览器直接打开；点击"播放描边动画 / 暂停"按钮体验 JS 控制。
+
+  【效果说明】
+    上半部分：同一个 100×50 viewBox 的图形放进 3 个不同比例的相框，
+    分别用 meet / slice / none 装裱，直观对比缩放策略。
+    下半部分：一个进度环（CSS 循环动画）+ 一条心电图式折线
+    （JS 逐帧推进 dashoffset，可暂停/重播），并显示路径总长数据。
+
+  【注意事项】
+    - dasharray 写死大数值会让短路径"提前断线"，正确做法是
+      getTotalLength() 取精确长度（本示例两种方式都有演示对比）。
+    - 描边动画只改 stroke-dashoffset，不触发布局重排，性能好。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SVG 示例 02 · viewBox 缩放与描边动画</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    background: #0f172a;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #cbd5e1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    padding: 28px 16px;
+  }
+  h1 { font-size: 22px; color: #f1f5f9; }
+  p.desc { max-width: 640px; line-height: 1.8; font-size: 14px; text-align: center; }
+  section {
+    width: 100%;
+    max-width: 660px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 14px;
+    padding: 16px 18px;
+  }
+  section h2 { font-size: 15px; color: #7dd3fc; margin-bottom: 12px; }
+  .frames { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .frame { text-align: center; }
+  .frame svg { background: #0b1220; border: 1px dashed #475569; display: block; }
+  .frame span { display: block; font-size: 12px; color: #94a3b8; margin-top: 6px; }
+
+  /* ---------- 描边动画区布局 ---------- */
+  .row { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; justify-content: center; }
+  button {
+    padding: 8px 18px;
+    font-size: 13px;
+    color: #f8fafc;
+    background: #2563eb;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  button:hover { background: #3b82f6; }
+  #lenInfo { font-size: 13px; color: #94a3b8; }
+  code { color: #fbbf24; font-family: ui-monospace, Menlo, monospace; }
+
+  /* ---------- CSS 版描边动画：进度环 ---------- */
+  /* 圆周长 = 2π×45 ≈ 283（r=45）。dasharray 设为周长 → 实段占满整圈 */
+  .ring {
+    fill: none;
+    stroke: #38bdf8;
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-dasharray: 283;                    /* 实 283 空 283 循环 */
+    stroke-dashoffset: 283;                   /* 初始把实段推出视口 = 全隐形 */
+    animation: ring-run 2.4s ease-in-out infinite alternate;
+    transform: rotate(-90deg);                /* 让起点转到 12 点方向 */
+    transform-origin: 60px 60px;              /* 旋转中心 = 圆心 */
+  }
+  @keyframes ring-run { to { stroke-dashoffset: 0; } }  /* offset→0 = 环长满 */
+  /* 底圈：灰色完整圆环，衬托进度 */
+  .ring-track {
+    fill: none;
+    stroke: #334155;
+    stroke-width: 8;
+  }
+</style>
+</head>
+<body>
+
+<h1>viewBox 缩放原理 与 描边动画</h1>
+<p class="desc">
+  viewBox 是"逻辑图纸"，width/height 是"相框"，preserveAspectRatio 决定装裱方式；
+  而 stroke-dasharray/-offset 则让任意线条"自己画出来"——这是 SVG 最经典的两件事。
+</p>
+
+<!-- ========== 第一部分：preserveAspectRatio 三种装裱 ========== -->
+<section>
+  <h2>同一份 viewBox="0 0 100 50"，放进 300×100 的相框</h2>
+  <div class="frames">
+    <!-- 图案：简单十字圆点，方便观察变形 -->
+    <!-- 1) meet：等比缩放到"完整放得下"，可能留白（默认值） -->
+    <div class="frame">
+      <svg width="190" height="95" viewBox="0 0 100 50" preserveAspectRatio="xMidYMid meet">
+        <path d="M10,25 H90 M50,5 V45" stroke="#38bdf8" stroke-width="4" fill="none"/>
+        <circle cx="50" cy="25" r="8" fill="#fbbf24"/>
+      </svg>
+      <span>xMidYMid meet<br>完整显示 · 左右留白</span>
+    </div>
+    <!-- 2) slice：等比缩放到"刚好铺满"，超出部分裁切（类似 cover） -->
+    <div class="frame">
+      <svg width="190" height="95" viewBox="0 0 100 50" preserveAspectRatio="xMidYMid slice">
+        <path d="M10,25 H90 M50,5 V45" stroke="#38bdf8" stroke-width="4" fill="none"/>
+        <circle cx="50" cy="25" r="8" fill="#fbbf24"/>
+      </svg>
+      <span>xMidYMid slice<br>铺满相框 · 上下裁切</span>
+    </div>
+    <!-- 3) none：不等比，直接拉伸到视口尺寸，图形变形 -->
+    <div class="frame">
+      <svg width="190" height="95" viewBox="0 0 100 50" preserveAspectRatio="none">
+        <path d="M10,25 H90 M50,5 V45" stroke="#38bdf8" stroke-width="4" fill="none"/>
+        <circle cx="50" cy="25" r="8" fill="#fbbf24"/>
+      </svg>
+      <span>none<br>强行拉伸 · 已变形</span>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 第二部分：CSS 版进度环描边动画 ========== -->
+<section>
+  <h2>CSS 描边动画：循环进度环（纯 CSS，无 JS）</h2>
+  <div class="row">
+    <svg width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="循环进度环动画">
+      <!-- 底圈 + 动画圈叠放：进度环的标准结构 -->
+      <circle class="ring-track" cx="60" cy="60" r="45"/>
+      <circle class="ring" cx="60" cy="60" r="45"/>
+      <text x="60" y="66" text-anchor="middle" fill="#e2e8f0"
+            font-size="13" font-family="sans-serif">loading</text>
+    </svg>
+    <p style="max-width:340px; font-size:13px; line-height:1.8; color:#94a3b8">
+      dasharray = 周长(2πr≈283)，dashoffset 从 283 → 0，
+      实线段像"爬虫"一样爬进视口，圆环就从 0% 长到 100%。
+      <code>transform: rotate(-90deg)</code> 让起点转到 12 点方向。
+    </p>
+  </div>
+</section>
+
+<!-- ========== 第三部分：JS 版折线描边动画（可暂停/重播） ========== -->
+<section>
+  <h2>JS 描边动画：心电图折线（getTotalLength 精确配速）</h2>
+  <div class="row">
+    <svg id="ekg" width="420" height="120" viewBox="0 0 420 120" role="img" aria-label="心电图折线描边动画">
+      <!-- path 画一条"心电图"：多个尖峰模拟 P/QRS/T 波形 -->
+      <path id="ekgPath"
+            d="M 10,70 L 60,70 L 72,55 L 84,85 L 96,20 L 108,95 L 120,70
+               L 180,70 L 192,55 L 204,85 L 216,20 L 228,95 L 240,70
+               L 300,70 L 312,55 L 324,85 L 336,20 L 348,95 L 360,70 L 410,70"
+            fill="none" stroke="#f43f5e" stroke-width="3"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <button id="toggle">暂停</button>
+      <button id="replay">重播</button>
+      <div id="lenInfo">路径总长：<code>--</code></div>
+    </div>
+  </div>
+</section>
+
+<script>
+(function () {
+  'use strict';
+  // ---------- JS 版描边动画：用 getTotalLength 取精确长度 ----------
+  const path = document.getElementById('ekgPath');
+  const lenInfo = document.getElementById('lenInfo');
+  const toggleBtn = document.getElementById('toggle');
+  const replayBtn = document.getElementById('replay');
+
+  const total = path.getTotalLength(); // ★ 精确路径长度：写死数值会导致错拍
+  lenInfo.innerHTML = '路径总长：<code>' + Math.round(total) + 'px</code>';
+
+  // 初始化：实段=总长，offset=总长（完全隐形）
+  path.style.strokeDasharray = total;
+  path.style.strokeDashoffset = total;
+
+  // 用 rAF 自己控制 offset：便于暂停/重播/调速（CSS 动画较难做到精细控制）
+  let offset = total;                 // 当前偏移量
+  let playing = true;
+  const SPEED = total / 2.6;          // 2.6 秒走完全程 → 像素/秒
+
+  function loop(now, last) {
+    if (playing) {
+      // 位移 = 速度 × dt；dt 由本帧与上帧时间差得出，与刷新率无关
+      const dt = last ? Math.min((now - last) / 1000, 0.05) : 0;
+      offset -= SPEED * dt;
+      if (offset <= 0) offset = total;  // 走完归零后从头再来（循环效果）
+      path.style.strokeDashoffset = offset;
+    }
+    requestAnimationFrame(t => loop(t, now));
+  }
+  requestAnimationFrame(t => loop(t, 0));
+
+  // 暂停/继续：只翻 playing 开关，rAF 循环始终在跑（简单且不丢帧状态）
+  toggleBtn.addEventListener('click', () => {
+    playing = !playing;
+    toggleBtn.textContent = playing ? '暂停' : '继续';
+  });
+
+  // 重播：offset 拉回总长即可
+  replayBtn.addEventListener('click', () => {
+    offset = total;
+    playing = true;
+    toggleBtn.textContent = '暂停';
+  });
+})();
+</script>
+</body>
+</html>

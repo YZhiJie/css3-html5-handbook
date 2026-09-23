@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例：Canvas 动画时钟（指针 + 刻度全自绘）
+  ------------------------------------------------------------
+  【知识点】
+    1. devicePixelRatio 高清屏适配（位图放大 + CSS 尺寸不变 + ctx.scale）
+    2. 变换：translate(把原点移到中心) + rotate(绕中心旋转画针)
+    3. save / restore 状态管理：局部变换不污染后续绘制
+    4. requestAnimationFrame 动画循环 + 按时间戳驱动的"扫秒"
+    5. 路径绘制：arc 画表盘、lineTo 画刻度与指针、文字绘制
+
+  【运行方式】
+    双击本文件，浏览器直接打开即可（零依赖、无网络请求）。
+
+  【效果说明】
+    一个圆形模拟时钟：外圈表盘 + 60 根刻度（每 5 格加粗）+ 数字时刻，
+    时针/分针/红秒针按真实系统时间走动，秒针平滑扫动（非跳秒）。
+    页面下方实时显示当前时间文本。
+
+  【注意事项】
+    - 必须先做 dpr 适配再绘制，否则 Retina/高分屏上会模糊（本示例关键点）。
+    - rotate 的 0 弧度方向在"3 点钟"方向，画针/刻度时统一减去 Math.PI/2。
+    - restore 忘写会让变换累积，后续绘制全部"歪掉"——请体会每处 save/restore。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Canvas 示例 01 · 动画时钟</title>
+<style>
+  /* 页面级样式：深色背景衬托表盘，讲解文字用浅色 */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    background: #0f172a;           /* 深蓝黑背景 */
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #cbd5e1;
+    padding: 24px;
+  }
+  h1 { font-size: 22px; color: #f1f5f9; }
+  p.desc { max-width: 560px; line-height: 1.8; font-size: 14px; text-align: center; }
+  #clock {
+    border-radius: 50%;            /* 圆形裁剪边缘（实际内容本身就是圆的） */
+    box-shadow: 0 0 40px rgba(56, 189, 248, .25); /* 外发光装饰 */
+  }
+  #time { font-size: 15px; color: #7dd3fc; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+
+<h1>Canvas 动画时钟</h1>
+<p class="desc">
+  表盘、刻度、指针全部由 Canvas 2D API 自绘，无任何图片资源。
+  请留意秒针是"平滑扫动"的——因为它由 requestAnimationFrame 的时间戳驱动，
+  并带上了毫秒小数（这是 rAF 与 setInterval 的本质区别之一）。
+</p>
+<canvas id="clock"></canvas>
+<div id="time">--:--:--</div>
+
+<script>
+(function () {
+  'use strict';
+  const canvas = document.getElementById('clock');
+  const ctx = canvas.getContext('2d');
+  const timeEl = document.getElementById('time');
+
+  // ---------------- 高清屏适配（关键坑） ----------------
+  // 设计基准：CSS 尺寸 320×320。
+  // 问题：Retina 屏 dpr=2/3，如果位图只有 320×320，会被拉伸显示而模糊。
+  // 方案：位图 = CSS 尺寸 × dpr，再用 ctx.scale(dpr, dpr) 把坐标系"缩回来"，
+  //       之后所有绘制仍按 CSS 像素写坐标，浏览器光栅化时自动乘 dpr 输出高清像素。
+  const CSS_SIZE = 320;                       // 希望的显示尺寸（CSS 像素）
+  const dpr = Math.min(window.devicePixelRatio || 1, 2); // 封顶 2，防止 4K 屏位图过大
+  canvas.width  = CSS_SIZE * dpr;             // 绘图表面（物理像素）
+  canvas.height = CSS_SIZE * dpr;
+  canvas.style.width  = CSS_SIZE + 'px';      // CSS 显示尺寸保持 320px
+  canvas.style.height = CSS_SIZE + 'px';
+  ctx.scale(dpr, dpr);                        // ★ 之后所有坐标仍按 CSS 像素计算
+
+  const R = CSS_SIZE / 2 - 10;                // 表盘半径（留 10px 呼吸边距）
+  const CX = CSS_SIZE / 2, CY = CSS_SIZE / 2; // 圆心
+
+  // ---------------- 工具函数 ----------------
+
+  // 画一根指针：angle 为弧度，0 表示指向 12 点方向
+  function drawHand(angle, length, width, color) {
+    ctx.save();                     // 保存当前状态（变换 + 样式）
+    ctx.translate(CX, CY);          // 原点移到表盘中心，rotate 才能绕中心转
+    ctx.rotate(angle);              // 绕新原点顺时针旋转
+    ctx.beginPath();
+    ctx.moveTo(0, 10);              // 针尾略过圆心，视觉更真实
+    ctx.lineTo(0, -length);         // 沿 -y 方向画针身（旋转前朝上）
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = 'round';          // 圆头针更精致
+    ctx.stroke();
+    ctx.restore();                  // ★ 恢复变换与样式，避免影响后续绘制
+  }
+
+  // 画全部 60 根刻度：5 的倍数加粗加长，其余细短
+  function drawTicks() {
+    for (let i = 0; i < 60; i++) {
+      const isMajor = i % 5 === 0;                    // 每 5 格一根主刻度
+      ctx.save();
+      ctx.translate(CX, CY);
+      ctx.rotate((i / 60) * Math.PI * 2);             // 均分 60 份，每份 6°
+      ctx.beginPath();
+      ctx.moveTo(0, -R);                              // 从表盘边缘向内
+      ctx.lineTo(0, -(isMajor ? R - 14 : R - 8));     // 主刻度更长
+      ctx.strokeStyle = isMajor ? '#f1f5f9' : '#475569';
+      ctx.lineWidth = isMajor ? 2.5 : 1;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // 画 12 个数字时刻
+  function drawNumbers() {
+    ctx.font = '600 13px "PingFang SC", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#94a3b8';
+    for (let n = 1; n <= 12; n++) {
+      // 12 点方向是 -90°，用 cos/sin 求圆周坐标：x = cx + r·cos, y = cy + r·sin
+      const angle = (n / 12) * Math.PI * 2 - Math.PI / 2;
+      const nx = CX + Math.cos(angle) * (R - 28);
+      const ny = CY + Math.sin(angle) * (R - 28);
+      ctx.fillText(String(n), nx, ny);
+    }
+  }
+
+  // ---------------- 主渲染：一帧完整画面 ----------------
+  function render() {
+    // 1. 清屏：clearRect 才能恢复透明底（fillRect 白色会盖住透明底）
+    ctx.clearRect(0, 0, CSS_SIZE, CSS_SIZE);
+
+    // 2. 表盘：外圆 + 径向渐变模拟轻微立体感
+    const bg = ctx.createRadialGradient(CX, CY - 30, 20, CX, CY, R + 8);
+    bg.addColorStop(0, '#1e293b');
+    bg.addColorStop(1, '#0b1220');
+    ctx.beginPath();
+    ctx.arc(CX, CY, R + 8, 0, Math.PI * 2);
+    ctx.fillStyle = bg;
+    ctx.fill();
+
+    drawTicks();
+    drawNumbers();
+
+    // 3. 按系统时间计算三针角度（弧度）
+    const now = new Date();
+    const ms   = now.getMilliseconds();
+    const sec  = now.getSeconds() + ms / 1000;      // 带小数 → 秒针平滑扫动
+    const min  = now.getMinutes() + sec / 60;       // 分针随秒缓慢推进
+    const hr   = (now.getHours() % 12) + min / 60;  // 时针随分推进（12 小时制）
+
+    // (value / total) * 2π 把时间量映射为一圈弧度；-π/2 是因为 0 弧度在 3 点方向
+    drawHand((hr  / 12) * Math.PI * 2, R * 0.45, 6,   '#f8fafc');
+    drawHand((min / 60) * Math.PI * 2, R * 0.62, 4,   '#cbd5e1');
+    drawHand((sec / 60) * Math.PI * 2, R * 0.74, 1.8, '#ef4444');
+
+    // 4. 中心轴帽：小圆盖住三针交汇处
+    ctx.beginPath();
+    ctx.arc(CX, CY, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ef4444';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(CX, CY, 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#0f172a';
+    ctx.fill();
+
+    // 5. 同步更新页面上的数字时间
+    const pad = n => String(n).padStart(2, '0');
+    timeEl.textContent = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+  }
+
+  // ---------------- 动画循环 ----------------
+  // rAF：与显示器刷新同步、页面切后台自动暂停；每帧"清屏 + 整帧重绘"
+  function loop() {
+    render();
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+</script>
+</body>
+</html>
