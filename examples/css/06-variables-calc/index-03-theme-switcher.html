@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：主题切换实战 —— data-theme + localStorage 记忆
+  ------------------------------------------------------------
+  【知识点】
+    1. 三级变量体系：色板层（--gray-900）→ 语义层（--bg/--ink）→ 使用层
+    2. data-theme 属性选择器驱动换肤：[data-theme="dark"] 覆盖语义层
+    3. color-scheme 属性让滚动条/表单控件跟随主题
+    4. prefers-color-scheme 跟随系统 + localStorage 记住手动选择
+    5. 防闪烁（FOUC）：初始化脚本必须先于渲染执行
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    顶部开关切换亮/暗主题：整页（含卡片、表格、输入框、滚动条）
+    平滑换色；刷新页面后仍保持上次选择；首次打开跟随系统偏好。
+    右下角显示当前主题来源（手动 / 系统 / 默认）。
+  【注意事项】
+    暗色模式避免纯黑 #000 与纯白 #fff（对比过强易疲劳）；
+    localStorage 里建议只存 "light"/"dark"/"auto" 三态，
+    "auto" 表示跟随系统，这样系统切换时页面还能跟上。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 03 · 主题切换 data-theme + localStorage</title>
+<script>
+  /* ============ 防闪烁初始化（必须放在 <head> 最前面）============
+     原因：样式渲染先于 body 解析，若等 body 末尾再读 localStorage，
+     暗色用户会先看到一闪而过的亮色（FOUC）。
+     三态策略：手动选择 → 系统偏好 → 默认亮色 */
+  (function () {
+    try {
+      var saved = localStorage.getItem('handbook-theme');
+      var theme = saved === 'light' || saved === 'dark'
+        ? saved                                    // 用户手动选择过 → 尊重选择
+        : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); // 未选择 → 跟随系统
+      document.documentElement.dataset.theme = theme;
+    } catch (e) { /* 隐私模式等场景 localStorage 不可用，静默降级为默认亮色 */ }
+  })();
+</script>
+<style>
+  /* ============ 语义层变量（主题唯一开关点）============
+     设计要点：
+     1) 亮色为默认（无 data-theme 时也成立）；
+     2) 暗色不是"反转色"，而是独立调过对比度的软色板；
+     3) color-scheme 让浏览器原生控件（滚动条、input、下拉）跟随主题 */
+  :root {
+    /* 语义层 - 亮色 */
+    --bg: #f4f6fa;            /* 页面背景：浅灰蓝，比纯白柔和 */
+    --surface: #ffffff;       /* 卡片表面 */
+    --ink: #1d2733;           /* 正文：近黑的深蓝灰 */
+    --ink-soft: #68798c;      /* 次要文字 */
+    --brand: #3b5bdb;         /* 品牌主色 */
+    --brand-ink: #ffffff;     /* 主色上的文字 */
+    --line: #e2e8f1;          /* 分隔线 */
+    --ok: #2f9e44; --warn: #e8590c;
+    color-scheme: light;      /* 原生控件走亮色渲染 */
+  }
+  /* 暗色覆盖：只要换掉语义层，所有引用处自动换肤 */
+  :root[data-theme="dark"] {
+    --bg: #10151f;            /* 软黑：带一点蓝调，比 #000 舒服 */
+    --surface: #1a2233;       /* 暗色卡片比背景亮一档，保持层级 */
+    --ink: #e6eaf2;           /* 软白正文，避免刺眼 */
+    --ink-soft: #94a3b8;
+    --brand: #748ffc;         /* 暗色下主色提亮，保证对比度 */
+    --brand-ink: #0b1120;
+    --line: #2a3550;
+    --ok: #69db7c; --warn: #ffa94d;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink);
+    padding: 24px; line-height: 1.6;
+    /* 换肤平滑过渡：只对颜色类属性过渡，时长克制避免"拖影感" */
+    transition: background-color .3s ease, color .3s ease;
+  }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  h1 { font-size: 1.45rem; }
+  .source { font-size: .78rem; color: var(--ink-soft); }
+
+  /* 主题开关：checkbox + 兄弟组合器纯 CSS 滑块（呼应选择器篇技巧） */
+  .toggle { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+  .toggle input { display: none; }
+  .toggle .track {
+    width: 52px; height: 28px; border-radius: 999px;
+    background: #c3cfe0; position: relative; transition: background .3s; flex: none;
+  }
+  .toggle .track::after {
+    content: "☀";            /* 亮色态显示太阳 */
+    position: absolute; top: 3px; left: 3px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: #fff; color: #f59f00;
+    display: grid; place-items: center; font-size: .8rem;
+    transition: left .3s, content .1s;
+  }
+  .toggle input:checked + .track { background: var(--brand); }
+  .toggle input:checked + .track::after { left: 27px; content: "🌙"; }  /* 暗色态换成月亮 */
+
+  section {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 16px;
+    transition: background-color .3s, border-color .3s;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 10px; }
+  .tip { font-size: .82rem; color: var(--ink-soft); margin-bottom: 14px; }
+  code.tok { background: rgba(127,143,166,.14); padding: 1px 5px; border-radius: 4px; font-size: .82em; }
+
+  /* 组件全部只引用语义变量 —— 组件层永远不写死颜色 */
+  .btn {
+    font: inherit; padding: 9px 18px; border: none; border-radius: 8px;
+    background: var(--brand); color: var(--brand-ink);
+    cursor: pointer; transition: transform .15s, filter .15s;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:active { transform: scale(.97); }
+  .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); }
+
+  table.card-t { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  table.card-t th, table.card-t td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+  table.card-t tbody tr:last-child td { border-bottom: none; }
+  table.card-t tbody tr:nth-child(2n) { background: rgba(127,143,166,.06); }  /* 半透明斑马纹：两套主题都自然 */
+
+  .status { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; }
+  .status i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+  .status.warn i { background: var(--warn); }
+
+  input.field {
+    width: 100%; max-width: 380px; font: inherit;
+    padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--bg); color: var(--ink); outline: none;
+    transition: border-color .2s;
+  }
+  input.field:focus { border-color: var(--brand); }
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>主题切换实战：data-theme + localStorage</h1>
+      <p class="source" id="source">当前主题来源：读取中…</p>
+    </div>
+    <!-- 开关状态由 JS 依据当前主题同步（checked = 暗色） -->
+    <label class="toggle" title="切换亮/暗主题">
+      <input type="checkbox" id="themeToggle">
+      <span class="track" aria-hidden="true"></span>
+      <span style="font-size:.86rem">暗色模式</span>
+    </label>
+  </header>
+
+  <section>
+    <h2>为什么换肤只需要改一个属性？</h2>
+    <p class="tip">
+      页面所有颜色都引用语义变量（<code class="tok">var(--bg)</code>、<code class="tok">var(--ink)</code>…），
+      而 <code class="tok">:root[data-theme="dark"]</code> 重新定义了这组变量。
+      JS 把 <code class="tok">&lt;html&gt;</code> 的 <code class="tok">data-theme</code> 改成 <code class="tok">dark</code>，
+      继承链刷新 → 全组件换色。组件代码零改动。
+    </p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+      <button class="btn" id="btn-save">主按钮 · var(--brand)</button>
+      <button class="btn ghost">次要按钮 · var(--line) 描边</button>
+      <span class="status"><i></i> 服务正常 · var(--ok)</span>
+      <span class="status warn"><i></i> 流量告警 · var(--warn)</span>
+    </div>
+    <table class="card-t">
+      <thead><tr><th>变量</th><th>亮色值</th><th>暗色值</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td>--bg</td><td>#f4f6fa</td><td>#10151f</td><td>页面背景</td></tr>
+        <tr><td>--surface</td><td>#ffffff</td><td>#1a2233</td><td>卡片表面</td></tr>
+        <tr><td>--ink</td><td>#1d2733</td><td>#e6eaf2</td><td>正文文字</td></tr>
+        <tr><td>--brand</td><td>#3b5bdb</td><td>#748ffc</td><td>品牌主色（暗色提亮保对比度）</td></tr>
+        <tr><td>--line</td><td>#e2e8f1</td><td>#2a3550</td><td>分隔线</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>原生控件也跟随主题（color-scheme）</h2>
+    <p class="tip">在两套变量里分别声明 <code class="tok">color-scheme: light / dark</code>，滚动条、输入框、日期控件等由浏览器绘制的部分自动跟随，不再出现暗页白框的违和感。试试这个输入框与页面滚动条：</p>
+    <input class="field" type="text" placeholder="聚焦我，看看边框与光标颜色…">
+  </section>
+
+  <section>
+    <h2>记忆策略（生产环境思路）</h2>
+    <p class="tip" style="margin-bottom:8px">本页采用三态策略，建议直接搬进项目：</p>
+    <ol style="font-size:.85rem;color:var(--ink-soft);padding-left:20px">
+      <li><b>手动优先</b>：localStorage 里有 <code class="tok">light/dark</code> 就用它，用户意志最高；</li>
+      <li><b>系统兜底</b>：没有手动记录时读 <code class="tok">prefers-color-scheme</code>；</li>
+      <li><b>先于渲染</b>：初始化脚本内联在 <code class="tok">&lt;head&gt;</code>，杜绝 FOUC 白闪；</li>
+      <li><b>容错</b>：读写 localStorage 全部 try/catch，隐私模式下静默降级。</li>
+    </ol>
+    <p style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn ghost" id="btn-clear">清除记忆，回到"跟随系统"</button>
+      <button class="btn ghost" id="btn-sys">查看系统当前偏好</button>
+    </p>
+    <p id="storage-note" style="font-size:.8rem;color:var(--ink-soft);margin-top:8px"></p>
+  </section>
+
+<script>
+(function () {
+  'use strict';
+  var root = document.documentElement;
+  var toggle = document.getElementById('themeToggle');
+  var source = document.getElementById('source');
+  var note = document.getElementById('storage-note');
+
+  /* ---- 状态同步：把"当前主题"反映到开关与文案 ---- */
+  function current() { return root.dataset.theme || 'light'; }
+  function wasManual() {
+    var v = null;
+    try { v = localStorage.getItem('handbook-theme'); } catch (e) {}
+    return v === 'light' || v === 'dark';
+  }
+  function sync() {
+    toggle.checked = current() === 'dark';       // 开关位置跟随主题
+    source.textContent = '当前主题：' + current() +
+      '（来源：' + (wasManual() ? '手动选择，已记忆' : '跟随系统偏好') + '）';
+  }
+
+  /* ---- 切换：改属性 + 写缓存，两步完成"换肤 + 记忆" ---- */
+  toggle.addEventListener('change', function () {
+    var next = toggle.checked ? 'dark' : 'light';
+    root.dataset.theme = next;                    // ① 换肤：一行属性
+    try { localStorage.setItem('handbook-theme', next); } catch (e) {} // ② 记忆：容错写入
+    sync();
+  });
+
+  /* ---- 清除记忆：回到 auto 模式，重新跟随系统 ---- */
+  document.getElementById('btn-clear').addEventListener('click', function () {
+    try { localStorage.removeItem('handbook-theme'); } catch (e) {}
+    var sys = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    root.dataset.theme = sys;
+    sync();
+    note.textContent = '已清除记忆，主题回到"跟随系统"（系统偏好 = ' + sys + '）。';
+  });
+
+  /* ---- 查看系统偏好：演示 matchMedia 检测 ---- */
+  document.getElementById('btn-sys').addEventListener('click', function () {
+    var dark = matchMedia('(prefers-color-scheme: dark)').matches;
+    note.textContent = '系统 prefers-color-scheme = ' + (dark ? 'dark（深色）' : 'light（浅色）') +
+      '。在系统设置里切换深浅色后刷新本页（无手动记忆时）可看到跟随效果。';
+  });
+
+  /* ---- 进阶：监听系统主题变化（手动记忆存在时不打扰用户） ---- */
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
+    if (!wasManual()) {                           // 只有"跟随系统"模式才自动跟进
+      root.dataset.theme = e.matches ? 'dark' : 'light';
+      sync();
+    }
+  });
+
+  sync();   // 首帧同步一次
+})();
+</script>
+</body>
+</html>

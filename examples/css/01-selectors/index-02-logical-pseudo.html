@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 02：:not / :is / :where / :has 逻辑伪类对比实验
+  ------------------------------------------------------------
+  【知识点】
+    1. :not()  —— 否定匹配，多参数写法，优先级取括号内最复杂参数
+    2. :is()   —— 宽容选择器列表，任一命中即命中，合并前缀减少重复
+    3. :where()—— 与 :is 同语义，但优先级恒为 0（零优先级默认样式）
+    4. :has()  —— "父选择器"：按后代/兄弟内容选中祖先，状态驱动 UI
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    三个实验区：
+    A 区对比 :is 与 :where 的覆盖行为 —— 两张卡片样式完全相同，
+    但 :where 卡片的标题可以被一行低优先级规则覆盖，:is 卡片不行；
+    B 区演示 :has 驱动的表单组校验与卡片联动；C 区给出四个伪类
+    的优先级速查表与"何时用哪个"的决策指引。
+  【注意事项】
+    :has 需要较新内核（Chrome 105+/Safari 15.4+），老浏览器请用
+    @supports selector(:has(*)) 包裹增强样式；:is/:has 的优先级
+    取括号内"最复杂"的参数，这是最常被忽略的规则。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>示例 02 · :not / :is / :where / :has 对比</title>
+  <style>
+    :root {
+      --bg: #f5f6fa;
+      --card: #fff;
+      --ink: #2f3640;
+      --muted: #808e9b;
+      --brand: #00a8ff;
+      --ok: #44bd32;
+      --bad: #e84118;
+      --line: #e5e9f2;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      padding: 24px;
+      line-height: 1.6;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 4px;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: .9rem;
+      margin-bottom: 18px;
+    }
+
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+
+    h2 {
+      font-size: 1.05rem;
+      margin-bottom: 8px;
+    }
+
+    .tip {
+      font-size: .82rem;
+      color: var(--muted);
+      background: #f2f7ff;
+      border-left: 3px solid var(--brand);
+      padding: 6px 10px;
+      margin-bottom: 14px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    code.inline {
+      background: #eef1f9;
+      color: #273c75;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: .82em;
+    }
+
+    /* ================= A 区：:is 与 :where 的优先级差异 ================= */
+    .duo {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    @media (max-width: 720px) {
+      .duo {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* 两张卡片标题视觉上一模一样，但书写方式不同：
+     左卡用 :is —— 优先级取括号内最复杂的 .box-a → (0,1,1)
+     右卡用 :where —— 优先级恒为 0 → 整条规则只有 h3 的 (0,0,1) */
+    :is(.box-a) h3 {
+      color: #487eb0;
+      font-size: 1.05rem;
+    }
+
+    :where(.box-b) h3 {
+      color: #487eb0;
+      font-size: 1.05rem;
+    }
+
+    /* 覆盖尝试①：单类选择器 .override-title（优先级 0,1,0）
+     与 :is 版本同优先级，但源顺序靠后 → :is 版本的标题【被覆盖】 */
+    .override-title h3 {
+      color: #e84118;
+    }
+
+    /* 覆盖尝试②：单一元素选择器 h3（优先级 0,0,1）
+     低于 :is(0,1,0) 与 :where(0,0,0) 的对比基线 → 两边都盖不住。
+     关键结论：:where 优先级是 0，任何"有优先级"的规则都能覆盖它；
+     :is 至少有括号内最复杂参数的优先级，"轻量覆盖"会失效 */
+    /* 这里特意不写 :where 的对照覆盖，让下方按钮切换两个状态更直观 */
+
+    /* 说明：注入实验通过 JS 控制 <style> 节点的 disabled 属性实现，
+     不借助 !important —— 生产代码应通过调整优先级而非 important 解决覆盖问题 */
+
+    /* ================= B 区：:has 状态驱动 ================= */
+    .form-group {
+      border: 2px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      transition: border-color .2s;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: .85rem;
+      margin-bottom: 6px;
+    }
+
+    .form-group input {
+      width: 100%;
+      font: inherit;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      outline: none;
+    }
+
+    .form-group input:focus {
+      border-color: var(--brand);
+    }
+
+    .hint {
+      display: none;
+      font-size: .78rem;
+      color: var(--bad);
+      margin-top: 6px;
+    }
+
+    /* 核心：父级 .form-group 通过 :has 感知内部 input 是否非法
+     —— 此前必须 JS 给父级加 class，现在一条选择器搞定 */
+    .form-group:has(input:invalid) {
+      border-color: var(--bad);
+    }
+
+    .form-group:has(input:invalid) .hint {
+      display: block;
+    }
+
+    /* 合法且"已被填写过"时给绿色反馈：placeholder-shown 表示还没输入 */
+    .form-group:has(input:not(:placeholder-shown):valid) {
+      border-color: var(--ok);
+    }
+
+    /* :has + 兄弟组合器：卡片含"推荐"标签时，后面的价格行高亮 */
+    .plan {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+    }
+
+    .plan .tag {
+      display: inline-block;
+      font-size: .72rem;
+      color: #fff;
+      background: var(--bad);
+      padding: 2px 8px;
+      border-radius: 999px;
+      margin-bottom: 8px;
+    }
+
+    .plan .price {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .plan:has(.tag) .price {
+      color: #e67e22;
+    }
+
+    .plan:has(.tag) {
+      border-color: #f9ca24;
+      background: #fffbe9;
+    }
+
+    /* ================= C 区：优先级速查表 ================= */
+    table.spec {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .84rem;
+    }
+
+    table.spec th,
+    table.spec td {
+      border: 1px solid var(--line);
+      padding: 7px 10px;
+      text-align: left;
+    }
+
+    table.spec thead th {
+      background: #f2f7ff;
+    }
+
+    /* 斑马纹：结构伪类，与示例 01 呼应 */
+    table.spec tbody tr:nth-child(2n) {
+      background: #fafbfe;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>:not / :is / :where / :has 逻辑伪类对比</h1>
+  <p class="sub">三个实验区分别对应"优先级差异""父级感知"与"选型速查"。</p>
+
+  <!-- ============ A 区：优先级对比 ============ -->
+  <section>
+    <h2>A · :is 与 :where 的优先级差异</h2>
+    <p class="tip">
+      <code class="inline">:is(.box-a, .box-b) h3</code> 的优先级是 <b>(0,1,1)</b>（取括号内最复杂的 .box）；
+      <code class="inline">:where(...) h3</code> 的优先级是 <b>(0,0,1)</b>。
+      点击按钮注入一条 <b>(0,0,1)</b> 的 h3 规则：:where 部分被覆盖、:is 部分纹丝不动 —— 这就是两者的本质区别。
+    </p>
+    <div class="duo override-demo">
+      <!-- 两张卡片结构完全一致，仅类名不同 -->
+      <div class="box-a" style="border:1px solid var(--line);border-radius:10px;padding:14px">
+        <h3>:is 版标题</h3>
+        <p style="font-size:.84rem;color:var(--muted)">
+          该标题由 <code class="inline">:is(.box-a, .box-b) h3</code> 上色，规则优先级 (0,1,1)。
+        </p>
+      </div>
+      <div class="box-b" style="border:1px solid var(--line);border-radius:10px;padding:14px">
+        <h3 class="where-h3">:where 版标题</h3>
+        <p style="font-size:.84rem;color:var(--muted)">
+          该标题由 <code class="inline">:where(.box-a, .box-b) h3</code> 上色，规则优先级 (0,0,1)。
+        </p>
+      </div>
+    </div>
+    <p style="margin-top:12px">
+      <button id="btn-inject"
+        style="font:inherit;padding:7px 14px;border:1px solid var(--brand);background:#e9f6ff;color:#273c75;border-radius:8px;cursor:pointer">
+        注入一条 h3 { color: 紫 }（优先级 0,0,1）
+      </button>
+      <span id="inject-note" style="font-size:.82rem;color:var(--muted)">观察右侧 :where 标题变化，左侧 :is 标题应保持蓝色。</span>
+    </p>
+    <!-- 动态注入的样式：用 :where 包一层，使其优先级恰好为 (0,0,1)
+         —— 演示"零优先级默认值被任意普通规则覆盖"的机制。
+         初始 disabled，由 JS 切换开关，避免页面加载即生效 -->
+    <style id="inject-style" disabled>
+      :where(.override-demo) h3 {
+        color: #8e44ad;
+      }
+    </style>
+  </section>
+
+  <!-- ============ B 区：:has 状态驱动 ============ -->
+  <section>
+    <h2>B · :has 让父级感知子级状态</h2>
+    <p class="tip">在输入框里随便输入：非法邮箱立刻让整组变红并出现提示；输入合法后变绿。<b>全程无 JS 校验逻辑</b>，全靠 <code
+        class="inline">:has(input:invalid)</code>。</p>
+    <div class="duo">
+      <div>
+        <div class="form-group">
+          <label for="mail">邮箱（演示 :has(input:invalid)）</label>
+          <input id="mail" type="email" placeholder="例如 dev@example.com" required>
+          <p class="hint">邮箱格式不正确，请包含 @ 与域名。</p>
+        </div>
+        <div class="form-group">
+          <label for="nick">昵称（至少 2 个字符）</label>
+          <input id="nick" type="text" placeholder="例如 小明" minlength="2" required>
+          <p class="hint">昵称太短啦。</p>
+        </div>
+      </div>
+      <div>
+        <!-- 价格卡：:has(.tag) 让"含推荐标签"的卡片整体换肤，
+             运营改标签只需增删 DOM，无需同步改样式 -->
+        <div class="plan" style="margin-bottom:10px">
+          <span class="tag">推荐</span>
+          <p>专业版 · 全功能</p>
+          <p class="price">¥ 299 / 月</p>
+        </div>
+        <div class="plan">
+          <p>基础版 · 个人使用</p>
+          <p class="price">¥ 99 / 月</p>
+        </div>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:8px">
+          上方卡片因含有 <code class="inline">.tag</code>，被 <code class="inline">.plan:has(.tag)</code> 命中 → 金边黄底、价格变橙。
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ C 区：选型速查 ============ -->
+  <section>
+    <h2>C · 四兄弟选型速查</h2>
+    <table class="spec">
+      <thead>
+        <tr>
+          <th>伪类</th>
+          <th>优先级</th>
+          <th>一句话定位</th>
+          <th>典型场景</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code class="inline">:not()</code></td>
+          <td>取括号内最复杂参数</td>
+          <td>排除法：选中"不满足条件"的</td>
+          <td>排除最后一项的边框、排除本站外链</td>
+        </tr>
+        <tr>
+          <td><code class="inline">:is()</code></td>
+          <td>取括号内最复杂参数</td>
+          <td>合并前缀，任一命中即命中</td>
+          <td>多容器同样式；列表里的非法项会被宽容忽略</td>
+        </tr>
+        <tr>
+          <td><code class="inline">:where()</code></td>
+          <td><b>恒为 0</b></td>
+          <td>零优先级默认值，人人可覆盖</td>
+          <td>组件库/重置样式的"默认层"</td>
+        </tr>
+        <tr>
+          <td><code class="inline">:has()</code></td>
+          <td>取括号内最复杂参数</td>
+          <td>向前看：按后代/兄弟选祖先</td>
+          <td>表单组校验反馈、内容驱动的卡片换肤</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="tip" style="margin-top:12px">
+      口诀：<b>要覆盖用 :where，要合并用 :is，要排除用 :not，要向上用 :has</b>。
+      另外 :is/:where 的参数列表是"宽容"的 —— 写错一个选择器不会让整条规则作废，而普通选择器列表会整体失效。
+    </p>
+  </section>
+
+  <script>
+    (function () {
+      'use strict';
+      /* A 区：注入/移除 :where 低优先级规则，演示覆盖差异。
+         直接切换 <style> 节点的 disabled —— 不污染选择器优先级，
+         实验结果纯粹由"两条规则的优先级对比"决定 */
+      var btn = document.getElementById('btn-inject');
+      var note = document.getElementById('inject-note');
+      var injectStyle = document.getElementById('inject-style');
+      injectStyle.disabled = true;            // 初始关闭，保证初始状态两边同色
+      var on = false;
+      btn.addEventListener('click', function () {
+        on = !on;
+        injectStyle.disabled = !on;           // 开启后注入规则参与层叠竞争
+        // 按钮文字随状态变化，形成可反复切换的对比实验
+        btn.textContent = on ? '移除注入规则，恢复默认' : '注入一条 h3 { color: 紫 }（优先级 0,0,1）';
+        note.textContent = on
+          ? '注意：紫色规则 (0,0,1) 只能覆盖 :where 版（同为 0,0,1 但源顺序靠后），盖不住 :is 版 (0,1,1)。'
+          : '观察右侧 :where 标题变化，左侧 :is 标题应保持蓝色。';
+      });
+    })();
+  </script>
+</body>
+
+</html>

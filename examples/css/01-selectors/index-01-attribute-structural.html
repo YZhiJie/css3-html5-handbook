@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 01：属性选择器 + 结构伪类 交互速查
+  ------------------------------------------------------------
+  【知识点】
+    1. 属性选择器：[attr] / [attr="v"] / [attr~="v"] / [attr^="v"]
+       / [attr$="v"] / [attr*="v"] / [attr|="v"] 以及 i / s 大小写标志
+    2. 结构伪类：:first-child / :last-child / :nth-child(an+b)
+       / :nth-of-type / :nth-last-child / :empty
+    3. 组合器：> / + / ~ / 空格 的联动效果
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    页面上半部分是"属性选择器实验室"：点击左侧任意运算符按钮，
+    右侧链接列表会实时高亮"当前运算符命中"的元素；
+    下半部分是"结构伪类实验室"：点击 nth 表达式按钮，网格中的
+    方块按 an+b 规则点亮，直观理解线性表达式计数方式。
+  【注意事项】
+    属性值匹配默认区分大小写（如 .PDF 不命中 [href$=".pdf"]），
+    除非追加 i 标志；:empty 连空格文本节点都无法容忍。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 01 · 属性选择器 + 结构伪类</title>
+<style>
+  /* ---------- 全局基调 ---------- */
+  /* 使用 CSS 自定义属性统一管理配色，便于整页换色（详见 06 主题文档） */
+  :root {
+    --bg: #f4f6fb;          /* 页面背景 */
+    --card: #ffffff;        /* 卡片背景 */
+    --ink: #2d3436;         /* 主文字色 */
+    --muted: #7f8c9b;       /* 次要文字色 */
+    --brand: #4361ee;       /* 品牌蓝：选中/高亮 */
+    --hit: #ffd166;         /* 命中黄：匹配元素标记 */
+    --line: #e3e8f0;        /* 分隔线 */
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 24px;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
+  section {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 10px; }
+  .tip {
+    font-size: 0.82rem;
+    color: var(--muted);
+    background: #f6f8fd;
+    border-left: 3px solid var(--brand);
+    padding: 6px 10px;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 12px;
+  }
+
+  /* ---------- 属性选择器实验室 ---------- */
+  .lab { display: grid; grid-template-columns: 300px 1fr; gap: 16px; }
+  @media (max-width: 720px) { .lab { grid-template-columns: 1fr; } }
+
+  /* 按钮组：每个按钮携带 data-op 属性，即"当前演示的运算符" */
+  .ops { display: flex; flex-wrap: wrap; gap: 6px; align-content: start; }
+  .ops button {
+    font: inherit; font-size: 0.78rem;
+    padding: 5px 9px; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 6px;
+    background: #fbfcff;
+    transition: background .15s, color .15s;
+  }
+  /* 组合器 ">" 与兄弟选择器联动：同一行中紧跟在 .active 后面的按钮
+     自动变蓝 —— 这就是 A + B 组合器的实际表现 */
+  .ops button.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+  .ops button.active + button { outline: 2px dashed rgba(67,97,238,.5); outline-offset: 1px; }
+
+  /* 当前运算符说明文字，由 JS 更新 */
+  #op-desc { font-size: 0.82rem; color: var(--muted); min-height: 3em; margin-top: 8px; }
+  #op-desc code { background: #eef1fb; padding: 1px 4px; border-radius: 4px; color: var(--brand); }
+
+  /* 链接列表：每条链接带有不同 href，用于被不同属性选择器命中 */
+  .links { list-style: none; }
+  .links li {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.85rem;
+    transition: background .15s;
+  }
+  .links li code { color: var(--muted); font-size: 0.78rem; margin-left: 6px; }
+  /* JS 会给命中的 li 添加 .hit 类：黄底 + 左侧色条，视觉上"点亮" */
+  .links li.hit { background: var(--hit); }
+  .links li.hit::before {
+    content: "●";                 /* 用伪元素输出"命中"小圆点，装饰不进 DOM */
+    color: #b25e00;
+    margin-right: 6px;
+    font-size: 0.7rem;
+  }
+
+  /* ---------- 结构伪类实验室 ---------- */
+  /* nth 网格：8 个方块，JS 按表达式给对应序号方块加 .on */
+  .grid8 {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .grid8 .cell {
+    aspect-ratio: 1;               /* 正方形：宽高比 1:1 */
+    display: grid; place-items: center;
+    background: #eef1f8; color: var(--muted);
+    border-radius: 8px; font-size: 0.8rem;
+    transition: background .2s, color .2s, transform .2s;
+  }
+  .grid8 .cell.on {
+    background: var(--brand); color: #fff;
+    transform: translateY(-4px);   /* 点亮时轻微上浮，增强反馈 */
+  }
+
+  /* 真实表格演示斑马纹：纯 CSS 结构伪类，JS 不参与 */
+  table.zebra { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 12px; }
+  table.zebra th, table.zebra td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; }
+  /* 偶数行淡底：2n 等价于 even，比逐行加 class 可维护 */
+  table.zebra tbody tr:nth-child(2n) { background: #f6f8fd; }
+  /* 悬停行高亮，仅 tbody 生效，不影响表头 */
+  table.zebra tbody tr:hover { background: #eef4ff; }
+  /* 末行去掉底边：last-child 精确收口，删行加行都不用改样式 */
+  table.zebra tbody tr:last-child td { border-bottom: none; }
+</style>
+</head>
+<body>
+  <h1>属性选择器 + 结构伪类 交互速查</h1>
+  <p class="sub">点击按钮切换运算符 / nth 表达式，观察哪些元素被"点亮"。</p>
+
+  <!-- ============ 实验室一：属性选择器 ============ -->
+  <section>
+    <h2>实验室一 · 属性选择器</h2>
+    <p class="tip">属性值匹配默认<b>区分大小写</b>；需要忽略时追加 <code>i</code> 标志。`~=` 匹配空格分隔的单词，`|=` 匹配值或 `值-` 前缀（语言代码场景）。</p>
+    <div class="lab">
+      <!-- 按钮列表：data-op 存放要演示的选择器，data-desc 存放说明 -->
+      <div>
+        <div class="ops" id="ops">
+          <button data-op="[href]" data-desc="[href] —— 只要存在 href 属性就命中，不看值。">[href]</button>
+          <button data-op='[href="/"]' data-desc='[href="/"] —— 完全相等，仅命中首页链接。'>[href="/"]</button>
+          <button data-op='[href~="docs"]' data-desc='[href~="docs"] —— class 式单词列表匹配：值按空格拆分后包含 docs。'>[href~="docs"]</button>
+          <button data-op='[href^="https"]' data-desc='[href^="https"] —— 以 https 开头：常用于识别外链。'>[href^="https"]</button>
+          <button data-op='[href$=".pdf"]' data-desc='[href$=".pdf"] —— 以 .pdf 结尾：识别下载文件（默认区分大小写）。'>[href$=".pdf"]</button>
+          <button data-op='[href*="shop"]' data-desc='[href*="shop"] —— 包含子串 shop，位置不限。'>[href*="shop"]</button>
+          <button data-op='[href$=".PDF" i]' data-desc='[href$=".PDF" i] —— i 标志忽略大小写，连 .Pdf / .pdf 也一并命中。'>[href$=".PDF" i]</button>
+          <button data-op='[lang|="zh"]' data-desc='[lang|="zh"] —— 等于 zh 或以 zh- 开头，语言代码场景专用。'>[lang|="zh"]</button>
+        </div>
+        <p id="op-desc">点击左侧按钮查看对应运算符的命中结果。</p>
+      </div>
+      <!-- 演示数据：故意混入不同协议 / 大小写 / 语言，覆盖各运算符的差异 -->
+      <ul class="links" id="links">
+        <li data-href="/" data-lang="zh">首页 <code>href="/" lang="zh"</code></li>
+        <li data-href="/docs/start" data-lang="zh-CN">入门文档 <code>href="/docs/start" lang="zh-CN"</code></li>
+        <li data-href="https://github.com/x" data-lang="en">GitHub 外链 <code>href="https://..." lang="en"</code></li>
+        <li data-href="/shop/item/9" data-lang="zh">商城详情 <code>href="/shop/item/9" lang="zh"</code></li>
+        <li data-href="/files/report.pdf" data-lang="en">报表 PDF <code>href="/files/report.pdf" lang="en"</code></li>
+        <li data-href="/files/spec.PDF" data-lang="en">规格书大写 PDF <code>href="/files/spec.PDF" lang="en"</code></li>
+        <li data-href="/api/docs/openapi" data-lang="en">API 文档 <code>href="/api/docs/openapi" lang="en"</code></li>
+        <li data-href="/docsy/weird" data-lang="zhx">文档站变体 <code>href="/docsy/weird" lang="zhx"</code></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ 实验室二：结构伪类 ============ -->
+  <section>
+    <h2>实验室二 · :nth-child(an+b) 线性表达式</h2>
+    <p class="tip">n 从 0 开始递增，表达式的每个正整数结果都会命中对应位置的兄弟。<code>-n+3</code> 表示"前 3 个"，<code>n+4</code> 表示"第 4 个起"。</p>
+    <div class="ops" id="nths">
+      <button data-nth="odd">odd（奇数）</button>
+      <button data-nth="2n">2n（偶数）</button>
+      <button data-nth="-n+3">-n+3（前 3 个）</button>
+      <button data-nth="n+6">n+6（第 6 个起）</button>
+      <button data-nth="3n+1">3n+1（1,4,7…）</button>
+      <button data-nth="last">:last-child（末尾）</button>
+    </div>
+    <!-- 网格：JS 依据表达式计算命中序号并给 cell 加 .on -->
+    <div class="grid8" id="grid8">
+      <div class="cell">1</div><div class="cell">2</div><div class="cell">3</div><div class="cell">4</div>
+      <div class="cell">5</div><div class="cell">6</div><div class="cell">7</div><div class="cell">8</div>
+    </div>
+
+    <h2 style="margin-top:22px">真实表格 · 斑马纹 / 悬停 / 末行收口（纯 CSS）</h2>
+    <table class="zebra">
+      <thead><tr><th>订单号</th><th>商品</th><th>金额</th></tr></thead>
+      <tbody>
+        <tr><td>A1001</td><td>无线耳机</td><td>¥299</td></tr>
+        <tr><td>A1002</td><td>机械键盘</td><td>¥549</td></tr>
+        <tr><td>A1003</td><td>显示器支架</td><td>¥189</td></tr>
+        <tr><td>A1004</td><td>桌面理线器</td><td>¥39</td></tr>
+        <tr><td>A1005</td><td>USB-C 扩展坞</td><td>¥429</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ================= 实验室一：属性选择器 ================= */
+  var ops = document.getElementById('ops');
+  var links = document.getElementById('links');
+  var desc = document.getElementById('op-desc');
+
+  /**
+   * 按 data-op 中的选择器逐一测试 li 是否命中。
+   * 用 element.matches() 让浏览器引擎帮我们做匹配，
+   * 避免手写正则导致与真实 CSS 行为不一致 —— 这是本页的核心技巧。
+   */
+  function applyOp(op) {
+    var items = links.querySelectorAll('li');
+    items.forEach(function (li) {
+      // 临时把 data-href / data-lang 映射为真实 href/lang，
+      // 这样 matches('[href^="https"]') 才能按浏览器原生规则判定
+      li.setAttribute('href', li.getAttribute('data-href') || '');
+      li.setAttribute('lang', li.getAttribute('data-lang') || '');
+      // matches() 返回"该元素是否被此选择器命中"，与 CSS 匹配语义完全一致
+      li.classList.toggle('hit', li.matches(op));
+      // 清理：href 会影响 li 的可访问性语义，测完即删
+      li.removeAttribute('href');
+    });
+  }
+
+  ops.addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;                       // 只响应按钮自身的点击
+    // 高亮当前按钮：先清空所有 active，再给命中者加
+    ops.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    desc.innerHTML = '<code>' + btn.dataset.op.replace(/</g, '&lt;') + '</code>：' + btn.dataset.desc;
+    applyOp(btn.dataset.op);
+  });
+  // 默认展示 ^=，让用户打开页面立刻看到效果
+  ops.querySelector('button[data-op^="[href^="]').click();
+
+  /* ================= 实验室二：nth 表达式 ================= */
+  var nths = document.getElementById('nths');
+  var cells = document.querySelectorAll('#grid8 .cell');
+
+  /**
+   * 解析 an+b：仅覆盖本页用到的五种形态，思路是
+   * "枚举 n = 0..count，收集所有落在 1..count 的结果"。
+   * 真实浏览器引擎同样采用枚举/迭代方式求值，语义一致。
+   */
+  function evalNth(expr, count) {
+    var hits = [];
+    // 常用别名直接映射，与 CSS 规范关键字等价
+    if (expr === 'odd') expr = '2n+1';
+    if (expr === 'even') expr = '2n';
+    // 拆分 an + b：正则兼容 -n+3 / n+6 / 3n+1 / 2n
+    var m = expr.match(/^(-?\d*)n([+-]\d+)?$|^(\d+)$/);
+    if (!m) return hits;
+    var a = 0, b = 0;
+    if (m[3] !== undefined) { b = parseInt(m[3], 10); }        // 纯数字：单点命中
+    else {
+      var aStr = m[1];                                          // 系数部分（可能是 "" / "-" / "3"）
+      a = (aStr === '' || aStr === '+') ? 1 : (aStr === '-' ? -1 : parseInt(aStr, 10));
+      b = m[2] ? parseInt(m[2], 10) : 0;                        // 常数部分
+    }
+    // 枚举 n：a 为负时结果递减，循环到 0 以下自然停止
+    for (var n = 0; n <= count; n++) {
+      var idx = a * n + b;
+      if (idx >= 1 && idx <= count) hits.push(idx);
+      if (a === 0) break;                                       // a=0 时只算一次 b
+    }
+    return hits;
+  }
+
+  nths.addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    nths.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    var expr = btn.dataset.nth;
+    var isLast = expr === 'last';
+    var hits = isLast ? [cells.length] : evalNth(expr, cells.length);
+    cells.forEach(function (cell, i) {
+      // 序号从 1 开始（CSS 位置计数同样从 1 开始），i+1 与 nth 语义对齐
+      cell.classList.toggle('on', hits.indexOf(i + 1) !== -1);
+    });
+  });
+  // 默认点亮奇数位，页面初始即有内容可看
+  nths.querySelector('button[data-nth="odd"]').click();
+})();
+</script>
+</body>
+</html>

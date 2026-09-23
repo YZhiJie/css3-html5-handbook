@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 01：CSS 自定义属性基础 —— 作用域、继承与 JS 联动
+  ------------------------------------------------------------
+  【知识点】
+    1. 自定义属性声明与 var() 取值、回退值 var(--x, fallback)
+    2. 作用域即 DOM 继承作用域：:root 全局、局部节点覆盖
+    3. JS 读写：setProperty / getPropertyValue / removeProperty
+    4. 变量二次引用：--gap-lg: calc(var(--gap) * 2)
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    页面左右各有一张"卡片"，全局品牌色可通过滑杆/色板调整；
+    局部滑杆只影响右卡子树。观察"改全局右卡也变、改局部只有
+    右卡变"的继承边界。下方 JS 面板演示运行时写变量驱动样式。
+  【注意事项】
+    自定义属性区分大小写；读取未定义变量返回空字符串而非报错；
+    setProperty 的影响范围 = 目标节点及其后代（继承生效）。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 01 · 自定义属性基础</title>
+<style>
+  /* ---------- 全局默认层（:root 等价于 html，全站可继承） ---------- */
+  :root {
+    --brand: #4361ee;                     /* 品牌色：全局唯一真源 */
+    --gap: 12px;                          /* 基础间距 */
+    --gap-lg: calc(var(--gap) * 2);       /* 二次引用：大间距 = 基础间距 × 2，改 --gap 全链路联动 */
+    --radius: 12px;
+    --bg: #f4f6fb; --card: #fff; --ink: #243244; --muted: #7d8da3; --line: #e4e9f2;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink);
+    padding: 24px; line-height: 1.6;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 10px; }
+  .tip { font-size: .82rem; color: var(--muted); background: #f2f6ff;
+         border-left: 3px solid var(--brand); padding: 6px 10px; margin-bottom: 14px;
+         border-radius: 0 6px 6px 0; }
+
+  /* ---------- 作用域对比区 ---------- */
+  /* 局部覆盖：只在 .card-local 子树内，--accent 变为红色。
+     出了这张卡片（如页头/全局滑杆区），--accent 仍是全局蓝 */
+  .card-local { --accent: #e84118; }
+  /* 引用方：不关心变量在哪定义，只管用 —— 解耦的关键 */
+  .accent-bar {
+    height: 10px; border-radius: 999px;
+    background: var(--accent, #999);       /* 回退值兜底：变量缺失时不至于透明 */
+    margin: 8px 0;
+  }
+  .accent-chip {
+    display: inline-block; padding: 3px 12px;
+    background: var(--accent); color: #fff;
+    border-radius: 999px; font-size: .78rem;
+  }
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .duo { grid-template-columns: 1fr; } }
+  .scope-card {
+    border: 1px solid var(--line); border-radius: 10px; padding: 14px;
+    background: #fbfcfe;
+  }
+  .scope-card h3 { font-size: .95rem; margin-bottom: 6px; }
+
+  /* ---------- 控制面板 ---------- */
+  .panel { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+  .panel label { font-size: .84rem; display: flex; align-items: center; gap: 8px; }
+  input[type="range"] { accent-color: var(--brand); width: 160px; }
+  .swatches { display: flex; gap: 6px; }
+  .swatches button {
+    width: 26px; height: 26px; border-radius: 8px; cursor: pointer;
+    border: 2px solid transparent; padding: 0;
+  }
+  .swatches button.on { border-color: var(--ink); }
+  code.readout {
+    font-family: ui-monospace, Consolas, monospace; font-size: .8rem;
+    background: #eef1f9; padding: 3px 8px; border-radius: 6px; color: #273c75;
+  }
+  /* 演示"整段值变量"：box-shadow 打包成变量注入 */
+  .demo-box {
+    width: 120px; height: 76px; border-radius: 10px;
+    background: var(--brand);
+    box-shadow: var(--elev, none);
+    display: grid; place-items: center; color: #fff; font-size: .8rem;
+    transition: box-shadow .3s;
+  }
+  /* 阴影梯度：间距思维同样适用于海拔（elevation）系统 */
+  .elev-1 { --elev: 0 1px 3px rgba(0,0,0,.18); }
+  .elev-2 { --elev: 0 4px 10px rgba(0,0,0,.20); }
+  .elev-3 { --elev: 0 12px 26px rgba(0,0,0,.28); }
+</style>
+</head>
+<body>
+  <h1>自定义属性基础：作用域、继承与 JS 联动</h1>
+  <p class="sub">变量是"活的"：改一处，所有引用它的样式自动重算。</p>
+
+  <!-- ============ 作用域对比实验 ============ -->
+  <section>
+    <h2>实验一 · 继承边界可视化</h2>
+    <p class="tip">两卡结构相同。左卡吃 <code>:root</code> 的全局 <code>--accent</code>（蓝）；右卡在自身上覆盖了 <code>--accent: #e84118</code>（红）。拖动全局滑杆时两卡联动，拖动局部滑杆时只有右卡变色 —— 这就是继承的作用域边界。</p>
+    <div class="duo">
+      <div class="scope-card">
+        <h3>左卡 · 全局作用域</h3>
+        <div class="accent-bar"></div>
+        <span class="accent-chip">--accent 未覆盖</span>
+        <p style="font-size:.8rem;color:var(--muted)">继承自 :root → 跟随全局滑杆。</p>
+      </div>
+      <!-- .card-local 上覆盖 --accent，其后代全部吃到红色 -->
+      <div class="scope-card card-local" id="localCard">
+        <h3>右卡 · 局部覆盖</h3>
+        <div class="accent-bar"></div>
+        <span class="accent-chip">--accent: #e84118（被覆盖）</span>
+        <p style="font-size:.8rem;color:var(--muted)">继承自 .card-local → 跟随局部滑杆。</p>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:14px">
+      <label>全局 --accent <input type="range" id="globalRange" min="0" max="360" value="228"></label>
+      <label>局部 --accent <input type="range" id="localRange" min="0" max="360" value="6"></label>
+      <span class="swatches" id="swatches"></span>
+      <code class="readout" id="readout">--brand = #4361ee</code>
+    </div>
+  </section>
+
+  <!-- ============ JS 联动 ============ -->
+  <section>
+    <h2>实验二 · JS 运行时写变量（set/get/remove）</h2>
+    <p class="tip">按钮分别"设置变量 / 读取变量 / 删除变量"。删除后样式回退到样式表中的值 —— 内联变量优先级高于样式表，但可被移除还原。</p>
+    <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">
+      <div class="demo-box elev-1" id="box">demo-box</div>
+      <div class="panel" style="flex-direction:column;align-items:stretch">
+        <button id="btn-set" style="font:inherit;padding:8px 12px;border:1px solid var(--brand);background:#eaf0ff;border-radius:8px;cursor:pointer">setProperty：--elev 换成 3 级海拔阴影</button>
+        <button id="btn-read" style="font:inherit;padding:8px 12px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer">getPropertyValue：读取当前 --elev</button>
+        <button id="btn-del" style="font:inherit;padding:8px 12px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer">removeProperty：删除内联 --elev，回退样式表</button>
+      </div>
+    </div>
+    <p id="js-note" style="font-size:.8rem;color:var(--muted);margin-top:10px">海拔阴影也打包成了变量（--elev），体现"整段值也能成为变量"。</p>
+  </section>
+
+<script>
+(function () {
+  'use strict';
+  var root = document.documentElement;      // :root 即 html 元素
+  var localCard = document.getElementById('localCard');
+
+  /* HSL → HEX：滑杆给的是色相 0-360，转成 hex 便于展示与存储 */
+  function hsl2hex(h, s, l) {
+    s /= 100; l /= 100;
+    var k = function (n) { return (n + h / 30) % 12; };
+    var a = s * Math.min(l, 1 - l);
+    var f = function (n) {
+      var c = l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+      return Math.round(255 * c).toString(16).padStart(2, '0');
+    };
+    return '#' + f(0) + f(8) + f(4);
+  }
+
+  /* ---- 全局滑杆：写 :root 上的 --brand，同时联动 --accent 的"全局值" ----
+     注意：右卡局部覆盖了 --accent，所以全局滑杆不会影响右卡 —— 这正是实验点 */
+  var globalRange = document.getElementById('globalRange');
+  var readout = document.getElementById('readout');
+  globalRange.addEventListener('input', function () {
+    var hex = hsl2hex(+globalRange.value, 78, 60);
+    root.style.setProperty('--brand', hex);        // 影响范围：全文档
+    root.style.setProperty('--accent', hex);       // 左卡的 --accent 跟随全局
+    readout.textContent = '--brand = ' + hex;
+  });
+
+  /* ---- 局部滑杆：只写右卡节点，继承边界之外一概不动 ---- */
+  var localRange = document.getElementById('localRange');
+  localRange.addEventListener('input', function () {
+    var hex = hsl2hex(+localRange.value, 85, 55);
+    localCard.style.setProperty('--accent', hex);  // 影响范围：#localCard 及其后代
+  });
+
+  /* ---- 色板快捷方式：点击直接设全局变量 ---- */
+  var palette = ['#4361ee', '#0a9396', '#ee9b00', '#ae2012', '#7b2cbf'];
+  var swatches = document.getElementById('swatches');
+  palette.forEach(function (c, i) {
+    var b = document.createElement('button');
+    b.style.background = c;
+    if (i === 0) b.classList.add('on');            // 默认色标记为选中
+    b.title = '设为全局品牌色 ' + c;
+    b.addEventListener('click', function () {
+      root.style.setProperty('--brand', c);
+      root.style.setProperty('--accent', c);
+      readout.textContent = '--brand = ' + c;
+      swatches.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+    });
+    swatches.appendChild(b);
+  });
+
+  /* ---- 实验二：set / read / remove 三步演示 ---- */
+  var box = document.getElementById('box');
+  var note = document.getElementById('js-note');
+  var elev3 = '0 12px 26px rgba(0,0,0,.28), 0 2px 6px rgba(0,0,0,.15)';  // 3 级海拔：大而柔
+
+  document.getElementById('btn-set').addEventListener('click', function () {
+    // 写内联变量：优先级高于样式表中的 .elev-1 定义
+    box.style.setProperty('--elev', elev3);
+    note.textContent = '已 setProperty("--elev", "0 12px 26px ...")，阴影立刻变深 —— 无需改 class。';
+  });
+
+  document.getElementById('btn-read').addEventListener('click', function () {
+    // getComputedStyle 读取的是"计算后"的值（含继承与回退结果）
+    var v = getComputedStyle(box).getPropertyValue('--elev').trim();
+    note.textContent = '当前 --elev = "' + (v || '(空：变量未定义，var() 走了回退值 none)') + '"，读取未定义变量不报错，只会得到空串。';
+  });
+
+  document.getElementById('btn-del').addEventListener('click', function () {
+    // 删除内联变量 → 样式表的 .elev-1 重新接管，完成"还原"
+    box.style.removeProperty('--elev');
+    note.textContent = '已 removeProperty("--elev")，样式表中的 1 级海拔重新生效。';
+  });
+})();
+</script>
+</body>
+</html>

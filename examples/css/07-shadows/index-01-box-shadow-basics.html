@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 01：box-shadow 全参数交互实验台
+  ------------------------------------------------------------
+  【知识点】
+    1. box-shadow 六要素：inset / x / y / blur / spread / color
+    2. 多层阴影叠加顺序：先写的层在上层（先细后粗更自然）
+    3. 负 spread 的"收进"效果与聚焦环（0 0 0 Npx）技巧
+    4. hover 抬升的两种实现：改 box-shadow 值（重绘） vs
+       伪元素阴影 + opacity（只合成）——性能差异对照
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    上半部是参数实验台：拖滑杆/勾选 inset/选颜色，舞台上的方块
+    与生成的 CSS 代码实时同步；下半部是"单层 vs 多层 vs 伪元素
+    动画"对照区，鼠标悬停感受性能差异的推荐写法。
+  【注意事项】
+    直接过渡 box-shadow 值会触发逐帧重绘；示例的"性能版"用
+    伪元素承载阴影、只动 opacity 与 transform，动画更流畅。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 01 · box-shadow 参数实验台</title>
+<style>
+  :root {
+    --brand: #4361ee; --ink: #232c3d; --muted: #7c8aa0; --line: #e3e8f1;
+    --bg: #f4f6fb; --card: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.6;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 10px; }
+  .tip { font-size: .82rem; color: var(--muted); background: #f1f5ff;
+         border-left: 3px solid var(--brand); padding: 6px 10px; margin-bottom: 14px;
+         border-radius: 0 6px 6px 0; }
+
+  /* ---------- 参数实验台 ---------- */
+  .lab { display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
+  @media (max-width: 760px) { .lab { grid-template-columns: 1fr; } }
+  .ctl-grid { display: grid; gap: 10px; }
+  .ctl { display: grid; grid-template-columns: 96px 1fr 52px; align-items: center; gap: 8px; font-size: .82rem; }
+  .ctl input[type="range"] { accent-color: var(--brand); width: 100%; }
+  .ctl output { font-family: ui-monospace, Consolas, monospace; color: var(--brand); font-size: .78rem; text-align: right; }
+  .ctl-inline { display: flex; gap: 14px; align-items: center; font-size: .82rem; flex-wrap: wrap; }
+  .colors { display: flex; gap: 6px; }
+  .colors button {
+    width: 24px; height: 24px; border-radius: 7px; border: 2px solid transparent;
+    cursor: pointer; padding: 0;
+  }
+  .colors button.on { border-color: var(--ink); }
+
+  /* 舞台：JS 每次输入重写这一个元素的 box-shadow */
+  .stage {
+    min-height: 240px; display: grid; place-items: center;
+    background:
+      /* 网格底纹：帮助观察阴影方向与距离 */
+      linear-gradient(#eef1f8 1px, transparent 1px),
+      linear-gradient(90deg, #eef1f8 1px, transparent 1px);
+    background-size: 24px 24px;
+    background-color: #fbfcff;
+    border: 1px solid var(--line); border-radius: 10px;
+  }
+  #cube {
+    width: 150px; height: 150px; border-radius: 18px;
+    background: linear-gradient(145deg, #ffffff, #eef1f8);
+    /* 初始值即"标准单层阴影"，JS 会整体覆盖 */
+    box-shadow: 0 10px 20px rgba(40,60,120,.30);
+  }
+
+  /* 生成的 CSS 代码实时展示 */
+  pre.code {
+    grid-column: 1 / -1;
+    background: #232c3d; color: #c7d3ea;
+    font-size: .76rem; padding: 12px 14px; border-radius: 8px;
+    overflow-x: auto; white-space: pre-wrap; word-break: break-all;
+  }
+
+  /* ---------- 对照区：三种 hover 抬升写法 ---------- */
+  .trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 720px) { .trio { grid-template-columns: 1fr; } }
+  .trio .demo {
+    position: relative;
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px; background: #fbfcff; text-align: center;
+  }
+  .trio .demo b { display: block; font-size: .88rem; margin-bottom: 4px; }
+  .trio .demo small { color: var(--muted); font-size: .74rem; display: block; min-height: 3.2em; }
+
+  /* 写法 A：hover 直接改 box-shadow —— 简单但每帧重绘 */
+  .hov-a .chip {
+    display: inline-block; margin-top: 10px; padding: 10px 20px; border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(16,24,40,.10);
+    transition: box-shadow .25s ease;        /* 过渡阴影值 → 逐帧重绘 */
+  }
+  .hov-a:hover .chip {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 24px rgba(16,24,40,.22);
+  }
+
+  /* 写法 B：伪元素承载"深阴影"，平时 opacity 0，hover 淡入 —— 只合成不重绘 */
+  .hov-b .chip {
+    display: inline-block; margin-top: 10px; padding: 10px 20px; border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(16,24,40,.10);   /* 静止态阴影：永远不变 */
+    transition: transform .25s ease;            /* 只过渡位移 */
+    will-change: transform;                     /* 提升合成层，位移走 GPU */
+  }
+  .hov-b .chip::after {
+    content: "";
+    position: absolute; inset: 0;
+    border-radius: 10px;
+    box-shadow: 0 10px 24px rgba(16,24,40,.22); /* 深阴影画在伪元素上 */
+    opacity: 0;                                  /* 平时不可见 */
+    transition: opacity .25s ease;               /* hover 只动 opacity → 纯合成 */
+  }
+  .hov-b:hover .chip { transform: translateY(-4px); }
+  .hov-b:hover .chip::after { opacity: 1; }      /* 阴影淡入，无需重绘阴影本身 */
+
+  /* 写法 C：聚焦环技巧 —— spread 偏移为零的"硬环" */
+  .hov-c .chip {
+    display: inline-block; margin-top: 10px; padding: 10px 20px; border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 0 0 0 rgba(67,97,238,.30);     /* spread 0：看不见 */
+    transition: box-shadow .2s ease;
+  }
+  .hov-c:hover .chip {
+    box-shadow: 0 0 0 4px rgba(67,97,238,.30);   /* 只放大 spread：柔和聚焦环 */
+  }
+</style>
+</head>
+<body>
+  <h1>box-shadow 参数实验台</h1>
+  <p class="sub">拖滑杆观察每个参数如何塑造阴影，下方代码实时同步。</p>
+
+  <!-- ============ 实验台 ============ -->
+  <section>
+    <h2>参数实验台</h2>
+    <p class="tip">顺序记忆：<code>inset? → x → y → blur → spread → color</code>。blur 管虚实、spread 管胖瘦；负 spread 会把阴影"收进"元素底下，形成贴地感。</p>
+    <div class="lab">
+      <div class="ctl-grid">
+        <label class="ctl">X 偏移 <input type="range" id="sx" min="-50" max="50" value="0"><output id="ox">0px</output></label>
+        <label class="ctl">Y 偏移 <input type="range" id="sy" min="-50" max="50" value="10"><output id="oy">10px</output></label>
+        <label class="ctl">模糊 blur <input type="range" id="sb" min="0" max="80" value="20"><output id="ob">20px</output></label>
+        <label class="ctl">扩散 spread <input type="range" id="ss" min="-30" max="40" value="0"><output id="os">0px</output></label>
+        <label class="ctl">透明度 <input type="range" id="sa" min="5" max="80" value="30"><output id="oa">.30</output></label>
+        <div class="ctl-inline">
+          <label><input type="checkbox" id="inset"> inset 内阴影</label>
+          <label><input type="checkbox" id="multi" checked> 双层（细+粗）</label>
+        </div>
+        <div class="ctl-inline">
+          阴影色
+          <span class="colors" id="colors"></span>
+        </div>
+      </div>
+      <div class="stage"><div id="cube"></div></div>
+      <pre class="code" id="code">box-shadow: 0px 10px 20px 0px rgba(40,60,120,.30);</pre>
+    </div>
+  </section>
+
+  <!-- ============ 对照区 ============ -->
+  <section>
+    <h2>三种 hover 抬升写法对照（鼠标扫过感受差异）</h2>
+    <p class="tip">写法 A 直接过渡 box-shadow 值（重绘）；写法 B 用伪元素承载深阴影、只动 opacity（合成，推荐）；写法 C 是聚焦环——只动 spread。</p>
+    <div class="trio">
+      <div class="demo hov-a">
+        <b>A · 过渡阴影值</b>
+        <small>transition: box-shadow —— 实现最直观，但动画期间每帧都在重绘阴影。</small>
+        <span class="chip">悬停我</span>
+      </div>
+      <div class="demo hov-b">
+        <b>B · 伪元素 + opacity（推荐）</b>
+        <small>深阴影常驻伪元素、透明度切换 —— 动画只发生在合成阶段，滚动列表里更顺滑。</small>
+        <span class="chip">悬停我</span>
+      </div>
+      <div class="demo hov-c">
+        <b>C · 聚焦环（spread）</b>
+        <small>blur 保持 0、只放大 spread —— 硬边环，适合选中态与表单聚焦反馈。</small>
+        <span class="chip">悬停我</span>
+      </div>
+    </div>
+  </section>
+
+<script>
+(function () {
+  'use strict';
+  /* ---- 实验台：读滑杆 → 拼 box-shadow → 写变量 + 代码展示 ---- */
+  var ids = ['sx', 'sy', 'sb', 'ss', 'sa'];
+  var outIds = { sx: 'ox', sy: 'oy', sb: 'ob', ss: 'os', sa: 'oa' };
+  var cube = document.getElementById('cube');
+  var code = document.getElementById('code');
+  var insetBox = document.getElementById('inset');
+  var multiBox = document.getElementById('multi');
+  var shadowColor = 'rgba(40,60,120,';        // 颜色前缀 + 动态透明度
+
+  /* 色板：切换阴影主色调（演示"彩色阴影"技巧 —— 与品牌色同源） */
+  var palette = [
+    { name: '蓝', v: '40,60,120,' }, { name: '青', v: '10,120,110,' },
+    { name: '红', v: '150,40,40,' }, { name: '紫', v: '90,40,150,' }
+  ];
+  var colors = document.getElementById('colors');
+  palette.forEach(function (p, i) {
+    var b = document.createElement('button');
+    b.style.background = 'rgb(' + p.v + '1)';
+    b.title = p.name + '系阴影';
+    if (i === 0) b.classList.add('on');
+    b.addEventListener('click', function () {
+      shadowColor = p.v;
+      colors.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      render();                               // 换色立即重渲染
+    });
+    colors.appendChild(b);
+  });
+
+  /** 读全部滑杆 → 组装阴影字符串 → 同步元素样式与代码面板 */
+  function render() {
+    var v = {};
+    ids.forEach(function (id) { v[id] = +document.getElementById(id).value; });
+    // 透明度滑杆值 5-80 → 0.05-0.80
+    var alpha = (v.sa / 100).toFixed(2);
+    var prefix = insetBox.checked ? 'inset ' : '';
+    var single = prefix + v.sx + 'px ' + v.sy + 'px ' + v.sb + 'px ' + v.ss + 'px ' + shadowColor + alpha + ')';
+    // 双层模式：第一层"细"（小偏移小模糊）叠在第二层"粗"上方 → 先细后粗
+    var double = prefix + '0px 1px 2px ' + shadowColor + alpha + '),' + prefix + v.sx + 'px ' + v.sy + 'px ' + v.sb + 'px ' + v.ss + 'px ' + shadowColor + (alpha / 2).toFixed(2) + ')';
+    var finalShadow = multiBox.checked ? double : single;
+    cube.style.boxShadow = finalShadow;       // 写到舞台方块
+    // 代码面板同步展示（双层时格式化换行，便于抄写）
+    code.textContent = multiBox.checked
+      ? 'box-shadow:\n  0px 1px 2px ' + shadowColor + alpha + ',   /* 接触层：细 */\n  ' + v.sx + 'px ' + v.sy + 'px ' + v.sb + 'px ' + v.ss + 'px ' + shadowColor + (alpha / 2).toFixed(2) + ');  /* 环境层：粗 */'
+      : 'box-shadow: ' + single + ';';
+    // 输出框同步数值
+    ids.forEach(function (id) { document.getElementById(outIds[id]).textContent = id === 'sa' ? (v.sa / 100).toFixed(2) : v[id] + 'px'; });
+  }
+  ids.forEach(function (id) { document.getElementById(id).addEventListener('input', render); });
+  insetBox.addEventListener('change', render);
+  multiBox.addEventListener('change', render);
+  render();                                   // 初始渲染一次
+})();
+</script>
+</body>
+</html>

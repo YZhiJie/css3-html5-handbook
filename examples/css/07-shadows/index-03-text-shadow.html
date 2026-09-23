@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：text-shadow 文字阴影 —— 霓虹字 / 浮雕 / 长投影
+  ------------------------------------------------------------
+  【知识点】
+    1. text-shadow 语法：x / y / blur / color，可叠多层；
+       没有 spread 与 inset（与 box-shadow 的关键差异）
+    2. 霓虹字：白芯 + 多层同色光晕，深底才成立
+    3. 浮雕字：亮上暗下双阴影模拟顶光；凹陷字反向
+    4. 长投影：45° 逐像素堆叠（JS 生成）；
+    5. 性能：闪烁动画只动 opacity，不动阴影值
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    深色展示区：霓虹招牌（可开关灯光）、浮雕与凹刻对照、
+    长投影标题（滑杆调层数与角度）、描边字对照。
+    浅色展示区：刻字按钮与纸面压印效果。
+  【注意事项】
+    大模糊文字阴影在大段正文上会明显拖慢绘制，特效只用于
+    标题与装饰字；浅色背景慎用光晕（会发灰）。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 03 · text-shadow 文字特效</title>
+<style>
+  :root {
+    --ink: #232c3d; --muted: #7c8aa0; --line: #e3e8f1; --bg: #f4f6fb; --card: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.6;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px; overflow: hidden;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 10px; }
+  .tip { font-size: .82rem; color: var(--muted); background: #f1f5ff;
+         border-left: 3px solid #4361ee; padding: 6px 10px; margin-bottom: 14px;
+         border-radius: 0 6px 6px 0; }
+
+  /* ---------- 霓虹展示区：深色背景是霓虹成立的前提 ---------- */
+  .dark-room {
+    background: radial-gradient(ellipse at 50% 30%, #171726, #0b0b14 70%);
+    border-radius: 12px; padding: 40px 20px; text-align: center;
+  }
+  .neon {
+    font-size: clamp(1.8rem, 6vw, 3.4rem);
+    font-weight: 800; letter-spacing: .12em; color: #fff;
+    /* 五层霓虹：3 层白芯（小模糊逐层放大）+ 2 层青色光晕（大范围低强度） */
+    text-shadow:
+      0 0 4px  #fff,
+      0 0 11px #fff,
+      0 0 21px #fff,
+      0 0 42px #0ff,
+      0 0 82px #0ff;
+  }
+  /* 灯光开关：灭灯态只保留极弱光晕 —— 过渡 opacity 感知"断电" */
+  .neon.off { animation: none; text-shadow: 0 0 2px rgba(255,255,255,.4); color: #6d7480; }
+  /* 闪烁动画：只动 opacity —— 若动 text-shadow 每帧重绘，闪烁会卡 */
+  .neon.flicker { animation: flick 4s infinite; }
+  @keyframes flick {
+    0%, 100% { opacity: 1; }
+    92%      { opacity: 1; }
+    93%      { opacity: .4; }   /* 临近周期的短促暗闪，模拟灯管接触不良 */
+    94%      { opacity: 1; }
+    96%      { opacity: .7; }
+    97%      { opacity: 1; }
+  }
+
+  /* ---------- 浮雕 / 凹刻：亮上暗下 = 凸，反向 = 凹 ---------- */
+  .engrave-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 680px) { .engrave-row { grid-template-columns: 1fr; } }
+  .emboss {
+    font-size: 1.6rem; font-weight: 800; text-align: center;
+    color: #cfd6e0;
+    /* 浮雕：暗影在下（光从上方来，下缘背光） + 白高光在上 */
+    text-shadow: 0 1px 1px rgba(0,0,0,.45), 0 -1px 0 rgba(255,255,255,.85);
+  }
+  .deboss {
+    font-size: 1.6rem; font-weight: 800; text-align: center;
+    color: #c7cedb;
+    /* 凹刻：光反向 —— 亮影在下、暗影在上，字像被压进底面 */
+    text-shadow: 0 -1px 1px rgba(0,0,0,.5), 0 1px 0 rgba(255,255,255,.9);
+  }
+  /* 浅色底的凹刻按钮：纸面压印质感 */
+  .press-btn {
+    display: block; margin: 18px auto 0; font: inherit; font-size: .95rem;
+    padding: 12px 34px; border: none; border-radius: 12px; cursor: pointer;
+    background: #dfe5ee; color: #8d97a8; letter-spacing: .2em;
+    text-shadow: 0 -1px 0 rgba(0,0,0,.28), 0 1px 0 rgba(255,255,255,.85);
+    box-shadow: 0 2px 0 #b9c2d0, 0 4px 8px rgba(80,95,125,.25);
+  }
+  .press-btn:active {
+    transform: translateY(2px);                       /* 物理下压 */
+    box-shadow: 0 0 0 #b9c2d0, 0 1px 3px rgba(80,95,125,.3);
+    text-shadow: 0 1px 0 rgba(0,0,0,.25), 0 -1px 0 rgba(255,255,255,.6); /* 压下后光反转 */
+  }
+
+  /* ---------- 长投影：45° 方向逐像素堆叠，JS 生成 ---------- */
+  .long-stage {
+    background: linear-gradient(135deg, #ff7b54, #d63447);
+    border-radius: 12px; padding: 40px 20px; text-align: center;
+  }
+  .long-title {
+    font-size: clamp(1.5rem, 5vw, 2.6rem); font-weight: 900; color: #fff;
+    /* text-shadow 由 JS 按层数/角度生成 */
+  }
+  .long-ctl { margin-top: 14px; font-size: .8rem; color: rgba(255,255,255,.85); display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+  .long-ctl label { display: flex; align-items: center; gap: 6px; }
+  .long-ctl input { accent-color: #fff; width: 130px; }
+
+  /* ---------- 描边对照：四向 1px 模拟描边 ---------- */
+  .stroke-demos { display: flex; gap: 26px; flex-wrap: wrap; justify-content: center; }
+  .stroke-demos p { font-size: 1.4rem; font-weight: 800; }
+  /* 四向阴影描边：text-shadow 没有 spread，用四个 1px 方向凑 */
+  .stroke-4 {
+    color: #fff;
+    text-shadow: 1px 1px 0 #232c3d, -1px 1px 0 #232c3d, 1px -1px 0 #232c3d, -1px -1px 0 #232c3d;
+  }
+  /* 模糊光晕：单层大模糊只能得到"发光"，得不到描边锐度 */
+  .glow-only { color: #fff; text-shadow: 0 0 8px #4361ee, 0 0 2px #4361ee; }
+</style>
+</head>
+<body>
+  <h1>text-shadow：霓虹 / 浮雕 / 长投影</h1>
+  <p class="sub">文字阴影跟随字形轮廓，是纯 CSS 文字特效的唯一原料（无 spread、无 inset）。</p>
+
+  <!-- ============ 霓虹 ============ -->
+  <section>
+    <h2>① 霓虹招牌（深底 + 白芯 + 光晕）</h2>
+    <p class="tip">霓虹三层结构：<b>白芯</b>（笔画通电感）→ <b>中距光晕</b> → <b>大范围光晕</b>。闪烁动画只动 <code>opacity</code>，绝不动阴影值（每帧重绘会卡）。</p>
+    <div class="dark-room">
+      <div class="neon flicker" id="neonSign">深夜食堂 · 营业中</div>
+    </div>
+    <p style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+      <button id="btn-light" style="font:inherit;padding:8px 16px;border:1px solid #232c3d;background:#fff;border-radius:8px;cursor:pointer">开灯 / 关灯</button>
+      <button id="btn-flick" style="font:inherit;padding:8px 16px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer">暂停 / 恢复闪烁</button>
+    </p>
+  </section>
+
+  <!-- ============ 浮雕与凹刻 ============ -->
+  <section>
+    <h2>② 浮雕 vs 凹刻：两条阴影的方向互换</h2>
+    <p class="tip">凸 = 暗影在下、亮影在上；凹 = 全部反转。这就是"一条高光 + 一条投影"的顶光假设。</p>
+    <div class="engrave-row">
+      <div style="background:#dfe5ee;border-radius:12px;padding:26px"><div class="emboss">EMBOSS 浮雕</div></div>
+      <div style="background:#dfe5ee;border-radius:12px;padding:26px"><div class="deboss">DEBOSS 凹刻</div></div>
+    </div>
+    <button class="press-btn" id="pressBtn">按 我 一 下</button>
+  </section>
+
+  <!-- ============ 长投影 ============ -->
+  <section style="padding:0;overflow:hidden">
+    <h2 style="padding:18px 18px 0">③ 长投影（Long Shadow）：逐像素堆叠</h2>
+    <div class="long-stage">
+      <div class="long-title" id="longTitle">FLAT DESIGN</div>
+      <div class="long-ctl">
+        <label>层数 <input type="range" id="lsLayers" min="0" max="60" value="30"></label>
+        <label>投影长度(px/层) <input type="range" id="lsStep" min="1" max="6" value="2"></label>
+        <span id="lsRead">30 层 × 2px = 60px</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 描边对照 ============ -->
+  <section>
+    <h2>④ 描边的正路与歧路</h2>
+    <p class="tip">text-shadow 没有 spread，"四向 1px"只能凑合细描边；更锐利的描边请用 <code>-webkit-text-stroke</code>（右侧对照），光晕和描边是两种效果别混淆。</p>
+    <div class="stroke-demos">
+      <p class="stroke-4">四向 1px 描边</p>
+      <p class="glow-only">模糊光晕 ≠ 描边</p>
+      <p style="color:#fff;-webkit-text-stroke:1.5px #232c3d;text-shadow:2px 2px 0 rgba(35,44,61,.25)">-webkit-text-stroke</p>
+    </div>
+  </section>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---- ① 霓虹开关与闪烁控制 ----
+     关灯 = 换成弱阴影类；闪烁 = animation-play-state 切换 */
+  var sign = document.getElementById('neonSign');
+  document.getElementById('btn-light').addEventListener('click', function () {
+    sign.classList.toggle('off');              // off 类关闭光晕并压暗文字色
+  });
+  document.getElementById('btn-flick').addEventListener('click', function () {
+    // 直接切换 animation-play-state，不销毁动画 —— 恢复时从断点继续
+    sign.style.animationPlayState =
+      sign.style.animationPlayState === 'paused' ? 'running' : 'paused';
+  });
+
+  /* ---- ③ 长投影生成器 ----
+     45° 方向逐层堆叠同色阴影：第 i 层偏移 = i × step。
+     层数多时字符串较长，但生成一次即可，运行时零成本 */
+  var title = document.getElementById('longTitle');
+  var layers = document.getElementById('lsLayers');
+  var step = document.getElementById('lsStep');
+  var read = document.getElementById('lsRead');
+  function renderLong() {
+    var n = +layers.value, s = +step.value;
+    var parts = [];
+    for (var i = 1; i <= n; i++) {
+      parts.push(i * s + 'px ' + i * s + 'px 0 rgba(140,20,35,.9)');  // 同角度同步长
+    }
+    title.style.textShadow = parts.join(', ') || 'none';
+    read.textContent = n + ' 层 × ' + s + 'px = ' + (n * s) + 'px';
+  }
+  layers.addEventListener('input', renderLong);
+  step.addEventListener('input', renderLong);
+  renderLong();
+
+  /* ---- ② 按压按钮：点击后短暂回弹，配合 :active 已有的 CSS 效果 ---- */
+  document.getElementById('pressBtn').addEventListener('click', function () {
+    // 纯演示占位：实际效果由 CSS :active 承载，JS 不干预样式
+  });
+})();
+</script>
+</body>
+</html>

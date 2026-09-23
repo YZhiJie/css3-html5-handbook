@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 04：@property 注册变量类型 —— 让变量"会动画"
+  ------------------------------------------------------------
+  【知识点】
+    1. @property 语法：syntax 类型 / initial-value 初始值 / inherits 继承
+    2. 未注册变量 = 字符串，动画只能"跳变"；注册 <angle>/<color>/<length>
+       后浏览器可逐帧插值
+    3. 注册变量参与 transition / animation 的完整链路
+    4. JS 配合：滑杆写变量 → 注册过的属性平滑过渡
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    ① 锥形渐变圆环：--deg 注册为 <angle>，keyframes 动画它，
+       渐变角度连续旋转（未注册的变量做不到）；
+    ② 颜色滑杆：--c 注册为 <color>，松手后颜色平滑过渡；
+    ③ 对照组：未注册的 --raw 拖动时"瞬跳"，与②形成鲜明对比。
+  【注意事项】
+    @property 需 Chrome 85+/Safari 16.4+/Firefox 128+；
+    不支持的浏览器里变量退化为普通字符串 —— 功能仍在，动画失效，
+    因此生产中 @property 只做渐进增强，不承载核心功能。
+    initial-value 必填且必须匹配 syntax 类型，否则整条注册失效。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 04 · @property 注册变量类型</title>
+<style>
+  /* ============ 类型注册区 ============
+     每个 @property 三要素：
+     syntax   —— 声明类型，浏览器据此决定能否插值
+     initial-value —— 缺省时的值（必须类型匹配）
+     inherits —— 是否沿 DOM 继承（动画元素建议 false，各自独立） */
+  @property --deg {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+  }
+  @property --c {
+    syntax: '<color>';
+    initial-value: #0a9396;
+    inherits: false;
+  }
+  @property --r {
+    syntax: '<length>';
+    initial-value: 16px;
+    inherits: false;
+  }
+
+  :root {
+    --brand: #0a9396; --ink: #1c2b2e; --muted: #69808a; --line: #dfe9ea;
+    --bg: #f2f7f7; --card: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.6;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 8px; }
+  .tip { font-size: .82rem; color: var(--muted); background: #eff7f7;
+         border-left: 3px solid var(--brand); padding: 6px 10px; margin-bottom: 14px;
+         border-radius: 0 6px 6px 0; }
+  .row { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
+  label.ctl { font-size: .84rem; display: flex; flex-direction: column; gap: 6px; }
+  input[type="range"] { accent-color: var(--brand); width: 220px; }
+
+  /* ============ ① 锥形渐变旋转圆环 ============
+     conic-gradient(from var(--deg), ...) 的角度来自注册变量 --deg。
+     keyframes 直接动画 --deg：浏览器按 <angle> 类型逐帧插值，
+     渐变随之连续旋转 —— 未注册变量动画时只会首尾跳变 */
+  .ring {
+    --deg: 0deg;
+    width: 150px; height: 150px; border-radius: 50%;
+    background: conic-gradient(from var(--deg), #0a9396, #94d2bd, #ee9b00, #ca6702, #0a9396);
+    display: grid; place-items: center;
+    animation: spin 4s linear infinite;   /* 无限旋转：--deg 0deg → 360deg */
+  }
+  /* 内圆挖空成环：本质是遮罩视觉，用同色背景盖住中心 */
+  .ring::before {
+    content: ""; width: 96px; height: 96px; border-radius: 50%;
+    background: var(--card);
+  }
+  .ring span {
+    position: absolute; font-size: .78rem; color: var(--muted);
+  }
+  @keyframes spin { to { --deg: 360deg; } }   /* 动画的"属性"是自定义变量本身 */
+
+  /* ============ ② 颜色 / ③ 原始字符串 对照 ============ */
+  /* ② 注册过的 --c：加 transition 后，JS 改值 → 平滑变色 */
+  .swatch {
+    width: 140px; height: 90px; border-radius: var(--r);
+    background: var(--c);
+    transition: --c .45s ease, --r .45s ease;   /* 对"注册变量"做过渡 */
+    display: grid; place-items: center; color: #fff; font-size: .78rem;
+    text-shadow: 0 1px 2px rgba(0,0,0,.35);
+  }
+  /* ③ 未注册的 --raw：没有类型信息，transition 不生效 → 瞬跳 */
+  .swatch.raw { background: var(--raw, #ca6702); transition: none; }
+</style>
+</head>
+<body>
+  <h1>@property：给 CSS 变量装上"类型系统"</h1>
+  <p class="sub">注册类型的变量可以像普通属性一样参与过渡与动画。</p>
+
+  <!-- ============ ① 旋转圆环 ============ -->
+  <section>
+    <h2>① 动画自定义变量：锥形渐变匀速旋转</h2>
+    <p class="tip">关键三步：<code>@property --deg { syntax:'&lt;angle&gt;' }</code> 注册类型 → <code>background: conic-gradient(from var(--deg),…)</code> 引用 → <code>@keyframes { to { --deg: 360deg } }</code> 动画变量。未注册时此动画只有首尾两帧（跳变），注册后才是丝滑旋转。</p>
+    <div class="row">
+      <div class="ring" style="position:relative"><span>匀速旋转中</span></div>
+      <label class="ctl">
+        手动设置角度（动画会基于当前值继续）
+        <input type="range" id="degRange" min="0" max="360" value="0">
+      </label>
+      <code id="degRead" style="font-size:.8rem;color:var(--muted)">--deg: 0deg</code>
+    </div>
+    <p style="font-size:.8rem;color:var(--muted);margin-top:10px">
+      提示：拖动滑杆会在动画进行中"劫持"当前角度 —— 松开后旋转从新角度继续，说明变量是真被逐帧写入的。
+      再点按钮暂停动画，纯手动控制角度。
+    </p>
+    <button id="btn-pause" style="margin-top:8px;font:inherit;padding:7px 14px;border:1px solid var(--brand);background:#e6f3f3;color:#0a5959;border-radius:8px;cursor:pointer">暂停 / 恢复旋转</button>
+  </section>
+
+  <!-- ============ ②③ 颜色与圆角对照 ============ -->
+  <section>
+    <h2>② 注册 &lt;color&gt;/&lt;length&gt;：平滑过渡　③ 未注册：瞬跳对照</h2>
+    <p class="tip">两个色块外观相同、JS 逻辑相同，唯一差别：<b>左块的 --c/--r 已注册类型</b>，右块的 --raw 是普通字符串变量。拖动滑杆对比"平滑插值"与"瞬跳"。</p>
+    <div class="row">
+      <div class="swatch" id="swatchReg">已注册 --c / --r</div>
+      <div class="swatch raw" id="swatchRaw">未注册 --raw</div>
+    </div>
+    <div class="row" style="margin-top:16px">
+      <label class="ctl">
+        色相（左块平滑 · 右块瞬跳）
+        <input type="range" id="hueRange" min="0" max="360" value="180">
+      </label>
+      <label class="ctl">
+        圆角 --r（仅左块会平滑）
+        <input type="range" id="radiusRange" min="0" max="45" value="16">
+      </label>
+      <button id="btn-rand" style="font:inherit;padding:7px 14px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer">随机一跳（看 transition 差异）</button>
+    </div>
+  </section>
+
+  <!-- ============ 兼容性提示 ============ -->
+  <section>
+    <h2>兼容性与降级策略</h2>
+    <p class="tip" style="margin-bottom:8px">生产环境的三条军规：</p>
+    <ol style="font-size:.85rem;color:var(--muted);padding-left:20px">
+      <li><b>功能与增强分离</b>：核心交互不依赖 @property，动画失效也必须可用；</li>
+      <li><b>用 @supports 检测</b>：<code>@supports (animation-timeline: none) and (background: paint(x))</code> 不适用时可改用 JS 检测 <code>CSS.registerProperty</code> 是否存在；</li>
+      <li><b>initial-value 必填</b>：漏写或类型不符会让整条注册失效，变量退回"字符串"。</li>
+    </ol>
+  </section>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---- ① 角度滑杆：直接写注册变量 --deg ----
+     拖动时先暂停动画（避免动画帧覆盖内联值），松手恢复 */
+  var degRange = document.getElementById('degRange');
+  var degRead = document.getElementById('degRead');
+  var ring = document.querySelector('.ring');
+  var paused = false;
+  degRange.addEventListener('input', function () {
+    if (!paused) {                       // 动画运行时手动写值会被动画帧覆盖，先暂停更直观
+      ring.style.animationPlayState = 'paused';
+    }
+    ring.style.setProperty('--deg', degRange.value + 'deg');   // 写入角度变量
+    degRead.textContent = '--deg: ' + degRange.value + 'deg';
+  });
+  degRange.addEventListener('change', function () {
+    if (!paused) ring.style.animationPlayState = 'running';    // 松手恢复动画
+  });
+  document.getElementById('btn-pause').addEventListener('click', function (e) {
+    paused = !paused;
+    ring.style.animationPlayState = paused ? 'paused' : 'running';
+    e.target.textContent = paused ? '恢复旋转' : '暂停 / 恢复旋转';
+  });
+
+  /* ---- ②/③ 双色块联动：同样的写入，不同的结果 ----
+     HSL 生成颜色字符串；两个变量分别喂给注册版与原始版 */
+  var hueRange = document.getElementById('hueRange');
+  var radiusRange = document.getElementById('radiusRange');
+  var swReg = document.getElementById('swatchReg');
+  var swRaw = document.getElementById('swatchRaw');
+
+  function apply() {
+    var h = +hueRange.value;
+    var color = 'hsl(' + h + ' 65% 45%)';       // 现代空格语法，<color> 可解析
+    var radius = radiusRange.value + 'px';
+    swReg.style.setProperty('--c', color);       // 注册过 → transition 生效 → 平滑
+    swReg.style.setProperty('--r', radius);
+    swRaw.style.setProperty('--raw', color);     // 未注册 → 无插值 → 瞬跳
+  }
+  hueRange.addEventListener('input', apply);
+  radiusRange.addEventListener('input', apply);
+
+  /* ---- 随机跳变按钮：一次大跨度变化，肉眼对比两种行为 ---- */
+  document.getElementById('btn-rand').addEventListener('click', function () {
+    hueRange.value = Math.floor(Math.random() * 360);
+    radiusRange.value = Math.floor(Math.random() * 46);
+    apply();
+  });
+
+  /* ---- 能力检测提示：老内核给出说明而不是"静默失效" ---- */
+  var supported = (window.CSS && typeof CSS.registerProperty === 'function');
+  if (!supported) {
+    var tip = document.createElement('p');
+    tip.style.cssText = 'font-size:.8rem;color:#ca6702;margin-top:8px';
+    tip.textContent = '⚠️ 当前浏览器不支持 @property，左块也会瞬跳 —— 这正是"渐进增强"的含义：功能仍可用，仅动画退化。';
+    document.querySelector('section:nth-of-type(2)').appendChild(tip);
+  }
+  apply();   // 初始渲染一次
+})();
+</script>
+</body>
+</html>

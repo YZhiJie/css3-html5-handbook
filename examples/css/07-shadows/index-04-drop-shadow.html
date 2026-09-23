@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 04：filter: drop-shadow 与 box-shadow 的本质区别
+  ------------------------------------------------------------
+  【知识点】
+    1. box-shadow 投影"边框盒矩形"；drop-shadow 投影"渲染后的
+       alpha 轮廓"—— 透明镂空、伪元素尖角都计入轮廓
+    2. 气泡尖角、SVG 图标、clip-path 异形三类典型场景
+    3. drop-shadow 不支持 spread / inset，用多层叠加近似
+    4. 性能：filter 触发合成层，大面积高频动画需谨慎
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    对照区从上到下：① 对话气泡（尖角带阴影 vs 矩形破绽）；
+    ② 内联 SVG 图标（贴轮廓投影）；③ clip-path 异形卡片
+    （裁剪形状保留阴影的正确包法）；④ 透明镂空 PNG 式图形
+    （用 CSS 绘制的圆环：box-shadow 实心 vs drop-shadow 空心）。
+  【注意事项】
+    clip-path 会把 box-shadow 一起裁掉 —— 正确做法是外层包一层
+    放阴影、内层裁剪；drop-shadow 对大元素高频动画成本高。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 04 · drop-shadow vs box-shadow</title>
+<style>
+  :root {
+    --brand: #4361ee; --ink: #232c3d; --muted: #7c8aa0; --line: #e3e8f1;
+    --bg: #f4f6fb; --card: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.6;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 10px; }
+  .tip { font-size: .82rem; color: var(--muted); background: #f1f5ff;
+         border-left: 3px solid var(--brand); padding: 6px 10px; margin-bottom: 14px;
+         border-radius: 0 6px 6px 0; }
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 720px) { .duo { grid-template-columns: 1fr; } }
+  .pane { border: 1px dashed var(--line); border-radius: 10px; padding: 18px; text-align: center; background: #fbfcff; }
+  .pane b { display: block; margin-bottom: 10px; font-size: .88rem; }
+  .pane small { color: var(--muted); font-size: .76rem; display: block; margin-top: 10px; min-height: 2.8em; }
+
+  /* ============ ① 气泡：尖角是否带阴影 ============ */
+  /* 公共结构：主体圆角块 + ::after 画的 CSS 三角（与主体同色） */
+  .bubble {
+    position: relative; display: inline-block;
+    padding: 12px 18px; border-radius: 12px;
+    background: var(--brand); color: #fff; font-size: .88rem;
+  }
+  .bubble::after {
+    content: ""; position: absolute; left: 24px; bottom: -9px;
+    border: 9px solid transparent;
+    border-top-color: var(--brand);     /* 上边框着色形成向下的尖角 */
+    border-bottom: none;
+  }
+  /* box-shadow 版：阴影沿"主体矩形"画，尖角在矩形之外 → 尖角"悬空"没影子 */
+  .bubble.box {
+    box-shadow: 0 10px 18px rgba(67,97,238,.35);
+  }
+  /* drop-shadow 版：浏览器把"主体+伪元素"合并为一个轮廓再投影 → 尖角也带阴影 */
+  .bubble.drop {
+    filter: drop-shadow(0 10px 12px rgba(67,97,238,.4));
+    box-shadow: none;                    /* 必须清掉 box-shadow，否则两种投影叠加 */
+  }
+
+  /* ============ ② SVG 图标 ============ */
+  .icons { display: flex; gap: 22px; justify-content: center; align-items: center; }
+  .icons svg { width: 54px; height: 54px; }
+  /* drop-shadow 跟随 SVG path 的 alpha 轮廓；box-shadow 只会画矩形（略） */
+  .icons .with-shadow svg { filter: drop-shadow(0 5px 6px rgba(35,44,61,.35)); }
+
+  /* ============ ③ clip-path 异形卡片 ============ */
+  /* 错误包法（对比）：clip-path 会把 box-shadow 一起裁没 */
+  .cut-wrong {
+    width: 200px; height: 120px; margin: 0 auto;
+    background: linear-gradient(135deg, #63a4ff, #4361ee);
+    border-radius: 14px;
+    clip-path: polygon(0 0, 100% 0, 100% 70%, 85% 100%, 0 100%);  /* 斜切一角 */
+    box-shadow: 0 12px 24px rgba(67,97,238,.4);  /* ← 会被裁剪，看不到 */
+  }
+  /* 正确包法：外层放 drop-shadow（作用在"裁剪后"的轮廓上），内层裁剪 */
+  .cut-right { filter: drop-shadow(0 12px 14px rgba(67,97,238,.45)); }
+  .cut-right .cut-wrong { box-shadow: none; }
+
+  /* ============ ④ 镂空轮廓：实心矩形 vs 空心剪影 ============ */
+  /* CSS 自绘"圆环"（中间透明的甜甜圈）：径向渐变中心透明 */
+  .donut {
+    width: 90px; height: 90px; border-radius: 50%;
+    background: radial-gradient(circle, transparent 0 34px, #d63447 34px 44px, transparent 44px);
+  }
+  /* box-shadow：不看透明度，照着矩形画 → 方形影子穿帮 */
+  .donut.box { box-shadow: 0 12px 20px rgba(35,44,61,.3); }
+  /* drop-shadow：按 alpha 剪影画 → 中空处无阴影，影子也是"甜甜圈" */
+  .donut.drop { filter: drop-shadow(0 12px 10px rgba(35,44,61,.35)); }
+</style>
+</head>
+<body>
+  <h1>drop-shadow：贴轮廓的阴影</h1>
+  <p class="sub">box-shadow 投影矩形边框盒；drop-shadow 投影渲染后的 alpha 轮廓。</p>
+
+  <!-- ============ ① 气泡 ============ -->
+  <section>
+    <h2>① 对话气泡：尖角阴影破绽对照</h2>
+    <p class="tip">两个气泡结构完全相同（主体 + ::after 三角尖）。左：box-shadow 沿主体矩形投影，尖角在矩形外 → "悬空没影子"；右：drop-shadow 把伪元素并入轮廓 → 尖角同样带阴影。</p>
+    <div class="duo">
+      <div class="pane">
+        <b>box-shadow 版（注意尖角）</b>
+        <span class="bubble box">你好，这个方案里尖角没影子！</span>
+        <small>阴影 = 主体矩形。伪元素尖角游离在矩形外，视觉断裂。</small>
+      </div>
+      <div class="pane">
+        <b>drop-shadow 版（浑然一体）</b>
+        <span class="bubble drop">你好，我的尖角也有影子！</span>
+        <small>阴影 = 主体 + 伪元素合并后的真实轮廓。</small>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ② SVG 图标 ============ -->
+  <section>
+    <h2>② 内联 SVG 图标：异形轮廓投影</h2>
+    <p class="tip">闪电与云朵是 path 绘制的不规则形状。drop-shadow 贴着 path 投影 —— 若用 box-shadow，会得到一个矩形影子（此处省略对照组，脑补即可）。</p>
+    <div class="icons with-shadow">
+      <!-- 闪电图标：多边形 path，阴影随轮廓起伏 -->
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#f9a825" d="M13 2 4 14h6l-2 8 11-13h-6l2-7z"/></svg>
+      <!-- 云朵图标：圆弧组合 path -->
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4361ee" d="M6.5 19a4.5 4.5 0 1 1 .42-8.98 6 6 0 0 1 11.6 1.6A3.7 3.7 0 0 1 18 19H6.5z"/></svg>
+      <!-- 对话泡图标 -->
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#2a9d8f" d="M4 4h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-4.3 3.6A.6.6 0 0 1 4 19V4z"/></svg>
+    </div>
+    <p style="text-align:center;font-size:.78rem;color:var(--muted);margin-top:10px">filter: drop-shadow(0 5px 6px rgba(35,44,61,.35)) —— 一行样式服务任意形状。</p>
+  </section>
+
+  <!-- ============ ③ clip-path ============ -->
+  <section>
+    <h2>③ clip-path 异形卡片：谁裁掉了谁的阴影</h2>
+    <p class="tip">左：clip-path 会把 box-shadow 一起裁掉（看不到影子）；右：阴影放到外层容器用 drop-shadow —— 它作用于"裁剪后"的最终轮廓，影子是异形的。</p>
+    <div class="duo">
+      <div class="pane">
+        <b>box-shadow 被 clip-path 裁没</b>
+        <div class="cut-wrong"></div>
+        <small>代码里写了 box-shadow，但 clip-path 优先 —— 阴影与斜切角一起被裁掉。</small>
+      </div>
+      <div class="pane">
+        <b>外层 drop-shadow 包裹（正确）</b>
+        <div class="cut-right"><div class="cut-wrong"></div></div>
+        <small>阴影作用在裁剪后的轮廓上 —— 斜切角的影子形状是对的。</small>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ④ 镂空 ============ -->
+  <section>
+    <h2>④ 镂空图形：实心矩形影 vs 空心剪影</h2>
+    <p class="tip">圆环中心是透明的。box-shadow 照着矩形画（影子是"实心方饼"）；drop-shadow 按 alpha 剪影画，影子的中心也是空的 —— 处理透明 PNG 插图时同理。</p>
+    <div class="duo">
+      <div class="pane" style="display:grid;place-items:center;min-height:170px">
+        <div class="donut box"></div>
+        <small>box-shadow：矩形影子，中心被填实。</small>
+      </div>
+      <div class="pane" style="display:grid;place-items:center;min-height:170px">
+        <div class="donut drop"></div>
+        <small>drop-shadow：影子跟着"甜甜圈"一起镂空。</small>
+      </div>
+    </div>
+  </section>
+
+<script>
+(function () {
+  'use strict';
+  /* 本页以 CSS 对照为主，脚本仅做一个小交互：
+     点击任意气泡/圆环，切换 box-shadow ⇆ drop-shadow，
+     亲眼看到同一元素两种投影的差别 —— 加深"轮廓"概念 */
+  document.querySelectorAll('.bubble, .donut').forEach(function (el) {
+    el.title = '点击切换投影方式';
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', function () {
+      var isBox = el.classList.contains('box');
+      el.classList.toggle('box', !isBox);
+      el.classList.toggle('drop', isBox);      // 两种类互斥切换
+    });
+  });
+})();
+</script>
+</body>
+</html>

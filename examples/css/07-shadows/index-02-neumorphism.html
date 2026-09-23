@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 02：多层阴影材质感 —— 新拟态（Neumorphism）控件
+  ------------------------------------------------------------
+  【知识点】
+    1. 新拟态三要素：同色底 + 双向外阴影（凸）+ 双向内阴影（凹）
+    2. 光源假设：左上方 45°，亮阴影朝左上、暗阴影朝右下
+    3. 按压态切换：raised ⇆ pressed 的阴影翻转
+    4. 海拔三段式（接触/主体/环境）与新拟态的混合用法
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    页面整体为米灰新拟态底：包含凸起按钮组（可按压切换凹凸）、
+    凹陷滑杆与输入区、新拟态开关、以及"新拟态 + 海拔"混合卡片。
+    右上滑杆可调节整体光影强度，观察材质如何随参数变化。
+  【注意事项】
+    新拟态对比度低，仅适合工具面板/氛围页，正文与关键操作仍需
+    高对比配色；底色变化时三处阴影色必须一起调（示例用变量收敛）。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 02 · 新拟态多层阴影</title>
+<style>
+  /* ============ 新拟态变量层 ============
+     光源固定在左上：所有凸起元素"右下暗、左上亮"。
+     三个颜色必须联动调整，因此全部收敛为变量 */
+  :root {
+    --nm-bg: #e0e5ec;                     /* 底色：中性偏冷灰 */
+    --nm-dark: rgba(163, 177, 198, .62);  /* 暗影：青灰色 */
+    --nm-light: rgba(255, 255, 255, .92); /* 亮影：接近纯白 */
+    --nm-ink: #4a5568;                    /* 正文：低饱和深灰蓝 */
+    --nm-accent: #5b6bd5;                 /* 强调色：低饱和紫蓝 */
+    --nm-red: #d6635f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--nm-bg); color: var(--nm-ink);
+    padding: 26px; line-height: 1.6; min-height: 100vh;
+    transition: background-color .3s;
+  }
+  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 1.4rem; }
+  header label { font-size: .8rem; display: flex; align-items: center; gap: 8px; }
+  header input { accent-color: var(--nm-accent); width: 140px; }
+
+  h2 { font-size: 1rem; margin: 0 0 12px; }
+  .tip {
+    font-size: .8rem; color: #7a8699;
+    background: rgba(255,255,255,.5); border-left: 3px solid var(--nm-accent);
+    padding: 6px 10px; border-radius: 0 6px 6px 0; margin-bottom: 14px;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; max-width: 1080px; }
+
+  /* 面板本身也是"微凸"的：弱化版双外阴影 */
+  .panel {
+    background: var(--nm-bg); border-radius: 20px; padding: 20px;
+    box-shadow: 6px 6px 14px var(--nm-dark), -6px -6px 14px var(--nm-light);
+  }
+
+  /* ============ 凸起 / 凹陷两大基类 ============ */
+  /* 凸起：双外阴影 —— 暗影右下、亮影左上（光源在左上） */
+  .raised {
+    background: var(--nm-bg);
+    border-radius: 14px;
+    box-shadow: 7px 7px 14px var(--nm-dark), -7px -7px 14px var(--nm-light);
+  }
+  /* 凹陷：方向反转成 inset，元素像"压进"底面 */
+  .pressed {
+    background: var(--nm-bg);
+    border-radius: 14px;
+    box-shadow: inset 5px 5px 10px var(--nm-dark), inset -5px -5px 10px var(--nm-light);
+  }
+
+  /* ---- 按钮组：点击在凹凸间切换 ----
+     .down 类由 JS 切换；按钮本体平时凸起，按下变凹 —— 拟物按压 */
+  .nm-buttons { display: flex; gap: 16px; flex-wrap: wrap; }
+  .nm-btn {
+    font: inherit; font-size: .86rem; cursor: pointer;
+    padding: 12px 22px; border: none; color: var(--nm-ink);
+    background: var(--nm-bg); border-radius: 14px;
+    box-shadow: 6px 6px 12px var(--nm-dark), -6px -6px 12px var(--nm-light);
+    transition: box-shadow .18s ease, color .18s ease, transform .18s ease;
+  }
+  .nm-btn:active { transform: scale(.98); }          /* 物理回弹微缩 */
+  .nm-btn.down {                                      /* 凹陷态 = "已激活" */
+    box-shadow: inset 4px 4px 8px var(--nm-dark), inset -4px -4px 8px var(--nm-light);
+    color: var(--nm-accent);
+  }
+
+  /* ---- 新拟态开关：checkbox 驱动凹凸切换 ---- */
+  .nm-switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; font-size: .84rem; }
+  .nm-switch input { display: none; }
+  .nm-switch .well {
+    width: 56px; height: 30px; border-radius: 999px;
+    background: var(--nm-bg);
+    box-shadow: inset 4px 4px 8px var(--nm-dark), inset -4px -4px 8px var(--nm-light);
+    position: relative; transition: box-shadow .2s;
+  }
+  .nm-switch .knob {
+    position: absolute; top: 4px; left: 4px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--nm-bg);
+    box-shadow: 3px 3px 6px var(--nm-dark), -3px -3px 6px var(--nm-light);
+    transition: left .2s ease;              /* 只动 left，阴影随元素整体合成 */
+  }
+  .nm-switch input:checked ~ .well .knob { left: 30px; }
+  .nm-switch input:checked ~ .well { box-shadow: inset 4px 4px 8px rgba(91,107,213,.5), inset -3px -3px 6px var(--nm-light); }
+  .nm-switch input:checked ~ .well .knob { background: var(--nm-accent); }
+
+  /* ---- 凹陷输入框与滑杆 ---- */
+  .nm-input {
+    font: inherit; width: 100%; padding: 12px 16px;
+    border: none; outline: none; color: var(--nm-ink);
+    background: var(--nm-bg); border-radius: 12px;
+    box-shadow: inset 4px 4px 9px var(--nm-dark), inset -4px -4px 9px var(--nm-light);
+  }
+  .nm-input:focus { box-shadow: inset 4px 4px 9px var(--nm-dark), inset -4px -4px 9px var(--nm-light), 0 0 0 2px rgba(91,107,213,.35); }
+  input[type="range"].nm-range { width: 100%; accent-color: var(--nm-accent); }
+
+  /* ---- 混合卡片：新拟态底 + 海拔三段式 ----
+     接触层(细) + 主体层(中) + 环境层(大而淡)，再叠新拟态双向光 */
+  .nm-card {
+    background: var(--nm-bg); border-radius: 18px; padding: 18px;
+    box-shadow:
+      0 1px 2px rgba(80,95,125,.25),                          /* 接触 */
+      0 6px 16px rgba(80,95,125,.18),                         /* 主体 */
+      12px 12px 24px var(--nm-dark), -12px -12px 24px var(--nm-light); /* 新拟态双向 */
+    transition: transform .2s, box-shadow .2s;
+  }
+  .nm-card:hover { transform: translateY(-3px); }
+
+  /* 音量条：凹陷轨道 + 凸起滑块本身就是新拟态语言的复用 */
+  .meter { height: 14px; border-radius: 999px; background: var(--nm-bg);
+           box-shadow: inset 3px 3px 6px var(--nm-dark), inset -3px -3px 6px var(--nm-light);
+           overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 62%; border-radius: 999px;
+             background: linear-gradient(90deg, #8f9bd8, var(--nm-accent));
+             box-shadow: 1px 1px 3px rgba(91,107,213,.5); }
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>新拟态（Neumorphism）材质面板</h1>
+      <p style="font-size:.84rem;color:#7a8699">同一底色 + 双向光影 = "从材质里长出来"的控件</p>
+    </div>
+    <!-- 光影强度滑杆：JS 同步改三个变量，观察材质随光源变化 -->
+    <label>光影强度 <input type="range" id="depth" min="4" max="18" value="9"></label>
+  </header>
+
+  <div class="grid">
+    <!-- ============ 面板一：按钮 ============ -->
+    <div class="panel">
+      <h2>凸起 ⇆ 凹陷（点按切换）</h2>
+      <p class="tip">按压的本质是"阴影方向翻转"：外阴影变内阴影。点击下方按钮试试，激活态以凹陷+强调色表达。</p>
+      <div class="nm-buttons" id="btnGroup">
+        <button class="nm-btn down">简洁</button>
+        <button class="nm-btn">均衡</button>
+        <button class="nm-btn">鲜艳</button>
+      </div>
+      <p style="margin-top:16px">
+        <label class="nm-switch">
+          <input type="checkbox" checked>
+          <span class="well"><span class="knob"></span></span>
+          深度渲染（开关凹槽 + 凸起滑块）
+        </label>
+      </p>
+    </div>
+
+    <!-- ============ 面板二：输入 ============ -->
+    <div class="panel">
+      <h2>凹陷输入区</h2>
+      <p class="tip">输入框是典型的"凹槽"：inset 双向阴影 + 无边框，聚焦时叠加一圈品牌色环（box-shadow 追加第 5 层）。</p>
+      <div style="display:grid;gap:14px">
+        <input class="nm-input" type="text" placeholder="试试聚焦 —— 凹槽 + 聚焦环">
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:.78rem;color:#7a8699;margin-bottom:6px">
+            <span>渲染质量</span><span>62%</span>
+          </div>
+          <div class="meter"><i></i></div>
+        </div>
+        <input type="range" class="nm-range" min="0" max="100" value="62" id="meterRange">
+      </div>
+    </div>
+
+    <!-- ============ 面板三：混合卡片 ============ -->
+    <div class="panel">
+      <h2>新拟态 × 海拔混合</h2>
+      <p class="tip">实际项目常两者混用：双向光维持材质统一，三段式海拔（接触/主体/环境）提供层级。悬停卡片看抬升反馈。</p>
+      <div class="nm-card" style="margin-bottom:12px">
+        <b style="font-size:.9rem">音频工作站 · 混音台</b>
+        <p style="font-size:.78rem;color:#7a8699;margin-top:4px">
+          双向光建立"同材质"的整体感，海拔阴影建立"浮在上层"的层级感 —— 两种语言各司其职。
+        </p>
+      </div>
+      <div class="nm-card">
+        <b style="font-size:.9rem">任务队列 · 状态健康</b>
+        <p style="font-size:.78rem;color:#7a8699;margin-top:4px">
+          12 个任务运行中 · 无失败重试
+        </p>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---- 按钮组：单选式凹凸切换 ----
+     设计取舍：点击者永远"被按下"，其余弹起 —— 用状态类承载，
+     CSS 只认类，与具体交互解耦 */
+  var group = document.getElementById('btnGroup');
+  group.addEventListener('click', function (e) {
+    var btn = e.target.closest('.nm-btn');
+    if (!btn) return;
+    group.querySelectorAll('.nm-btn').forEach(function (b) { b.classList.remove('down'); });
+    btn.classList.add('down');
+  });
+
+  /* ---- 光影强度滑杆：同步更新三个新拟态变量 ----
+     暗影/亮影的偏移与模糊随"深度"等比放大，底色不变 —— 材质整体变深变浅 */
+  var depth = document.getElementById('depth');
+  depth.addEventListener('input', function () {
+    var d = +depth.value;
+    var root = document.documentElement;
+    // 偏移与模糊约为深度值：9 → 9px 9px 18px 的默认手感
+    root.style.setProperty('--nm-dark', 'rgba(163,177,198,' + Math.min(.8, .3 + d * .03).toFixed(2) + ')');
+    root.style.setProperty('--nm-light', 'rgba(255,255,255,' + Math.min(1, .6 + d * .035).toFixed(2) + ')');
+    // 同时改按钮阴影尺寸：选中所有使用固定尺寸的类不现实，
+    // 这里用 CSS 变量控制全局阴影几何（为简化演示，仅调暗影透明度）
+  });
+
+  /* ---- 渲染质量滑杆与音量条联动 ----
+     两个输入表示同一数据，同步修改宽度即可，无需框架 */
+  var meterRange = document.getElementById('meterRange');
+  var meterFill = document.querySelector('.meter i');
+  var meterLabel = document.querySelector('.meter')?.previousElementSibling?.querySelector('span:last-child');
+  meterRange.addEventListener('input', function () {
+    meterFill.style.width = meterRange.value + '%';       // 进度条跟随
+    if (meterLabel) meterLabel.textContent = meterRange.value + '%';  // 数字读数跟随
+  });
+})();
+</script>
+</body>
+</html>

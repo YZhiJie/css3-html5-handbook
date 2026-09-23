@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：伪元素 ::before / ::after / ::marker / ::placeholder
+  ------------------------------------------------------------
+  【知识点】
+    1. ::before / ::after —— content 必填；attr() 读取属性、
+       counter() 计数器、负 z-index 垫底、定位脱流做装饰
+    2. ::marker —— 列表标记盒定制（仅支持 color/font/content 等）
+    3. ::placeholder —— 占位文本样式（含旧内核前缀写法）
+    4. ::selection —— 选中文本高亮定制
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    四个展示区：① 数据角标徽章（attr() + ::after）；
+    ② CSS 计数器步骤条（counter-reset/increment + ::before）；
+    ③ 列表 marker 定制对比；④ 输入框占位样式 + 选中文本配色。
+    所有图形均由 CSS 自绘，无图片、无网络请求。
+  【注意事项】
+    ::before/::after 对 img、input 等替换元素不生效；::marker
+    只支持少数属性，复杂标记请用 list-style:none + ::before 自绘。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 03 · 伪元素四剑客</title>
+<style>
+  :root {
+    --bg: #f4f7f9; --card: #fff; --ink: #2d3436; --muted: #8395a7;
+    --brand: #0097e6; --warn: #e17055; --line: #e6ebf0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.6;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 10px; }
+  .tip { font-size: .82rem; color: var(--muted); background: #f0f7fc;
+         border-left: 3px solid var(--brand); padding: 6px 10px; margin-bottom: 14px;
+         border-radius: 0 6px 6px 0; }
+
+  /* ============ 区块一：attr() 角标徽章 ============ */
+  /* 场景：购物车/消息中心的数量角标。数字由 HTML 的 data-count
+     携带，::after 用 attr(data-count) 读取 —— 改数据不改样式 */
+  .badges { display: flex; gap: 26px; align-items: center; flex-wrap: wrap; }
+  .icon-btn {
+    position: relative;                     /* 伪元素按此定位 */
+    display: inline-grid; place-items: center;
+    width: 52px; height: 52px;
+    background: #f1f4f8; border-radius: 14px;
+    font-size: 1.4rem; user-select: none;   /* 装饰图标禁止误选中 */
+    cursor: default;
+  }
+  .icon-btn[data-count]::after {
+    content: attr(data-count);              /* 核心：属性值直接作为内容输出 */
+    position: absolute;
+    top: -7px; right: -7px;
+    min-width: 20px; height: 20px;
+    padding: 0 5px;
+    display: inline-grid; place-items: center;
+    background: var(--warn); color: #fff;
+    border-radius: 999px;                   /* 胶囊形，数字多时自动拉长 */
+    font-size: .68rem; font-weight: 700;
+    border: 2px solid #fff;                 /* 白描边让角标与图标分离 */
+  }
+  /* data-count 为空时根本不写该属性 → 角标自动消失，无需 if 判断 */
+
+  /* ============ 区块二：counter() 计数器步骤条 ============ */
+  .steps { counter-reset: step; list-style: none; }  /* 父级初始化计数器 */
+  .steps li { counter-increment: step; position: relative; padding: 10px 0 10px 96px; border-bottom: 1px dashed var(--line); }
+  .steps li:last-child { border-bottom: none; }      /* 末项收口 */
+  .steps li::before {
+    content: "第 " counter(step) " 步";     /* counter() 读取当前计数值 */
+    position: absolute; left: 0; top: 12px;
+    background: var(--brand); color: #fff;
+    font-size: .72rem; padding: 3px 10px; border-radius: 999px;
+  }
+  /* 用 ::after 给"已完成"项打钩：状态类由 JS 切换，样式只认类 */
+  .steps li.done { color: var(--muted); }
+  .steps li.done::before { background: #b2bec3; content: "✓ 完成"; }
+  .steps li.done::after {
+    content: "✓"; color: #44bd32; font-weight: 700;
+    margin-left: 8px;
+  }
+
+  /* ============ 区块三：::marker 列表标记 ============ */
+  .marker-demo { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 680px) { .marker-demo { grid-template-columns: 1fr; } }
+  .marker-demo h3 { font-size: .92rem; margin-bottom: 8px; }
+  ul.fruit { padding-left: 22px; }
+  /* ::marker 只能改 color / font / content / white-space 等，
+     不支持 background、padding 等盒模型属性 —— 这是它与 ::before
+     最大的差别：marker 盒的位置由列表布局决定，不可自由定位 */
+  ul.fruit li::marker { color: var(--warn); content: "🍊 "; font-size: 1em; }
+
+  /* 对比组：list-style:none + ::before 自绘标记，样式自由度 100% */
+  ul.free { list-style: none; }
+  ul.free li { position: relative; padding-left: 20px; margin-bottom: 4px; }
+  ul.free li::before {
+    content: "";                            /* 空字符串也会生成盒子 */
+    position: absolute; left: 0; top: .52em;
+    width: 9px; height: 9px;
+    background: linear-gradient(135deg, #0097e6, #44bd32);
+    border-radius: 2px;                     /* 方形标记：marker 做不到的样式 */
+  }
+
+  /* ============ 区块四：::placeholder 与 ::selection ============ */
+  .field { max-width: 420px; }
+  .field input {
+    width: 100%; font: inherit; padding: 10px 12px;
+    border: 1px solid var(--line); border-radius: 8px; outline: none;
+    transition: border-color .2s;
+  }
+  .field input:focus { border-color: var(--brand); }
+  /* 占位文本配色：现代内核用 ::placeholder，
+     旧 WebKit 内核需 -webkit-input-placeholder 前缀写法，
+     两条规则都要写，顺序上前缀在前避免覆盖新语法 */
+  .field input::-webkit-input-placeholder { color: #b0b8c4; font-style: italic; }
+  .field input::placeholder { color: #b0b8c4; font-style: italic; }
+  /* 注意占位颜色对比度别太低，否则无障碍审计不过 */
+
+  /* 选中文本高亮：只支持颜色类属性（color/background 等） */
+  .selection-demo p::selection { background: #ffeaa7; color: #d63031; }
+  .selection-demo p { max-width: 560px; font-size: .9rem; }
+
+  /* 通用代码展示块：用 ::before 挂"代码"角标，省掉每处写标签 */
+  pre.src {
+    position: relative;
+    background: #2d3436; color: #dfe6e9;
+    border-radius: 8px; padding: 26px 14px 12px;
+    font-size: .78rem; overflow-x: auto; margin-top: 10px;
+  }
+  pre.src::before {
+    content: "代码";
+    position: absolute; top: 6px; left: 10px;
+    font-size: .66rem; color: #95a5a6;
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+  <h1>伪元素四剑客：::before / ::after / ::marker / ::placeholder</h1>
+  <p class="sub">伪元素创建"不在 DOM 树里的虚拟盒子"，装饰与内容分离的最佳工具。</p>
+
+  <!-- ============ 区块一 ============ -->
+  <section>
+    <h2>① attr() 角标徽章 —— 数据在属性里，样式在伪元素里</h2>
+    <p class="tip">JS 只需更新 <code>data-count</code> 属性，角标内容自动同步；删除属性则角标消失。这就是"content 由结构决定"的设计思想。</p>
+    <div class="badges">
+      <div class="icon-btn" data-count="6">🛒 <span style="font-size:.6rem;display:block">购物车</span></div>
+      <div class="icon-btn" data-count="99">✉️ <span style="font-size:.6rem;display:block">消息</span></div>
+      <div class="icon-btn">🔔 <span style="font-size:.6rem;display:block">通知（无角标）</span></div>
+    </div>
+    <p style="margin-top:12px">
+      <button id="btn-add" style="font:inherit;padding:7px 14px;border:1px solid var(--brand);background:#e8f6fd;color:#0a6ea8;border-radius:8px;cursor:pointer">
+        购物车 +1（只改 data-count 属性）
+      </button>
+    </p>
+    <pre class="src">.icon-btn[data-count]::after {
+  content: attr(data-count);   /* 属性值 → 内容，样式与数据解耦 */
+  position: absolute; top: -7px; right: -7px;
+  min-width: 20px; height: 20px;
+  background: #e17055; border-radius: 999px;
+}</pre>
+  </section>
+
+  <!-- ============ 区块二 ============ -->
+  <section>
+    <h2>② counter() 计数器步骤条 —— 插入删除自动重排</h2>
+    <p class="tip">编号由 <code>counter-reset</code>（父级初始化）+ <code>counter-increment</code>（每项 +1）+ <code>counter()</code>（读取）三件套完成，列表项随意增删，编号永远正确。点击条目可切换"已完成"。</p>
+    <ol class="steps" id="steps">
+      <li>注册账号并完成实名认证</li>
+      <li>创建第一个应用，获取密钥</li>
+      <li>接入 SDK，配置回调地址</li>
+      <li>沙箱环境联调测试</li>
+      <li>提交审核，上线发布</li>
+    </ol>
+    <pre class="src">.steps { counter-reset: step; }        /* ① 父级清零 */
+.steps li { counter-increment: step; } /* ② 每项自增 */
+.steps li::before {
+  content: "第 " counter(step) " 步";  /* ③ 读取拼接 */
+}</pre>
+  </section>
+
+  <!-- ============ 区块三 ============ -->
+  <section>
+    <h2>③ ::marker 定制列表标记，以及它的天花板</h2>
+    <p class="tip">左侧用 ::marker 换内容与颜色；右侧用 list-style:none + ::before 自绘方形渐变标记 —— 当 marker 满足不了设计时，退回 ::before 自由绘制。</p>
+    <div class="marker-demo">
+      <div>
+        <h3>::marker 方案（支持 color/font/content）</h3>
+        <ul class="fruit">
+          <li>苹果 —— 脆甜多汁</li>
+          <li>橙子 —— 维 C 满格</li>
+          <li>葡萄 —— 串粒饱满</li>
+        </ul>
+      </div>
+      <div>
+        <h3>::before 自绘方案（样式自由）</h3>
+        <ul class="free">
+          <li>支持任意形状与渐变</li>
+          <li>可定位、可动画</li>
+          <li>适合设计规范严格的站点</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 区块四 ============ -->
+  <section>
+    <h2>④ ::placeholder 占位样式 + ::selection 选中高亮</h2>
+    <div class="field" style="margin-bottom:14px">
+      <input type="text" placeholder="试试聚焦与输入，占位文案是斜体灰色（旧内核需 -webkit- 前缀）">
+    </div>
+    <div class="selection-demo">
+      <p>用鼠标拖选这一段文字看看：高亮变成米黄底 + 红字，这是 ::selection 的效果。它只允许 color、background、text-shadow 等少数属性，不能改字号或边距 —— 安全限制是为了保持"选区"的可识别性。</p>
+    </div>
+  </section>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---- 区块一：改 data-count 即可驱动角标 ----
+     这里演示"样式与数据解耦"：脚本完全不接触样式 */
+  var cart = document.querySelector('.icon-btn[data-count]'); // 取第一个带角标的按钮（购物车）
+  var btnAdd = document.getElementById('btn-add');
+  btnAdd.addEventListener('click', function () {
+    var n = parseInt(cart.getAttribute('data-count'), 10) + 1; // 读旧值 +1
+    cart.setAttribute('data-count', n);   // 写回属性 → ::after 内容自动更新
+    btnAdd.textContent = '购物车 +1（当前 ' + n + '，再点试试）';
+  });
+
+  /* ---- 区块二：点击步骤切换完成态 ----
+     状态由类名承载，::before/::after 只认类 —— 状态机思路 */
+  var steps = document.getElementById('steps');
+  steps.addEventListener('click', function (e) {
+    var li = e.target.closest('li');
+    if (!li) return;
+    li.classList.toggle('done');          // 切换后伪元素内容/配色随类变化
+  });
+})();
+</script>
+</body>
+</html>

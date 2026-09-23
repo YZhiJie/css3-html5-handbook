@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 04：组合器演示 + 优先级实时计算器 + 层叠竞赛
+  ------------------------------------------------------------
+  【知识点】
+    1. 组合器：后代（空格）/ 子（>）/ 相邻兄弟（+）/ 通用兄弟（~）
+       —— 用真实 DOM 树高亮展示四者匹配范围差异
+    2. 优先级（Specificity）：(A,B,C) 三元组的逐位比较规则，
+       :not/:is/:has 取参数最大值、:where 恒为 0
+    3. 层叠（Cascade）：同优先级看源顺序、!important 反转、
+       内联样式高于一切普通规则
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    A 区：点击选择器按钮，右侧 DOM 树中被命中的节点高亮；
+    B 区：输入任意选择器，实时计算 (A,B,C) 并用三段柱状图展示；
+    C 区：三条不同优先级的规则竞赛，可单独启停，观察最终获胜者。
+  【注意事项】
+    本页优先级计算器是"教学用简化实现"，覆盖常见写法
+    （#id .class [attr] :pseudo ::element :is/:not/:has/:where），
+    生产环境请依据 CSS Selectors Level 4 规范计算。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 04 · 组合器与优先级演算</title>
+<style>
+  :root {
+    --bg: #f3f5f9; --card: #fff; --ink: #2b3a4a; --muted: #8494a7;
+    --brand: #5f27cd; --hit: #ffd32a; --line: #e4e9f1;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.6;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 8px; }
+  .tip { font-size: .82rem; color: var(--muted); background: #f4f1fd;
+         border-left: 3px solid var(--brand); padding: 6px 10px; margin-bottom: 14px;
+         border-radius: 0 6px 6px 0; }
+
+  /* ============ A 区：组合器树 ============ */
+  .lab-a { display: grid; grid-template-columns: 340px 1fr; gap: 16px; }
+  @media (max-width: 760px) { .lab-a { grid-template-columns: 1fr; } }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips button {
+    font-family: ui-monospace, Consolas, monospace; font-size: .78rem;
+    padding: 5px 9px; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 6px; background: #fafbff;
+  }
+  .chips button.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+  #combo-desc { font-size: .8rem; color: var(--muted); margin-top: 8px; min-height: 2.5em; }
+
+  /* DOM 树：用嵌套缩进边框呈现层级，节点命中时加 .match */
+  .tree { font-size: .82rem; }
+  .tree .node {
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 10px; margin: 6px 0 6px 18px;
+    background: #fbfcfe; transition: background .2s, border-color .2s;
+  }
+  .tree .node > .tag-name { color: var(--muted); font-size: .74rem; margin-left: 4px; }
+  /* 命中态：黄底紫边，一眼可辨 */
+  .tree .node.match { background: var(--hit); border-color: var(--brand); }
+  .tree .node.match > .tag-name { color: #6c3b00; }
+
+  /* ============ B 区：优先级计算器 ============ */
+  .calc-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  #spec-input {
+    flex: 1; min-width: 220px; font-family: ui-monospace, Consolas, monospace;
+    font-size: .9rem; padding: 9px 12px;
+    border: 1px solid var(--line); border-radius: 8px; outline: none;
+  }
+  #spec-input:focus { border-color: var(--brand); }
+  .chips .mini { font-size: .72rem; }
+  /* 三段柱：A 橙 / B 蓝 / C 绿，宽度随数量增长 */
+  .spec-visual { display: flex; align-items: flex-end; gap: 18px; margin-top: 14px; }
+  .bar-wrap { text-align: center; width: 84px; }
+  .bar {
+    width: 56px; margin: 0 auto 6px;
+    background: var(--line); border-radius: 6px 6px 0 0;
+    display: flex; align-items: flex-end; justify-content: center;
+    height: 120px; position: relative; overflow: hidden;
+  }
+  .bar > i {
+    display: block; width: 100%; height: 0%;
+    transition: height .35s ease;
+  }
+  .bar-a > i { background: #ff793f; }
+  .bar-b > i { background: #34ace0; }
+  .bar-c > i { background: #33d9b2; }
+  .bar-wrap .num { font-weight: 700; font-size: .95rem; }
+  .bar-wrap .cap { font-size: .72rem; color: var(--muted); }
+  #spec-error { color: #e55039; font-size: .8rem; margin-top: 8px; min-height: 1.4em; }
+  #spec-detail { font-size: .8rem; color: var(--muted); margin-top: 6px; }
+
+  /* ============ C 区：层叠竞赛 ============ */
+  .stage {
+    background: #faf9fd; border: 1px dashed var(--line); border-radius: 10px;
+    padding: 16px; text-align: center;
+  }
+  #cube {
+    display: inline-block; padding: 18px 34px; border-radius: 12px;
+    background: #dfe6e9; color: #636e72;   /* 初始灰：无规则命中 */
+    font-weight: 700; transition: all .25s;
+  }
+  .rules { margin-top: 14px; display: grid; gap: 8px; }
+  .rule-row {
+    display: flex; align-items: center; gap: 10px;
+    font-size: .82rem; padding: 8px 10px;
+    border: 1px solid var(--line); border-radius: 8px; background: #fff;
+  }
+  .rule-row code { flex: 1; font-size: .8rem; }
+  .rule-row .sp { color: var(--muted); font-size: .74rem; }
+  /* 开关样式：checkbox + 兄弟组合器联动（呼应 2.5 节技巧） */
+  .rule-row input { display: none; }
+  .rule-row .sw {
+    width: 38px; height: 20px; border-radius: 999px; background: #ced6e0;
+    position: relative; cursor: pointer; transition: background .2s; flex: none;
+  }
+  .rule-row .sw::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 16px; height: 16px; border-radius: 50%; background: #fff;
+    transition: left .2s;
+  }
+  .rule-row input:checked + .sw { background: #44bd32; }
+  .rule-row input:checked + .sw::after { left: 20px; }
+</style>
+</head>
+<body>
+  <h1>组合器演示 · 优先级实时计算 · 层叠竞赛</h1>
+  <p class="sub">三块实验区帮助你把"选择器规则"变成"看得见的匹配结果"。</p>
+
+  <!-- ============ A 区 ============ -->
+  <section>
+    <h2>A · 四种组合器在真实 DOM 树上的匹配范围</h2>
+    <p class="tip">点按钮观察高亮：<code>&nbsp;</code> 后代选所有层级；<code>&gt;</code> 只选直接孩子；<code>+</code> 只选紧邻的下一个兄弟；<code>~</code> 选后面所有同层兄弟。</p>
+    <div class="lab-a">
+      <div>
+        <div class="chips" id="combo-chips">
+          <button data-sel="#app a" data-desc="后代组合器（空格）：#app 内所有层级的 a 全部命中（共 4 个）。">#app a</button>
+          <button data-sel="#app > ul" data-desc="子组合器（>）：只命中 #app 的直接孩子 ul，不深入更深层。">#app > ul</button>
+          <button data-sel="li + li" data-desc="相邻兄弟（+）：每个'紧跟在 li 后面的 li'命中 → 第 2、3 个 li。">li + li</button>
+          <button data-sel="li.active ~ li" data-desc="通用兄弟（~）：.active 之后的同层 li 全部命中（不必相邻）。">li.active ~ li</button>
+          <button data-sel=".item a" data-desc="类 + 后代：带 .item 的 li 内部的 a（深层嵌套的 a 也算）。">.item a</button>
+          <button data-sel="li > div > a" data-desc="连续子组合器：逐级验证直接父子链。">li > div > a</button>
+        </div>
+        <p id="combo-desc">点击左侧按钮查看匹配范围。</p>
+      </div>
+      <!-- 演示用 DOM 树：结构刻意覆盖"深层嵌套 / 兄弟序列 / 混合标签" -->
+      <div class="tree" id="tree">
+        <div class="node" data-name="#app div">div#app<span class="tag-name">根容器</span>
+          <div class="node" data-name="ul.menu">ul.menu
+            <div class="node" data-name="li">li（菜单项 1）
+              <div class="node" data-name="a">a「首页」</div>
+            </div>
+            <div class="node" data-name="li.item.active">li.item.active（菜单项 2）
+              <div class="node" data-name="a.active">a.active「后台」</div>
+            </div>
+            <div class="node" data-name="li">li（菜单项 3）
+              <div class="node" data-name="div">div（包裹层）
+                <div class="node" data-name="a">a「深层链接」</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ B 区 ============ -->
+  <section>
+    <h2>B · 优先级 (A,B,C) 实时计算器</h2>
+    <p class="tip">
+      A = ID 个数；B = 类 / 属性 / 伪类个数（:is/:not/:has 取括号内最大值，:where 记 0）；
+      C = 元素 / 伪元素个数。逐位比较，(1,0,0) 永远大于 (0,99,99)。
+    </p>
+    <div class="calc-row">
+      <input id="spec-input" type="text" placeholder="输入选择器，如 #nav .item:hover 或 :is(#a, .b) span" spellcheck="false">
+      <div class="chips">
+        <button class="mini" data-put="#nav .item:hover">#nav .item:hover</button>
+        <button class="mini" data-put=":is(#a, .b) span">:is(#a, .b) span</button>
+        <button class="mini" data-put=":where(.a, #b) p">:where(.a, #b) p</button>
+        <button class="mini" data-put="ul li a.active::after">ul li a.active::after</button>
+        <button class="mini" data-put="form :has(input:invalid) .hint">form :has(...) .hint</button>
+      </div>
+    </div>
+    <div class="spec-visual">
+      <div class="bar-wrap"><div class="bar bar-a"><i></i></div><div class="num" id="num-a">0</div><div class="cap">A · ID</div></div>
+      <div class="bar-wrap"><div class="bar bar-b"><i></i></div><div class="num" id="num-b">0</div><div class="cap">B · 类/伪类</div></div>
+      <div class="bar-wrap"><div class="bar bar-c"><i></i></div><div class="num" id="num-c">0</div><div class="cap">C · 元素</div></div>
+      <div id="spec-detail" style="flex:1;align-self:center">在上方输入框键入或点右侧示例。</div>
+    </div>
+    <p id="spec-error"></p>
+  </section>
+
+  <!-- ============ C 区 ============ -->
+  <section>
+    <h2>C · 层叠竞赛：谁最终说了算</h2>
+    <p class="tip">三条规则同时瞄准同一个方块。逐个打开开关：优先级逐位比较；全开时 ID 规则获胜 —— 除非有人挂上 <code>!important</code>（生产代码请把它当逃生舱）。</p>
+    <div class="stage"><span id="cube">目标方块</span></div>
+    <div class="rules">
+      <!-- 每行：checkbox 开关 + 规则代码 + 优先级标注。
+           checkbox 兄弟选择器驱动滑块外观 —— 纯 CSS 开关 -->
+      <label class="rule-row">
+        <input type="checkbox" data-rule="1">
+        <span class="sw" aria-hidden="true"></span>
+        <code>#cube-target { background: #ff6b81; color: #fff; }</code>
+        <span class="sp">优先级 (1,0,0)</span>
+      </label>
+      <label class="rule-row">
+        <input type="checkbox" data-rule="2">
+        <span class="sw" aria-hidden="true"></span>
+        <code>.stage .blue { background: #54a0ff; color: #fff; }</code>
+        <span class="sp">优先级 (0,2,0)</span>
+      </label>
+      <label class="rule-row">
+        <input type="checkbox" data-rule="3">
+        <span class="sw" aria-hidden="true"></span>
+        <code>#cube-target { background: #1dd1a1 !important; }</code>
+        <span class="sp">优先级 (1,0,0) + !important</span>
+      </label>
+    </div>
+    <!-- 竞赛样式表：JS 按开关状态启用对应规则（disabled 切换） -->
+    <style id="rule-1" disabled>#cube { background: #ff6b81; color: #fff; }</style>
+    <style id="rule-2" disabled>.stage .blue { background: #54a0ff; color: #fff; }</style>
+    <style id="rule-3" disabled>#cube { background: #1dd1a1 !important; }</style>
+    <p id="cube-note" style="font-size:.8rem;color:var(--muted);margin-top:10px">提示：规则 2 写的是 .stage .blue，但方块并没有 blue 类 —— 打开后也不生效，体会"匹配先于优先级"。</p>
+  </section>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ================= A 区：组合器树 ================= */
+  var chips = document.getElementById('combo-chips');
+  var tree = document.getElementById('tree');
+  var comboDesc = document.getElementById('combo-desc');
+  chips.addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    chips.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    comboDesc.textContent = btn.dataset.desc;
+    // 先清空所有命中态，再让浏览器引擎用 matches 重新判定。
+    // 直接使用原生 querySelectorAll 确保演示结果 = 真实 CSS 行为
+    tree.querySelectorAll('.node').forEach(function (n) { n.classList.remove('match'); });
+    tree.querySelectorAll(btn.dataset.sel).forEach(function (n) { n.classList.add('match'); });
+  });
+  chips.querySelector('button').click();   // 初始展示"后代组合器"
+
+  /* ================= B 区：优先级计算器 =================
+     简化版教学实现：
+     1) 把选择器按"组合器"拆成复合选择器序列（尊重括号）
+     2) 每个 compound 内扫描 # / . / [ ] / : / :: / 元素名
+     3) :is/:not/:has 递归计算参数列表取最大值；:where 记 0 */
+  var input = document.getElementById('spec-input');
+  var elA = document.getElementById('num-a'), elB = document.getElementById('num-b'), elC = document.getElementById('num-c');
+  var barA = document.querySelector('.bar-a > i'), barB = document.querySelector('.bar-b > i'), barC = document.querySelector('.bar-c > i');
+  var detail = document.getElementById('spec-detail');
+  var err = document.getElementById('spec-error');
+
+  /** 按组合器拆分（不拆括号内的逗号内容），返回复合选择器数组 */
+  function splitCompounds(sel) {
+    var out = [], buf = '', depth = 0, i = 0;
+    while (i < sel.length) {
+      var ch = sel[i];
+      if (ch === '[' || ch === '(') { depth++; buf += ch; }
+      else if (ch === ']' || ch === ')') { depth--; buf += ch; }
+      else if (depth === 0 && (ch === '>' || ch === '+' || ch === '~')) {
+        out.push(buf.trim()); buf = '';           // 组合器本身不计优先级，直接跳过
+        // 吞掉组合器后可能的空格
+        while (i + 1 < sel.length && sel[i + 1] === ' ') i++;
+      } else if (depth === 0 && ch === ' ') {
+        // 空格 = 后代组合器：压缩连续空格后作为分隔
+        if (buf.trim() !== '') { out.push(buf.trim()); buf = ''; }
+        while (i + 1 < sel.length && sel[i + 1] === ' ') i++;
+      } else { buf += ch; }
+      i++;
+    }
+    if (buf.trim() !== '') out.push(buf.trim());
+    return out;
+  }
+
+  /** 取子串中与括号配对的内容：:is(...) / [attr="]"] 等场景 */
+  function extractParens(str) {
+    var depth = 0, res = [];
+    for (var i = 0; i < str.length; i++) {
+      if (str[i] === '(') { depth++; if (depth === 1) res.push({ open: i }); }
+      else if (str[i] === ')') { depth--; if (depth === 0) res[res.length - 1].close = i; }
+    }
+    return res;
+  }
+
+  /** 计算单个复合选择器的 (A,B,C) */
+  function calcCompound(comp) {
+    var spec = [0, 0, 0];
+    // 伪元素与伪类都从 ':' 开始：::xx 是伪元素。先统一扫描
+    var re = /(::[a-z-]+|:[a-z-]+(\([^)]*\))?|#-?\w+|\.[\w-]+|\[[^\]]*\]|[a-zA-Z][\w-]*|\*)/g;
+    var m;
+    while ((m = re.exec(comp)) !== null) {
+      var tok = m[0];
+      if (tok.charAt(0) === '#') { spec[0]++; continue; }              // ID
+      if (tok.charAt(0) === '.') { spec[1]++; continue; }              // 类
+      if (tok.charAt(0) === '[') { spec[1]++; continue; }              // 属性
+      if (tok.charAt(0) === '*') { continue; }                         // 通配符不计
+      if (tok.charAt(0) === ':') {
+        if (tok.charAt(1) === ':') { spec[2]++; continue; }            // 伪元素
+        var name = tok.slice(1).split('(')[0];
+        if (name === 'where') { continue; }                            // :where 恒 0
+        if (name === 'is' || name === 'not' || name === 'has') {
+          // 取参数列表中"最复杂"的那个：拆顶层逗号逐个递归
+          var pr = extractParens(tok);
+          if (pr.length) {
+            var inner = tok.slice(pr[0].open + 1, pr[0].close);
+            var parts = inner.split(/,(?![^(]*\))/);                   // 顶层逗号切分
+            var best = [0, 0, 0];
+            parts.forEach(function (p) {
+              var s = calcSelectorList(p.trim());
+              if (cmp(s, best) > 0) best = s;
+            });
+            spec[0] += best[0]; spec[1] += best[1]; spec[2] += best[2];
+          }
+          continue;
+        }
+        spec[1]++; continue;                                           // 普通伪类
+      }
+      spec[2]++;                                                       // 元素名
+    }
+    return spec;
+  }
+
+  /** 计算一个（可能带逗号的）选择器列表，返回最大优先级 */
+  function calcSelectorList(sel) {
+    // 这里复用 calcCompound：列表成员通常已是单一 compound，够教学用
+    return calcCompound(sel);
+  }
+
+  /** 三元组比较：逐位比较，返回正/零/负 */
+  function cmp(a, b) {
+    for (var i = 0; i < 3; i++) { if (a[i] !== b[i]) return a[i] - b[i]; }
+    return 0;
+  }
+
+  function render(spec, note) {
+    elA.textContent = spec[0]; elB.textContent = spec[1]; elC.textContent = spec[2];
+    // 柱高映射：按档位封顶，避免数值过大撑爆容器
+    barA.style.height = Math.min(100, spec[0] * 34) + '%';
+    barB.style.height = Math.min(100, spec[1] * 22) + '%';
+    barC.style.height = Math.min(100, spec[2] * 22) + '%';
+    detail.textContent = note;
+  }
+
+  input.addEventListener('input', function () {
+    var v = input.value.trim();
+    err.textContent = '';
+    if (!v) { render([0, 0, 0], '在上方输入框键入或点右侧示例。'); return; }
+    // 先做合法性校验：交给浏览器引擎判定，杜绝计算器误算非法选择器
+    try { document.querySelector(v); }
+    catch (e) { err.textContent = '⚠️ 非法选择器：' + e.message; return; }
+    var comps = splitCompounds(v);
+    var total = [0, 0, 0];
+    comps.forEach(function (c) {
+      var s = calcCompound(c);
+      total[0] += s[0]; total[1] += s[1]; total[2] += s[2];
+    });
+    render(total, '拆为 ' + comps.length + ' 个复合选择器逐个累加（组合器不计分）：' + comps.join(' ｜ '));
+  });
+  // 快捷示例按钮：填入并触发计算
+  document.querySelectorAll('[data-put]').forEach(function (b) {
+    b.addEventListener('click', function () { input.value = b.dataset.put; input.dispatchEvent(new Event('input')); });
+  });
+  input.value = '#nav .item:hover';      // 打开页面即有演示结果
+  input.dispatchEvent(new Event('input'));
+
+  /* ================= C 区：层叠竞赛 =================
+     通过 style 节点的 disabled 模拟"规则启停"，
+     最终颜色完全由浏览器层叠算法裁决 —— 演示结果真实可信 */
+  var cubeNote = document.getElementById('cube-note');
+  document.querySelectorAll('.rule-row input').forEach(function (cb) {
+    cb.addEventListener('change', function () {
+      var sheet = document.getElementById('rule-' + cb.dataset.rule);
+      sheet.disabled = !cb.checked;
+      // 文案总结当前层叠状态，帮助理解胜负原因
+      var on3 = document.querySelector('[data-rule="3"]').checked;
+      var on1 = document.querySelector('[data-rule="1"]').checked;
+      var on2 = document.querySelector('[data-rule="2"]').checked;
+      if (on3) cubeNote.textContent = '绿色获胜：!important 使 (1,0,0) 跃升到层叠最高档（作者级 important）。';
+      else if (on1 && on2) cubeNote.textContent = '红色获胜：同为作者普通样式时，(1,0,0) > (0,2,0)，ID 逐位碾压两个类。';
+      else if (on1) cubeNote.textContent = '红色获胜：(1,0,0) 单独生效。注意它虽是 ID，仍敌不过 !important。';
+      else if (on2) cubeNote.textContent = '蓝色不生效：方块没有 blue 类，选择器根本没匹配上 —— 匹配优先于优先级。';
+      else cubeNote.textContent = '提示：规则 2 写的是 .stage .blue，但方块并没有 blue 类 —— 打开后也不生效，体会"匹配先于优先级"。';
+    });
+  });
+})();
+</script>
+</body>
+</html>

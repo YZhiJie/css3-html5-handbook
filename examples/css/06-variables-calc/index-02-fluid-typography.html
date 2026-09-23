@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 02：calc / min / max / clamp 流体排版与安全间距
+  ------------------------------------------------------------
+  【知识点】
+    1. calc() 混合单位四则运算（% - px / vw + rem 等）
+    2. min() 取最小 = "上限封顶"；max() 取最大 = "下限兜底"
+    3. clamp(MIN, VAL, MAX) = max(MIN, min(VAL, MAX)) 夹逼
+    4. 流体字号公式：clamp(MIN, MINrem + 斜率×vw, MAX)
+    5. env(safe-area-inset-*) 刘海屏安全间距（概念演示）
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+    打开后【拖动浏览器窗口宽度】，观察字号与间距的连续变化。
+  【效果说明】
+    ① 大标题用 clamp() 流体缩放，页面内置"当前实际字号"读数；
+    ② 卡片栅格用 min()/max() 演示封顶与兜底；
+    ③ 侧栏布局用 calc(100% - 侧栏) 演示混合单位；
+    ④ 一组对照卡片展示"固定字号 vs 流体字号"的差异。
+  【注意事项】
+    calc() 运算符两侧必须有空格；clamp 参数顺序固定
+    （MIN, VAL, MAX），写反逻辑即错；老 Safari 需提供固定值回退行。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 02 · 流体排版与计算函数</title>
+<style>
+  :root {
+    --brand: #0a9396; --ink: #1b2a2e; --muted: #6b7f84; --line: #dfe9ea;
+    --bg: #f2f7f7; --card: #fff;
+    /* 间距令牌也做成"流体"的：小屏 16px，大屏最多 32px */
+    --pad: clamp(1rem, 0.6rem + 1.6vw, 2rem);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: var(--pad); line-height: 1.6;
+  }
+  h1 {
+    /* 流体标题公式：最小 1.6rem，斜率 2.2vw，上限 3.2rem。
+       中间值刻意写成 "rem + vw" 混合 —— 纯 vw 在窄屏过小、宽屏过大，
+       加常数项可以整体抬高基线，这是 Utopia.fyi 流体系统的核心思路 */
+    font-size: clamp(1.6rem, 1rem + 2.2vw, 3.2rem);
+    line-height: 1.15;
+  }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 4px; }
+  .meta { font-size: .8rem; color: var(--brand); margin-bottom: 18px; font-family: ui-monospace, Consolas, monospace; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: var(--pad); margin-bottom: 18px;
+  }
+  h2 { font-size: clamp(1rem, .9rem + .5vw, 1.25rem); margin-bottom: 10px; }
+  .tip { font-size: .82rem; color: var(--muted); background: #eff7f7;
+         border-left: 3px solid var(--brand); padding: 6px 10px; margin-bottom: 14px;
+         border-radius: 0 6px 6px 0; }
+
+  /* ---------- 区块二：min / max / clamp 卡片 ---------- */
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 760px) { .cards { grid-template-columns: 1fr; } }
+  .fcard { border: 1px solid var(--line); border-radius: 10px; padding: 14px; background: #fbfefe; }
+  .fcard h3 { font-size: .9rem; margin-bottom: 6px; }
+  .fcard .code { font-family: ui-monospace, Consolas, monospace; font-size: .74rem; background: #eef4f4; border-radius: 6px; padding: 4px 8px; display: block; margin-bottom: 8px; color: #145252; overflow-x: auto; white-space: nowrap; }
+  .fcard .bar-demo { height: 26px; border-radius: 6px; background: linear-gradient(90deg, #bde0e0, #0a9396); }
+
+  /* 演示容器宽度受函数控制：
+     1) min(100%, 360px)：手机全宽、电脑上封顶 360px
+     2) max(180px, 50%)：窄屏兜底 180px、宽屏跟随一半
+     3) clamp(180px, 60%, 420px)：两侧都夹住 */
+  .w-min  { width: min(100%, 360px); }
+  .w-max  { width: max(180px, 50%); }
+  .w-clamp{ width: clamp(180px, 60%, 420px); }
+
+  /* ---------- 区块三：calc 布局 ---------- */
+  /* 侧栏宽度变量化：一行改全局 */
+  :root { --sidebar: 200px; }
+  .layout { display: grid; grid-template-columns: var(--sidebar) 1fr; gap: 14px; }
+  /* 混合单位运算：主列宽度 = 窗口的 100% 减去固定侧栏 —— 媒体查询做不到的连续性 */
+  .layout-main { background: #eff7f7; border-radius: 8px; padding: 12px; }
+  .layout-side { background: #0a9396; color: #fff; border-radius: 8px; padding: 12px; font-size: .85rem; }
+  .layout-side .w-read { font-family: ui-monospace, Consolas, monospace; font-size: .74rem; opacity: .85; }
+  .layout input { width: 100%; accent-color: #fff; }
+  /* 折叠态：只换变量值，grid 自动重排（transition 对 grid-template-columns 生效） */
+  .layout-zone.collapsed { --sidebar: 56px; }
+  .layout-zone { transition: --sidebar .25s; }  /* 未注册类型时此 transition 无效，属渐进增强 */
+
+  /* ---------- 区块四：固定 vs 流体对照 ---------- */
+  .versus { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 680px) { .versus { grid-template-columns: 1fr; } }
+  /* 固定字号：断点间纹丝不动，窄屏容易挤爆 */
+  .fix h3 { font-size: 28px; }
+  /* 流体字号：随窗口连续缩放 */
+  .fluid h3 { font-size: clamp(1.05rem, .8rem + 1.5vw, 1.8rem); }
+  .versus .pane { border: 1px dashed var(--line); border-radius: 10px; padding: 14px; }
+  .versus .pane p { font-size: .82rem; color: var(--muted); }
+
+  /* 段落安全行长：min() 控制最大可读行长（约 65 字符） */
+  .safe-p { max-width: min(40rem, 100%); }
+</style>
+</head>
+<body>
+  <h1>calc / min / max / clamp：连续适配，而不是断点跳变</h1>
+  <p class="sub">试试拖动窗口宽度 —— 所有尺寸实时连续变化。</p>
+  <!-- 实时读数：JS 每帧读取实际渲染值，帮助验证"流体"是否生效 -->
+  <p class="meta" id="meta">窗口宽度读取中…</p>
+
+  <!-- ============ 区块一：流体标题 ============ -->
+  <section>
+    <h2>① clamp() 流体标题</h2>
+    <p class="tip">公式 <code>clamp(1.6rem, 1rem + 2.2vw, 3.2rem)</code>：中间项是"基线 + 斜率"，触到两端后锁定。下方读数显示当前实际渲染字号，对照窗口宽度理解"触底/触顶"。</p>
+    <p style="margin-bottom:6px">当前渲染字号：<b id="h1size">…</b>（min 25.6px / max 51.2px 之间连续变化）</p>
+    <div style="background:#eef7f7;border-radius:8px;padding:10px 14px" id="fluid-title-preview">
+      流体标题预览：液态化排版
+    </div>
+  </section>
+
+  <!-- ============ 区块二：min/max/clamp 三卡 ============ -->
+  <section>
+    <h2>② min() 封顶 · max() 兜底 · clamp() 双向夹</h2>
+    <p class="tip">拉宽/缩窄窗口观察三条色带的宽度边界。记忆口诀：<b>min 管"最大不能超过"，max 管"最小不能低于"</b>。</p>
+    <div class="cards">
+      <div class="fcard">
+        <h3>min() —— 上限封顶</h3>
+        <code>width: min(100%, 360px)</code>
+        <div class="bar-demo w-min"></div>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:6px">窄屏占满，宽屏锁死 360px。适合内容列、图片容器。</p>
+      </div>
+      <div class="fcard">
+        <h3>max() —— 下限兜底</h3>
+        <code>width: max(180px, 50%)</code>
+        <div class="bar-demo w-max"></div>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:6px">窄屏至少 180px，宽屏占一半。适合按钮、最小触控区。</p>
+      </div>
+      <div class="fcard">
+        <h3>clamp() —— 双向夹逼</h3>
+        <code>width: clamp(180px, 60%, 420px)</code>
+        <div class="bar-demo w-clamp"></div>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:6px">下限 180px、理想 60%、上限 420px，一条规则覆盖全场景。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 区块三：calc 布局 ============ -->
+  <section>
+    <h2>③ calc() 混合单位：固定侧栏 + 弹性主列</h2>
+    <p class="tip">grid 用 <code>var(--sidebar) 1fr</code> 布局；拖动下方滑杆改变 <code>--sidebar</code>，主列实时重排。再点"折叠"看变量切换如何驱动状态。</p>
+    <div class="layout-zone" id="layoutZone">
+      <div class="layout">
+        <div class="layout-side">
+          <div class="w-read" id="sideRead">--sidebar: 200px</div>
+          <hr style="border:none;border-top:1px solid rgba(255,255,255,.3);margin:8px 0">
+          <label style="display:flex;gap:6px;align-items:center;font-size:.78rem">
+            宽度
+            <input type="range" id="sideRange" min="120" max="320" value="200">
+          </label>
+        </div>
+        <div class="layout-main">
+          <b>主内容区（1fr 弹性）</b>
+          <p class="safe-p" style="font-size:.82rem;color:var(--muted);margin-top:4px">
+            我还是一条"安全行长"的演示：max-width: min(40rem, 100%) 保证每行不超过约 65 个字符 —— 过长的行会显著降低可读性。
+          </p>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top:10px">
+      <button id="btn-fold" style="font:inherit;padding:7px 14px;border:1px solid var(--brand);background:#e6f3f3;color:#0a5959;border-radius:8px;cursor:pointer">
+        折叠 / 展开侧栏（--sidebar: 200px ↔ 56px）
+      </button>
+    </p>
+  </section>
+
+  <!-- ============ 区块四：对照实验 ============ -->
+  <section>
+    <h2>④ 固定字号 vs 流体字号</h2>
+    <div class="versus">
+      <div class="pane fix">
+        <h3>固定 28px 标题</h3>
+        <p>断点之间纹丝不动：手机上显得臃肿、超宽屏上又偏小。要覆盖全设备需要 5～10 个媒体查询。</p>
+      </div>
+      <div class="pane fluid">
+        <h3>clamp() 流体标题</h3>
+        <p>一条规则连续适配：窄屏收紧、宽屏放大、两端锁定。媒体查询只留给"结构变化"。</p>
+      </div>
+    </div>
+  </section>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---- 实时读数：证明"流体"是连续的而非断点式的 ----
+     requestAnimationFrame 循环里仅更新两个文本节点，
+     不写任何样式变量，避免引发样式重算（读多写少是原则） */
+  var meta = document.getElementById('meta');
+  var h1size = document.getElementById('h1size');
+  var preview = document.getElementById('fluid-title-preview');
+  function tick() {
+    var w = window.innerWidth;
+    var fs = parseFloat(getComputedStyle(preview).fontSize).toFixed(1);
+    meta.textContent = '窗口宽度 ' + w + 'px（试着拖动窗口）';
+    h1size.textContent = fs + 'px';
+    requestAnimationFrame(tick);           // 持续监听比 resize 事件更直观
+  }
+  requestAnimationFrame(tick);
+
+  /* ---- 侧栏滑杆：写 :root 变量，grid 与文字读数同步更新 ---- */
+  var zone = document.getElementById('layoutZone');
+  var sideRange = document.getElementById('sideRange');
+  var sideRead = document.getElementById('sideRead');
+  sideRange.addEventListener('input', function () {
+    var px = sideRange.value + 'px';
+    document.documentElement.style.setProperty('--sidebar', px);  // 写变量 → 布局自动重排
+    sideRead.textContent = '--sidebar: ' + px;
+  });
+
+  /* ---- 折叠按钮：状态切换 = 变量值切换 ---- */
+  var btn = document.getElementById('btn-fold');
+  var folded = false;
+  btn.addEventListener('click', function () {
+    folded = !folded;
+    zone.classList.toggle('collapsed', folded);   // 类切换带动 --sidebar 覆盖
+    sideRange.value = folded ? 56 : 200;          // 滑杆位置同步，避免状态不同步
+    sideRange.dispatchEvent(new Event('input'));
+    btn.textContent = folded ? '展开侧栏（回到 200px）' : '折叠 / 展开侧栏（--sidebar: 200px ↔ 56px）';
+  });
+})();
+</script>
+</body>
+</html>
