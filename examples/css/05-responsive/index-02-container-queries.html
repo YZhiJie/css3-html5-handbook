@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 02：容器查询（@container / container-type / cqw 单位）
+           + 逻辑属性与国际化（RTL）
+  ------------------------------------------------------------
+  【知识点】
+    1. 容器查询三步：container-type 声明容器 → @container 按容器宽
+       查询 → 组件自带布局策略（与视口无关）
+    2. inline-size vs size：前者只锁定行内轴（高度仍由内容撑开），日常首选
+    3. 容器单位 cqw/cqi/cqh：以容器为基准的"vw"
+    4. 逻辑属性：margin-inline-start / padding-block / inset-inline /
+       text-align:start —— RTL 自动镜像
+    5. container-name 命名容器：避免跨组件误匹配
+  【运行方式】
+    双击本文件即可在浏览器中打开。玩法 1：拖动页面下方的"容器
+    宽度"滑杆，观察同一组件在窄/宽容器中的布局切换；玩法 2：
+    点击"切换 RTL"按钮，整页逻辑属性自动镜像。
+  【效果说明】
+    区块 1：同一张用户卡放进 240px / 480px 两个容器（滑杆可调），
+    窄容器竖排、宽容器横排——组件自己响应自己的环境；
+    区块 2：cqi 流体字号演示；区块 3：逻辑属性 RTL 对照。
+  【注意事项】
+    容器查询基线较新（Chrome 105 / Safari 16 / Firefox 110），
+    老浏览器中 @container 规则被整体忽略、组件退回基础样式，
+    页面仍然可用（渐进增强）。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>示例 02 · 容器查询与逻辑属性</title>
+  <style>
+    :root {
+      --brand: #4361ee;
+      --accent: #f72585;
+      --ink: #232c3d;
+      --muted: #7c8aa0;
+      --line: #e3e8f1;
+      --bg: #f4f6fb;
+      --card: #fff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      padding: 24px;
+      line-height: 1.65;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 4px;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: .9rem;
+      margin-bottom: 18px;
+    }
+
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+
+    h2 {
+      font-size: 1.05rem;
+      margin-bottom: 4px;
+    }
+
+    .tip {
+      font-size: .82rem;
+      color: var(--muted);
+      background: #f1f5ff;
+      border-left: 3px solid var(--brand);
+      padding: 6px 10px;
+      margin: 8px 0 14px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    code {
+      background: #eef1f8;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: .85em;
+      font-family: ui-monospace, Consolas, monospace;
+    }
+
+    button {
+      padding: 8px 16px;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+      background: var(--brand);
+      color: #fff;
+      font-size: .84rem;
+    }
+
+    button.ghost {
+      background: #fff;
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 110px 1fr 52px;
+      align-items: center;
+      gap: 8px;
+      font-size: .82rem;
+      margin-bottom: 6px;
+    }
+
+    .row output {
+      font-family: ui-monospace, Consolas, monospace;
+      color: var(--brand);
+      text-align: right;
+      font-size: .76rem;
+    }
+
+    input[type="range"] {
+      accent-color: var(--brand);
+      width: 100%;
+    }
+
+    /* ============================================================
+     ① 容器查询：组件自带布局策略
+     ============================================================ */
+    /* 容器声明：inline-size 只追踪"行内方向"（宽度），
+     高度仍由内容决定——绝大多数组件都用它，而不是 size */
+    .cq-box {
+      container-type: inline-size;
+      container-name: card-zone;
+      /* 命名容器：@container 可指名查询 */
+      border: 2px dashed var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      resize: horizontal;
+      /* 原生可拖拽调宽（演示用） */
+      overflow: auto;
+      background: #fbfcff;
+    }
+
+    .cq-box .cq-label {
+      font-size: .7rem;
+      color: var(--muted);
+      font-family: ui-monospace, Consolas, monospace;
+      margin-bottom: 8px;
+    }
+
+    /* 组件基础样式（窄容器态）：竖排居中 */
+    .profile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      text-align: center;
+      padding: 12px;
+      border-radius: 10px;
+      background: linear-gradient(160deg, #fff, #eef2fd);
+      border: 1px solid var(--line);
+    }
+
+    .profile .avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 1.5rem;
+      color: #fff;
+      background: linear-gradient(135deg, var(--brand), #7209b7);
+    }
+
+    .profile h4 {
+      font-size: 1rem;
+    }
+
+    .profile p {
+      font-size: .78rem;
+      color: var(--muted);
+    }
+
+    .profile .tags {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .profile .tags i {
+      font-style: normal;
+      font-size: .7rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #eef1fb;
+      color: var(--brand);
+    }
+
+    /* 指标列默认隐藏——注意：默认规则必须写在 @container 之前，
+     否则同特异性下"后声明的 display:none"会把容器查询的 display:flex 盖掉 */
+    .profile .stats {
+      display: none;
+    }
+
+    /* 容器宽 ≥ 420px：切换横排。注意条件是"容器宽"不是"视口宽"——
+     组件放进侧栏还是主区，全看它实际被分配到多宽 */
+    @container card-zone (min-width: 420px) {
+      .profile {
+        flex-direction: row;
+        text-align: start;
+        padding: 16px;
+      }
+
+      .profile .avatar {
+        width: 96px;
+        height: 96px;
+        border-radius: 14px;
+        flex-shrink: 0;
+      }
+
+      .profile .body {
+        display: grid;
+        gap: 4px;
+      }
+
+      .profile .tags {
+        justify-content: start;
+      }
+    }
+
+    /* 容器宽 ≥ 620px：再加一列指标（更宽的容器 = 更丰富的信息层级） */
+    @container card-zone (min-width: 620px) {
+      .profile .stats {
+        display: flex;
+        gap: 18px;
+        margin-inline-start: auto;
+      }
+
+      .profile .stats div {
+        text-align: center;
+      }
+
+      .profile .stats b {
+        display: block;
+        font-size: 1.1rem;
+        color: var(--brand);
+      }
+
+      .profile .stats span {
+        font-size: .68rem;
+        color: var(--muted);
+      }
+    }
+
+    /* ---------- cqi 流体字号：以容器为基准的"vw" ---------- */
+    .cq-type {
+      container-type: inline-size;
+      margin-top: 14px;
+    }
+
+    .cq-type .big {
+      /* 10cqi = 容器宽的 10%：容器缩放时字号跟随（视口不变也生效） */
+      font-size: clamp(1rem, 10cqi, 3rem);
+      font-weight: 800;
+      background: linear-gradient(100deg, var(--accent), var(--brand));
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* ============================================================
+     ③ 逻辑属性：一套代码，LTR/RTL 自动镜像
+     ============================================================ */
+    .rtl-demo {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fbfcff;
+    }
+
+    /* 全部使用逻辑属性：
+     margin-inline-start：LTR=左 / RTL=右
+     padding-inline：行内方向两侧
+     inset-inline-end：行内方向终点侧（LTR=右 / RTL=左） */
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: .84rem;
+    }
+
+    .breadcrumb .sep {
+      margin-inline: 2px;
+      color: var(--muted);
+    }
+
+    .badge-corner {
+      position: relative;
+      padding: 10px 14px;
+      font-size: .82rem;
+      background: #eef1fb;
+      border-radius: 8px;
+      padding-inline-end: 46px;
+      /* 给角标让位（逻辑方向终点侧） */
+    }
+
+    .badge-corner::after {
+      content: "HOT";
+      position: absolute;
+      inset-inline-end: 8px;
+      /* 逻辑定位：RTL 时自动到左边 */
+      top: 50%;
+      transform: translateY(-50%);
+      background: var(--accent);
+      color: #fff;
+      font-size: .68rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    .logical-note {
+      font-size: .78rem;
+      color: var(--muted);
+    }
+
+    /* RTL 模式下需要镜像的方向性图标：行内判断翻转 */
+    [dir="rtl"] .arrow-mirror {
+      transform: scaleX(-1);
+    }
+
+    .arrow-mirror {
+      display: inline-block;
+      transition: transform .2s;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>容器查询与逻辑属性</h1>
+  <p class="sub">组件级响应式：布局策略跟着"容器"走；方向策略跟着"文字流"走。</p>
+
+  <!-- ① 容器查询 -->
+  <section>
+    <h2>① 同一组件，容器不同 → 布局自动不同</h2>
+    <div class="tip">
+      下方两个虚线框都是 <code>container-type: inline-size</code> 容器。
+      上面的固定 260px（模拟侧栏），下面的用滑杆拖宽（模拟主区）。
+      同一份 <code>.profile</code> 组件代码，在不同容器里呈现三种层级。
+    </div>
+
+    <!-- 容器 A：固定窄宽（模拟侧栏） -->
+    <div class="cq-box" style="width: 260px; margin-bottom: 14px;">
+      <div class="cq-label">容器 A · 固定 260px（侧栏场景）→ 竖排卡</div>
+      <div class="profile">
+        <div class="avatar">🧑‍🎨</div>
+        <div class="body">
+          <h4>陈设策</h4>
+          <p>视觉设计师 · 参与 12 个项目</p>
+          <div class="tags"><i>Figma</i><i>CSS</i><i>动效</i></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 容器 B：滑杆控制宽度（模拟主区/运营栏位） -->
+    <div class="cq-box" id="cqWide">
+      <div class="cq-label">容器 B · 宽度 <span id="cqW">700</span>px（拖滑杆或直接拖框右下角）→ 横排 + 指标列</div>
+      <div class="profile">
+        <div class="avatar">🧑‍🎨</div>
+        <div class="body">
+          <h4>陈设策</h4>
+          <p>视觉设计师 · 参与 12 个项目</p>
+          <div class="tags"><i>Figma</i><i>CSS</i><i>动效</i></div>
+        </div>
+        <div class="stats">
+          <div><b>128</b><span>作品</span></div>
+          <div><b>4.9</b><span>评分</span></div>
+          <div><b>96%</b><span>准时率</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <label for="wRange">容器 B 宽度</label>
+      <input id="wRange" type="range" min="220" max="900" step="10" value="700">
+      <output id="wOut">700px</output>
+    </div>
+    <p style="font-size:.8rem;color:var(--muted)">
+      关键差异：换作<b>媒体查询</b>，两个框里的卡片只会同时变（因为视口相同）；
+      <b>容器查询</b>让每个框按自己的宽度独立决策——这才是组件化时代要的响应式。
+    </p>
+
+    <div class="cq-type">
+      <div class="big">cqi 流体字号</div>
+      <p style="font-size:.8rem;color:var(--muted)">font-size: clamp(1rem, 10cqi, 3rem) —— 以容器宽度为基准，容器窄字就小。</p>
+    </div>
+  </section>
+
+  <!-- ② 逻辑属性与 RTL -->
+  <section>
+    <h2>② 逻辑属性：点一下按钮，整页镜像</h2>
+    <div class="tip">
+      面包屑间距用 <code>margin-inline</code>、角标用 <code>inset-inline-end</code>、
+      对齐用 <code>text-align: start</code>——全是"逻辑方向"。
+      切换 <code>dir="rtl"</code>（如阿拉伯语）后自动镜像，无需任何额外规则。
+    </div>
+    <div style="margin-bottom:12px">
+      <button id="rtlBtn">🔄 切换 RTL / LTR</button>
+    </div>
+    <div class="rtl-demo">
+      <div class="breadcrumb">
+        <span>首页</span><span class="sep">/</span>
+        <span>分类</span><span class="sep">/</span>
+        <span>数码</span><span class="sep">/</span>
+        <span>机械键盘 <span class="arrow-mirror">→</span></span>
+      </div>
+      <div class="badge-corner">逻辑属性卡片：角标在"行内终点侧"，RTL 时自动跑到左边</div>
+      <p class="logical-note">
+        对照记忆：<code>margin-inline-start</code> ≈ LTR 的 margin-left；
+        <code>block</code> 轴 = 块堆叠方向（上下），<code>inline</code> 轴 = 文字流方向（左右）。
+      </p>
+    </div>
+  </section>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    // ---------- 容器 B 宽度滑杆 ----------
+    const box = $('cqWide');
+    $('wRange').addEventListener('input', (e) => {
+      const w = e.target.value + 'px';
+      box.style.width = w;              // 直接改容器宽：@container 自动重新求值
+      $('wOut').value = w;
+      $('cqW').textContent = e.target.value;
+    });
+
+    // ---------- RTL 切换 ----------
+    let rtl = false;
+    $('rtlBtn').addEventListener('click', () => {
+      rtl = !rtl;
+      document.documentElement.setAttribute('dir', rtl ? 'rtl' : 'ltr');
+      // body 的文字方向也一并切换，逻辑属性在两个层级都会生效
+      document.body.setAttribute('dir', rtl ? 'rtl' : 'ltr');
+      $('rtlBtn').textContent = rtl ? '↩ 切回 LTR（中文）' : '🔄 切换 RTL / LTR';
+    });
+  </script>
+</body>
+
+</html>

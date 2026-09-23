@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 02：conic-gradient 与 repeating-* 系列
+  ------------------------------------------------------------
+  【知识点】
+    1. conic-gradient：绕中心按角度插值，from 起始角 / at 中心点
+    2. "接力写法"：色标起点写 0 会自动接续前一段终点（饼图核心技巧）
+    3. repeating-linear / radial / conic：周期 = 最后一个色标位置
+    4. 条纹（斜纹/同心环/射线盘）、格纹、网格纸、点阵
+    5. conic 饼图 + CSS 变量 + JS 驱动（纯 CSS 数据可视化）
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    区块 1：色轮与四色饼图（拖滑杆改变饼图占比，双环演示接力写法）；
+    区块 2：条纹画廊——警示斜纹 / 同心圆环 / 射线盘 / 格纹 /
+    网格纸 / 点阵，每个样本附生成代码；区块 3：角度盘交互演示。
+  【注意事项】
+    conic-gradient 兼容基线较新（Chrome 69 / Safari 12.1），
+    老内核用 @supports 检测并回退 SVG（真实项目做法，见文档）。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>示例 02 · conic 渐变与 repeating 图案</title>
+  <style>
+    :root {
+      --brand: #4361ee;
+      --accent: #f72585;
+      --ink: #232c3d;
+      --muted: #7c8aa0;
+      --line: #e3e8f1;
+      --bg: #f4f6fb;
+      --card: #fff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      padding: 24px;
+      line-height: 1.65;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 4px;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: .9rem;
+      margin-bottom: 18px;
+    }
+
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+
+    h2 {
+      font-size: 1.05rem;
+      margin-bottom: 4px;
+    }
+
+    .tip {
+      font-size: .82rem;
+      color: var(--muted);
+      background: #f1f5ff;
+      border-left: 3px solid var(--brand);
+      padding: 6px 10px;
+      margin: 8px 0 14px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    code {
+      background: #eef1f8;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: .85em;
+      font-family: ui-monospace, Consolas, monospace;
+    }
+
+    .code-out {
+      padding: 9px 11px;
+      border-radius: 9px;
+      margin-top: 10px;
+      background: #101726;
+      color: #cfe0ff;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: .74rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* ---------- 区块 1：色轮 / 饼图 ---------- */
+    .wheel-lab {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+      align-items: start;
+    }
+
+    .wheel-item {
+      text-align: center;
+    }
+
+    .wheel-item p {
+      font-size: .78rem;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    /* 色轮：色相绕中心旋转一圈（from 0deg 起始，六色首尾相接） */
+    .color-wheel {
+      width: 150px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      margin: 0 auto;
+      background: conic-gradient(from 0deg,
+          #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+      /* 首尾同色（红）保证 360° 处无接缝 */
+    }
+
+    /* 饼图：--p 为 0~100 的数字，calc 换算成度数；接力写法补全剩余部分 */
+    .pie {
+      width: 150px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      margin: 0 auto;
+      background: conic-gradient(var(--brand) 0 calc(var(--p, 30) * 3.6deg), #e9edf5 0);
+      display: grid;
+      place-items: center;
+      /* 换算逻辑：100% ↔ 360deg，故占比 p 对应 p × 3.6 度 */
+    }
+
+    .pie::after {
+      /* 中心盖白圆 → donut 环形图（不要环就删掉此伪元素） */
+      content: "";
+      width: 55%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: #fff;
+    }
+
+    .pie .label {
+      position: relative;
+      z-index: 1;
+      font-weight: 700;
+      font-size: 1.2rem;
+    }
+
+    .pie-ctl {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+      margin-top: 10px;
+    }
+
+    .pie-ctl input[type="range"] {
+      accent-color: var(--brand);
+      width: 140px;
+    }
+
+    /* ---------- 区块 2：条纹画廊 ---------- */
+    .patterns {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+    }
+
+    .pattern-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .pattern-card .name {
+      font-size: .8rem;
+      color: var(--muted);
+      padding: 8px 12px;
+      border-top: 1px solid var(--line);
+      font-family: ui-monospace, Consolas, monospace;
+    }
+
+    .pattern-demo {
+      height: 120px;
+    }
+
+    /* 警示斜纹：45° 双色 hard-stop，周期 28px */
+    .p-hazard {
+      background: repeating-linear-gradient(45deg,
+          #f94144 0 14px, #ffffff 14px 28px);
+    }
+
+    /* 同心圆环：repeating-radial + 双位置色标，环宽 14px */
+    .p-rings {
+      background: repeating-radial-gradient(circle at 50% 50%,
+          #4361ee 0 7px, #ffffff 7px 14px);
+    }
+
+    /* 射线盘：repeating-conic 每 15° 一扇（亮度交替制造"光盘"效果） */
+    .p-rays {
+      background: repeating-conic-gradient(from 0deg at 50% 50%,
+          #dfe6ff 0 15deg, #ffffff 15deg 30deg);
+    }
+
+    /* 格纹（苏格兰呢感）：两层不同粗细的斜纹正交叠加，先写的在上层 */
+    .plaid {
+      background:
+        repeating-linear-gradient(0deg, rgba(67, 97, 238, .16) 0 14px, transparent 14px 42px),
+        repeating-linear-gradient(90deg, rgba(67, 97, 238, .16) 0 14px, transparent 14px 42px),
+        repeating-linear-gradient(0deg, rgba(247, 37, 133, .10) 0 7px, transparent 7px 42px),
+        repeating-linear-gradient(90deg, rgba(247, 37, 133, .10) 0 7px, transparent 7px 42px),
+        #fffdf8;
+      /* 四层条纹两两正交、两种周期，形成粗细交织的格纹 */
+    }
+
+    /* 网格纸：1px 细线 + 透明段构成周期，横竖两层 */
+    .p-grid-paper {
+      background:
+        repeating-linear-gradient(#dbe4f3 0 1px, transparent 1px 24px),
+        repeating-linear-gradient(90deg, #dbe4f3 0 1px, transparent 1px 24px),
+        #fdfefe;
+    }
+
+    /* 点阵：radial 画一个点，background-size 控制平铺周期 */
+    .p-dots {
+      background: radial-gradient(circle, #c7d2e8 1.5px, transparent 1.6px) 0 0 / 22px 22px #fff;
+    }
+
+    /* ---------- 区块 3：角度盘（交互） ---------- */
+    .dial-lab {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: center;
+    }
+
+    @media (max-width: 700px) {
+      .dial-lab {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .dial {
+      width: 180px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      position: relative;
+      justify-self: center;
+      background: repeating-conic-gradient(from var(--from, 0deg),
+          var(--brand) 0 30deg, #e9edf5 30deg 60deg);
+      /* from 角度由 CSS 变量 --from 驱动，拖滑杆即转动扇区起点 */
+    }
+
+    .dial::after {
+      /* 中心指针标记 */
+      content: "";
+      position: absolute;
+      inset: 50% auto auto 50%;
+      width: 10px;
+      height: 10px;
+      margin: -5px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+  </style>
+</head>
+
+<body>
+  <h1>conic 渐变与 repeating 图案</h1>
+  <p class="sub">色轮、饼图、射线盘、条纹、格纹——全部一行 CSS，零图片。</p>
+
+  <!-- ① 色轮与饼图 -->
+  <section>
+    <h2>① conic-gradient：色轮与纯 CSS 饼图</h2>
+    <div class="tip">
+      conic 的色标是<b>角度</b>而非长度。饼图的"接力写法"：
+      <code>conic-gradient(#4361ee 0 calc(var(--p) * 3.6deg), #e9edf5 0)</code>——
+      第二个色标起点写 0 会被钳制到前一段终点，自动补满 360°。
+      拖动滑杆改变占比，观察饼图与中心数字同步变化。
+    </div>
+    <div class="wheel-lab">
+      <div class="wheel-item">
+        <div class="color-wheel"></div>
+        <p>色轮：六色首尾相接，from 控制起始相</p>
+      </div>
+      <div class="wheel-item">
+        <div class="pie" id="pie" style="--p: 30"><span class="label" id="pieLabel">30%</span></div>
+        <div class="pie-ctl">
+          <input type="range" id="pieRange" min="0" max="100" step="1" value="30" aria-label="饼图占比">
+          <span id="pieVal" style="font-size:.82rem;color:var(--muted)">30</span>
+        </div>
+        <p>饼图/环形图：CSS 变量驱动角度，JS 只改一个数</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ② 条纹画廊 -->
+  <section>
+    <h2>② repeating 系列：六种常用图案</h2>
+    <div class="tip">
+      <b>周期 = 最后一个色标的位置</b>（radial/conic 中同理）。双位置色标
+      <code>color a b</code> 表示"从 a 到 b 都是这个颜色"，边界天然锐利。
+    </div>
+    <div class="patterns">
+      <div class="pattern-card">
+        <div class="pattern-demo p-hazard"></div>
+        <div class="name">警示斜纹 repeating-linear(45deg)</div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-demo p-rings"></div>
+        <div class="name">同心圆环 repeating-radial(circle)</div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-demo p-rays"></div>
+        <div class="name">射线盘 repeating-conic(15°/扇)</div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-demo plaid"></div>
+        <div class="name">格纹：四层条纹正交叠加</div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-demo p-grid-paper"></div>
+        <div class="name">网格纸：1px 线 + 24px 周期</div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-demo p-dots"></div>
+        <div class="name">点阵：radial 单点 + size 平铺</div>
+      </div>
+    </div>
+    <div class="code-out" id="patternCode">/* 每个样本的 CSS 已写在 .pattern-demo 对应类中，可开 DevTools 查看 */</div>
+  </section>
+
+  <!-- ③ 角度盘交互 -->
+  <section>
+    <h2>③ 角度盘：from 起始角交互演示</h2>
+    <div class="tip">
+      <code>from &lt;angle&gt;</code> 决定色标循环的起点方向。这里把 from 抽成变量
+      <code>--from</code>，拖滑杆即转动整个扇区盘；配合 animation 动画
+      <code>--from</code>（需 @property 注册）即可做加载转盘。
+    </div>
+    <div class="dial-lab">
+      <div>
+        <p style="font-size:.88rem">
+          <b>读法</b>：0° 在正上方，顺时针为正。from 30deg 表示第一扇区从"3 点钟偏上 30°"开始铺。<br>
+          <b>延伸</b>：真实加载器常用 <code>repeating-conic-gradient(var(--brand) 0 40deg, transparent 40deg 90deg)</code>
+          + 遮罩环，比 border 旋转更轻。
+        </p>
+        <div style="margin-top:12px">
+          <input type="range" id="fromRange" min="0" max="360" step="5" value="0" style="width:260px"
+            aria-label="from 起始角">
+          <output id="fromOut"
+            style="font-family:ui-monospace,Consolas,monospace;color:var(--brand);font-size:.82rem">0deg</output>
+        </div>
+        <div class="code-out" id="dialCode">background: repeating-conic-gradient(from 0deg,
+          #4361ee 0 30deg, #e9edf5 30deg 60deg);</div>
+      </div>
+      <div class="dial" id="dial"></div>
+    </div>
+  </section>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    // ---------- 饼图交互：JS 只写一个 0~100 的数字，CSS 负责换算角度 ----------
+    $('pieRange').addEventListener('input', (e) => {
+      const p = +e.target.value;
+      $('pie').style.setProperty('--p', p);   // 数据（占比）注入变量
+      $('pieLabel').textContent = p + '%';    // 中心数字同步
+      $('pieVal').textContent = p;
+    });
+
+    // ---------- 角度盘交互：from 角写入 CSS 变量 ----------
+    $('fromRange').addEventListener('input', (e) => {
+      const deg = e.target.value + 'deg';
+      $('dial').style.setProperty('--from', deg); // from 支持使用 var()
+      $('fromOut').value = deg;
+      $('dialCode').textContent =
+        `background: repeating-conic-gradient(from ${deg},\n  #4361ee 0 30deg, #e9edf5 30deg 60deg);`;
+    });
+
+    // ---------- 画廊样本：点击卡片把它的 CSS 代码展示到下方代码框 ----------
+    document.querySelectorAll('.pattern-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        const cls = card.querySelector('.pattern-demo').className.replace('pattern-demo ', '');
+        const rule = document.styleSheets[0].cssRules
+          ? Array.from(document.styleSheets[0].cssRules)
+            .filter((r) => r.selectorText === '.' + cls)
+            .map((r) => r.cssText)[0]
+          : null;
+        // 兜底：样式表读取失败时提示用 DevTools 查看
+        document.getElementById('patternCode').textContent = rule || `/* 请用 DevTools 查看 .${cls} 的 background 声明 */`;
+      });
+    });
+  </script>
+</body>
+
+</html>

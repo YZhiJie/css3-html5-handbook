@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：渐变文字 / 渐变边框 / 渐变 + 动画组合
+  ------------------------------------------------------------
+  【知识点】
+    1. 渐变文字三件套：background-clip:text（前缀+标准双写）、
+       -webkit-text-fill-color: transparent、color 兜底
+    2. 渐变边框两种方案：border-image（不支持圆角）vs
+       双层背景法（padding-box 实色 + border-box 渐变，圆角友好）
+    3. 渐变动画的两条正路：
+       a. background-position + 超宽渐变（兼容性最好）
+       b. @property 注册角度变量 → keyframes 动画变量（现代）
+    4. @supports 渐进增强：新特性缺失时不影响基础可读性
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    区块 1：三种渐变文字（流动渐变 / 彩虹描边 / 网格消隐字）；
+    区块 2：同一卡片分别用 border-image 与双层背景法实现渐变
+    边框，直观对比圆角表现；区块 3：两种渐变动画方案对照，
+    带 @property 支持检测与降级说明。
+  【注意事项】
+    老浏览器（如 Safari 13）只认 -webkit-background-clip:text，
+    本示例双写两种写法；不支持 @property 时方案 b 表现为
+    "跳变"而非平滑动画（有降级提示文字）。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>示例 03 · 渐变文字 / 边框 / 动画</title>
+  <style>
+    /* @property：把自定义属性注册为"有类型、可插值"的真属性。
+     注册后 --angle 可以在 transition/keyframes 中平滑变化——
+     这是让"渐变角度"动起来的官方正道。不支持的浏览器会跳变。 */
+    @property --angle {
+      syntax: '<angle>';
+      /* 类型声明：角度值 */
+      inherits: false;
+      /* 不向子元素继承 */
+      initial-value: 0deg;
+      /* 必须给初值，否则注册无效 */
+    }
+
+    @property --pos {
+      syntax: '<percentage>';
+      inherits: false;
+      initial-value: 0%;
+    }
+
+    :root {
+      --brand: #4361ee;
+      --accent: #f72585;
+      --ink: #232c3d;
+      --muted: #7c8aa0;
+      --line: #e3e8f1;
+      --bg: #f4f6fb;
+      --card: #fff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      padding: 24px;
+      line-height: 1.65;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 4px;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: .9rem;
+      margin-bottom: 18px;
+    }
+
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+
+    h2 {
+      font-size: 1.05rem;
+      margin-bottom: 4px;
+    }
+
+    .tip {
+      font-size: .82rem;
+      color: var(--muted);
+      background: #f1f5ff;
+      border-left: 3px solid var(--brand);
+      padding: 6px 10px;
+      margin: 8px 0 14px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    code {
+      background: #eef1f8;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: .85em;
+      font-family: ui-monospace, Consolas, monospace;
+    }
+
+    /* ================= 区块 1：渐变文字 ================= */
+    .text-row {
+      display: grid;
+      gap: 18px;
+    }
+
+    .demo-title {
+      font-size: clamp(1.6rem, 4.5vw, 2.6rem);
+      font-weight: 800;
+      line-height: 1.25;
+    }
+
+    /* 方案 1：流动渐变大标题（position 动画，兼容性最好） */
+    .flow-text {
+      background-image: linear-gradient(100deg, #f72585, #7209b7, #4361ee, #4cc9f0, #f72585);
+      background-size: 300% 100%;
+      /* 画宽一点，才有位移空间 */
+      -webkit-background-clip: text;
+      /* 兼容写法在前（Safari 只认它） */
+      background-clip: text;
+      /* 标准写法在后（Chrome 120+/FF） */
+      -webkit-text-fill-color: transparent;
+      /* 字形填充透明 → 透出底图 */
+      color: transparent;
+      animation: flow 6s linear infinite;
+      /* 循环流动 */
+    }
+
+    @keyframes flow {
+
+      /* 300% 宽的底图从 0 滑到 100% 再回来；linear + 首尾同色 = 无缝循环 */
+      from {
+        background-position: 0% 50%;
+      }
+
+      to {
+        background-position: 100% 50%;
+      }
+    }
+
+    /* 方案 2：彩虹描边字（双层 text-shadow 不行——描边用两层裁剪文字叠加） */
+    .stroke-text {
+      position: relative;
+      display: inline-block;
+      z-index: 0;
+      /* 关键：创建独立层叠上下文，让 ::before 的负 z-index
+                   只沉到自己文字下方，而不是沉到 section 白底后面 */
+      color: transparent;
+      background: conic-gradient(#f72585, #ffbe0b, #06d6a0, #4cc9f0, #7209b7, #f72585);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* 描边 = 同文字的另一层放到底下，只留 text-stroke；
+     -webkit-text-stroke 是"文字描边"专用属性（前缀属性，全主流支持） */
+    .stroke-text::before {
+      content: attr(data-text);
+      /* 复制一份文字 */
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      -webkit-text-stroke: 6px #101726;
+      /* 粗描边垫底 */
+      -webkit-text-fill-color: transparent;
+      /* 描边层字心透明 */
+    }
+
+    /* 方案 3：渐变消隐字（右端淡出，杂志风） */
+    .fade-text {
+      background-image: linear-gradient(90deg, var(--ink) 40%, transparent 95%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* ================= 区块 2：渐变边框 ================= */
+    .border-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      padding: 18px;
+      border-radius: 14px;
+      background: #fff;
+      font-size: .86rem;
+      color: var(--muted);
+      min-height: 130px;
+    }
+
+    .card b {
+      display: block;
+      color: var(--ink);
+      margin-bottom: 6px;
+      font-size: .95rem;
+    }
+
+    /* 方案 A：border-image——简单直接，但 border-radius 会失效！ */
+    .card-bi {
+      border: 5px solid;
+      border-image: linear-gradient(135deg, #f72585, #4361ee) 1;
+      /* slice=1：把渐变图整块作为边框图。注意：圆角被无视，四角是直角 */
+    }
+
+    /* 方案 B：双层背景法——圆角完美，生产首选 */
+    .card-bg2 {
+      border: 5px solid transparent;
+      /* 先留出边框厚度，颜色透明 */
+      border-radius: 14px;
+      background:
+        linear-gradient(#fff, #fff) padding-box,
+        /* 内层：内容区实色背景 */
+        linear-gradient(135deg, #f72585, #4361ee) border-box;
+      /* 外层：铺到边框区 */
+      /* 两层按顺序绘制：内层盖住外层中心，只露出边框区域一圈渐变 */
+    }
+
+    /* 方案 C：双层背景法 + 动画（@property 动画角度） */
+    .card-bg2-anim {
+      border: 5px solid transparent;
+      border-radius: 14px;
+      background:
+        linear-gradient(#fff, #fff) padding-box,
+        conic-gradient(from var(--angle), #f72585, #ffbe0b, #06d6a0, #4cc9f0, #7209b7, #f72585) border-box;
+      animation: spin-border 4s linear infinite;
+    }
+
+    @keyframes spin-border {
+      to {
+        --angle: 360deg;
+      }
+
+      /* 变量被 @property 注册过 → 浏览器对其插值 → 边框旋转 */
+    }
+
+    /* 不支持 @property 的浏览器：变量不插值，边框静止（优雅降级，不报错） */
+
+    /* ================= 区块 3：渐变动画对照 ================= */
+    .anim-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .panel {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      font-size: .82rem;
+      color: var(--muted);
+    }
+
+    .panel .stagebox {
+      height: 90px;
+      border-radius: 10px;
+      margin: 10px 0;
+    }
+
+    /* 方式 a：background-position 位移（所有支持渐变的浏览器都 OK） */
+    .anim-pos {
+      background-image: linear-gradient(90deg, #4361ee, #4cc9f0, #7209b7, #4361ee);
+      background-size: 300% 100%;
+      animation: slide-pos 3s ease-in-out infinite alternate;
+      /* alternate 来回，避免"瞬移"回起点 */
+    }
+
+    @keyframes slide-pos {
+      from {
+        background-position: 0% 50%;
+      }
+
+      to {
+        background-position: 100% 50%;
+      }
+    }
+
+    /* 方式 b：@property 动画渐变角度（现代浏览器；不支持则静止在初值） */
+    .anim-angle {
+      background-image: linear-gradient(var(--angle), #f72585, #4361ee);
+      animation: spin-angle 3s linear infinite;
+    }
+
+    @keyframes spin-angle {
+      from {
+        --angle: 0deg;
+      }
+
+      to {
+        --angle: 360deg;
+      }
+    }
+
+    .support-note {
+      font-size: .78rem;
+      color: var(--muted);
+    }
+
+    .support-ok {
+      color: #06a77d;
+      font-weight: 600;
+    }
+
+    .support-no {
+      color: #d62828;
+      font-weight: 600;
+    }
+
+    /* 无障碍兜底：减弱动态效果时停掉所有循环动画 */
+    @media (prefers-reduced-motion: reduce) {
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <h1>渐变文字 / 渐变边框 / 渐变动画</h1>
+  <p class="sub">三种文字玩法、三种边框方案、两条动画正路——每一条都注明降级行为。</p>
+
+  <!-- ① 渐变文字 -->
+  <section>
+    <h2>① 渐变文字（background-clip: text）</h2>
+    <div class="tip">
+      原理：<b>把背景图裁剪到字形里</b>，再把文字填充色设为透明。三件套缺一不可：
+      <code>background-clip: text</code>（前缀+标准双写）、
+      <code>-webkit-text-fill-color: transparent</code>、兜底 <code>color</code>。
+    </div>
+    <div class="text-row">
+      <p class="demo-title flow-text">流动渐变大标题：底图 300% 宽，position 循环位移</p>
+      <p class="demo-title"><span class="stroke-text" data-text="彩虹描边字">彩虹描边字</span>&nbsp;— 用 ::before 复制文字垫 stroke 层
+      </p>
+      <p class="demo-title fade-text">右端淡出的消隐字：渐变到 transparent 即可裁掉笔画尾部</p>
+    </div>
+  </section>
+
+  <!-- ② 渐变边框 -->
+  <section>
+    <h2>② 渐变边框：border-image vs 双层背景法</h2>
+    <div class="tip">
+      左卡的直角就是 <code>border-image</code> 的代价——<b>它不支持 border-radius</b>。
+      生产环境圆角卡片一律用双层背景法：<code>padding-box</code> 实色内层盖住
+      <code>border-box</code> 渐变外层的中心，只露出一圈边框。
+    </div>
+    <div class="border-row">
+      <div class="card card-bi">
+        <b>方案 A · border-image</b>
+        <code>border: 5px solid;<br>border-image: linear-gradient(…) 1;</code><br><br>
+        注意四角：被切成<b>直角</b>，border-radius 失效。适合直角设计或大屏氛围条。
+      </div>
+      <div class="card card-bg2">
+        <b>方案 B · 双层背景法（推荐）</b>
+        <code>border: 5px solid transparent;<br>background: 实色 padding-box, 渐变 border-box;</code><br><br>
+        圆角完美、支持多段渐变；唯一成本是 background 声明较啰嗦。
+      </div>
+      <div class="card card-bg2-anim">
+        <b>方案 C · 旋转流光边框</b>
+        conic 渐变角度由 <code>@property</code> 注册的 <code>--angle</code> 驱动，keyframes 里动画该变量。<br><br>
+        不支持 @property 的浏览器边框静止（可接受的优雅降级）。
+      </div>
+    </div>
+  </section>
+
+  <!-- ③ 渐变动画 -->
+  <section>
+    <h2>③ 渐变 + 动画的两条正路</h2>
+    <div class="tip">
+      <code>background-image</code> 是离散值<b>不可过渡</b>。动画渐变只有两条正路：
+      动 <code>background-position</code>（超宽底图位移），或用
+      <code>@property</code> 注册类型化变量后动画变量。
+    </div>
+    <div class="anim-row">
+      <div class="panel">
+        <b>方式 a · position 位移</b>（兼容到渐变本身的支持度）
+        <div class="stagebox anim-pos"></div>
+        底图 300% 宽，动 position；alternate 来回避免循环接缝跳变。
+      </div>
+      <div class="panel">
+        <b>方式 b · @property 动画角度</b>（Chrome 85+ / Safari 16.4+ / Firefox 128+）
+        <div class="stagebox anim-angle"></div>
+        keyframes 直接写 <code>--angle: 360deg</code>；已注册的类型变量会被插值。
+        <p class="support-note" id="propSupport">检测中……</p>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    // 特性检测：@property 是否可用（通过 CSS.registerProperty 存在性近似判断）。
+    // 真实项目里更稳的做法是视觉检测：对比动画前后 getComputedStyle 的变量值。
+    const supported = typeof CSS !== 'undefined' && typeof CSS.registerProperty === 'function';
+    const note = document.getElementById('propSupport');
+    note.innerHTML = supported
+      ? '<span class="support-ok">✔ 当前浏览器支持 @property，上方边框与渐变角度正在平滑旋转</span>'
+      : '<span class="support-no">✘ 当前浏览器不支持 @property——两个"方式 b"样本会静止或跳变，属预期降级</span>';
+
+    // 双保险降级：不支持时停掉依赖 @property 的动画，避免"抽帧"观感
+    if (!supported) {
+      document.querySelectorAll('.card-bg2-anim, .anim-angle').forEach((el) => {
+        el.style.animation = 'none';
+      });
+    }
+  </script>
+</body>
+
+</html>

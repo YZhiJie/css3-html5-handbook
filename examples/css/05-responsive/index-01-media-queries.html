@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 01：媒体查询 / 断点策略 / 视口单位 / clamp 流体排版
+  ------------------------------------------------------------
+  【知识点】
+    1. 移动优先断点：基础样式=最窄屏，min-width 向上增强
+    2. 媒体特性家族：width、orientation、hover、prefers-*
+    3. 视口单位 vw/vh/vmin/vmax 与移动端地址栏坑（100vh vs 100dvh）
+    4. clamp(最小, 首选, 最大) 流体排版：带"固定底座"的公式
+    5. 断点应"内容驱动"而非"设备驱动"
+  【运行方式】
+    双击本文件即可在浏览器中打开；**拖拽浏览器窗口宽度**是
+    本示例的核心玩法，建议拉到最窄再拖到最宽。
+  【效果说明】
+    顶部信息条实时显示视口宽度/当前命中的断点；示例区一个
+    网格随断点在 1/2/4 列间切换；流体标题按 clamp 公式连续
+    缩放（附实时计算读数）；"视口单位演示块"展示 vw/vh 差异；
+    底部说明移动端 100vh 地址栏坑与 dvh 解法。
+  【注意事项】
+    本示例断点故意只设 2 档（48em / 80em），以演示"少断点、
+    多流动"的现代策略——列数切换交给 grid auto-fit 的场景
+    见示例 03。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<!-- 响应式第一行代码：布局视口 = 设备逻辑宽度。缺了它移动端会按
+     980px 虚拟视口渲染再整体缩小，所有媒体查询都会"错位"。
+     注意不要加 user-scalable=no —— 禁止缩放是无障碍红线。 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 01 · 媒体查询与视口单位</title>
+<style>
+  :root {
+    --brand: #4361ee; --accent: #f72585; --ink: #232c3d;
+    --muted: #7c8aa0; --line: #e3e8f1; --bg: #f4f6fb; --card: #fff;
+    /* 流体间距：全局间距也走 clamp，主题治理只改这一处 */
+    --space: clamp(12px, 2vw, 24px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink);
+    padding: var(--space); line-height: 1.65;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 16px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: var(--space); margin-bottom: 16px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 4px; }
+  .tip {
+    font-size: .82rem; color: var(--muted); background: #f1f5ff;
+    border-left: 3px solid var(--brand); padding: 6px 10px; margin: 8px 0 14px;
+    border-radius: 0 6px 6px 0;
+  }
+  code { background: #eef1f8; padding: 1px 5px; border-radius: 4px;
+         font-size: .85em; font-family: ui-monospace, Consolas, monospace; }
+
+  /* ---------- ① 实时视口信息条 ---------- */
+  .vp-bar {
+    position: sticky; top: 8px; z-index: 10;
+    display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+    background: var(--ink); color: #cfe0ff; border-radius: 10px;
+    padding: 8px 14px; font-size: .78rem;
+    font-family: ui-monospace, Consolas, monospace;
+  }
+  .vp-bar b { color: #fff; }
+  .bp-chip { padding: 2px 10px; border-radius: 999px; background: #33405c; }
+  .bp-chip.hit { background: var(--accent); color: #fff; }
+
+  /* ---------- ② 断点网格（移动优先） ---------- */
+  /* 基础样式 = 最窄屏：单列。注意这里没有任何媒体查询——
+     移动优先的本质是"默认态就是手机态" */
+  .bp-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  .bp-grid .cell {
+    background: linear-gradient(135deg, #eef1fb, #dfe6fa);
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px; font-size: .82rem; color: var(--muted); text-align: center;
+  }
+  /* 断点 1：48em（≈768px@16px）。用 em 而不是 px：跟随用户字号，
+     浏览器整体放大时断点行为保持一致 */
+  @media (min-width: 48em) {
+    .bp-grid { grid-template-columns: repeat(2, 1fr); }
+    .bp-grid .cell { padding: 18px; }
+  }
+  /* 断点 2：80em（≈1280px） */
+  @media (min-width: 80em) {
+    .bp-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+  /* hover 特性隔离：没有鼠标的设备（触屏）永远不会"粘住"hover 态 */
+  @media (hover: hover) {
+    .bp-grid .cell:hover { border-color: var(--brand); color: var(--brand); }
+  }
+  /* 横竖屏切换演示 */
+  .orientation-note::after { content: "当前：竖屏 portrait"; }
+  @media (orientation: landscape) {
+    .orientation-note::after { content: "当前：横屏 landscape"; }
+  }
+  .orientation-note { font-size: .8rem; color: var(--muted); }
+
+  /* ---------- ③ clamp 流体标题 ---------- */
+  .fluid-title {
+    /* 公式拆解：
+       首选值 = 1rem（固定底座，保证小屏下限体验）
+              + 5vw（流动部分，每 100px 视口宽增长 5px）
+       范围 = [2rem, 4.5rem]：两端钳制，任何屏宽不失控 */
+    font-size: clamp(2rem, 5vw + 1rem, 4.5rem);
+    font-weight: 800; line-height: 1.15;
+    background: linear-gradient(100deg, var(--accent), var(--brand));
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .fluid-readout { font-size: .78rem; color: var(--muted);
+                   font-family: ui-monospace, Consolas, monospace; }
+
+  /* ---------- ④ 视口单位演示 ---------- */
+  .unit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .unit-box {
+    height: 110px; border-radius: 10px; display: grid; place-items: center;
+    font-size: .78rem; color: #fff; text-align: center;
+    font-family: ui-monospace, Consolas, monospace;
+  }
+  .u-vw  { width: 25vw;  background: #4361ee; }  /* 视口宽的 25% —— 拖窗口它跟着变 */
+  .u-vmin{ width: 34vmin; background: #06d6a0; } /* 短边的 34%：横竖屏切换时观察差异 */
+  .u-vmax{ width: 18vmax; background: #f72585; } /* 长边的 18% */
+  .unit-legend { font-size: .76rem; color: var(--muted); margin-top: 8px; }
+
+  /* ---------- ⑤ 100vh 与 100dvh ---------- */
+  .vh-demo {
+    /* 双写顺序很重要：先写旧单位兜底，再写新单位覆盖——
+       不支持 dvh 的浏览器忽略第二行，支持的用 dvh */
+    height: 100vh;
+    height: 100dvh;
+    max-height: 320px; /* 演示页限制高度，真实项目全屏区块去掉此行 */
+    display: grid; place-items: center;
+    background: linear-gradient(180deg, #4361ee 0%, #7209b7 100%);
+    border-radius: 12px; color: #fff; text-align: center; font-size: .9rem;
+  }
+  /* 真实项目的深色模式适配示范 */
+  @media (prefers-color-scheme: dark) {
+    .tip { background: #1d2434; color: #9db0d0; }
+  }
+</style>
+</head>
+<body>
+<!-- 实时信息条：sticky 悬浮，始终可读 -->
+<div class="vp-bar" id="vpBar">
+  <span>视口宽度：<b id="vpW">–</b>px</span>
+  <span>devicePixelRatio：<b id="vpDpr">–</b></span>
+  <span>断点：</span>
+  <span class="bp-chip" data-bp="base">&lt;48em</span>
+  <span class="bp-chip" data-bp="md">48–80em</span>
+  <span class="bp-chip" data-bp="lg">≥80em</span>
+</div>
+
+<h1 style="margin-top:14px">媒体查询与视口单位</h1>
+<p class="sub">拖拽窗口宽度是本页的玩法——信息条、网格、标题、单位块全部实时响应。</p>
+
+<!-- ① 断点网格 -->
+<section>
+  <h2>① 移动优先断点（48em / 80em 两档）</h2>
+  <div class="tip">
+    基础样式 = 手机单列（无查询）；<code>min-width: 48em</code> 切两列；
+    <code>min-width: 80em</code> 切四列。断点在"设计开始变丑"处插入，而非设备型号表。
+  </div>
+  <div class="bp-grid">
+    <div class="cell">格子 1<br>基础态单列</div>
+    <div class="cell">格子 2<br>≥48em 两列</div>
+    <div class="cell">格子 3<br>≥80em 四列</div>
+    <div class="cell">格子 4<br>hover 仅限真鼠标</div>
+  </div>
+  <p class="orientation-note" style="margin-top:10px"></p>
+</section>
+
+<!-- ② clamp 流体排版 -->
+<section>
+  <h2>② clamp() 流体标题（零断点）</h2>
+  <div class="tip">
+    <code>font-size: clamp(2rem, 5vw + 1rem, 4.5rem)</code> ——
+    1rem 是固定底座、5vw 是流动部分、两端钳制。窗口越宽标题越大，
+    但永远在 [2rem, 4.5rem] 之间。
+  </div>
+  <p class="fluid-title">流体大标题</p>
+  <p class="fluid-readout" id="fluidOut"></p>
+</section>
+
+<!-- ③ 视口单位 -->
+<section>
+  <h2>③ 视口单位：vw / vmin / vmax</h2>
+  <div class="tip">
+    <code>25vw</code> = 视口宽 25%；<code>vmin</code> 取宽高较小者、<code>vmax</code> 取较大者。
+    拖动窗口或旋转设备模拟，观察三种单位的差异。
+  </div>
+  <div class="unit-grid">
+    <div class="unit-box u-vw">width: 25vw</div>
+    <div class="unit-box u-vmin">width: 34vmin</div>
+    <div class="unit-box u-vmax">width: 18vmax</div>
+  </div>
+  <p class="unit-legend">
+    另有高度单位族：vh（基础）、<b>dvh</b>（动态，随移动端地址栏收放）、
+    svh（地址栏展开时最小值）、lvh（地址栏收起时最大值）。
+  </p>
+</section>
+
+<!-- ④ 100vh 坑位演示 -->
+<section>
+  <h2>④ 移动端地址栏坑：100vh vs 100dvh</h2>
+  <div class="tip">
+    iOS Safari 的 <code>100vh</code> 包含被地址栏遮挡的部分——首屏按钮会被顶出屏幕。
+    解法：<code>height: 100vh; height: 100dvh;</code> 双写（旧浏览器用前者，新浏览器用后者）。
+    在 DevTools 设备模拟（iPhone）中对比最明显。
+  </div>
+  <div class="vh-demo">
+    <p><b>height: 100dvh</b><br>真实项目：这是"恰好一屏"的首屏区块<br>（本演示限高 320px）</p>
+  </div>
+</section>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const chips = document.querySelectorAll('.bp-chip');
+
+  // 实时读取视口信息。用 matchMedia 而不是比对 innerWidth 数字——
+  // 与 CSS 断点共享同一套表达式，永远不会"两边不一致"
+  const bpQueries = {
+    lg: matchMedia('(min-width: 80em)'),
+    md: matchMedia('(min-width: 48em)'),
+  };
+
+  function update() {
+    $('vpW').textContent = window.innerWidth;
+    $('vpDpr').textContent = window.devicePixelRatio;
+
+    // 断点芯片高亮
+    const bp = bpQueries.lg.matches ? 'lg' : bpQueries.md.matches ? 'md' : 'base';
+    chips.forEach((c) => c.classList.toggle('hit', c.dataset.bp === bp));
+
+    // clamp 实时读数：演示"首选值公式"的当前取值
+    const vw = window.innerWidth;
+    const preferred = 0.05 * vw + 16; // 5vw + 1rem（1rem=16px）
+    const clamped = Math.min(72, Math.max(32, preferred)); // [2rem, 4.5rem]
+    $('fluidOut').textContent =
+      `当前 5vw+1rem = ${preferred.toFixed(1)}px → 钳制后 = ${clamped.toFixed(1)}px（范围 32px ~ 72px）`;
+  }
+
+  // resize 时合并到下一帧执行（rAF 节流），避免高频重排
+  let ticking = false;
+  window.addEventListener('resize', () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => { update(); ticking = false; });
+  });
+  update();
+</script>
+</body>
+</html>

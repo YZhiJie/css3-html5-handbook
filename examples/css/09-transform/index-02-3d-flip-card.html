@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 02：3D 翻转卡片（perspective / preserve-3d / backface-visibility）
+  ------------------------------------------------------------
+  【知识点】
+    1. 3D 三件套的分工：perspective（透视）→ transform-style:
+       preserve-3d（保留子元素 3D 关系）→ backface-visibility（藏背面）
+    2. perspective 写在父级（共享灭点）vs 写成变换函数（各自灭点）
+    3. perspective-origin：灭点位置改变"观察角度"
+    4. 翻转卡结构：场景层 / 翻转层 / 正反两面
+    5. preserve-3d 被拍平的元凶：overflow/filter/opacity<1
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    区块 1：三张翻转卡（hover 翻转 / 点击翻转 / 垂直翻转）；
+    区块 2：透视实验台——拖滑杆调 perspective 数值与灭点位置，
+    同一个旋转 30° 的卡片呈现从"鱼眼"到"近平面"的变化；
+    区块 3："拍平实验"：三张同样结构的 3D 卡，分别叠加
+    overflow / filter / 正常，对比 3D 效果是否失效。
+  【注意事项】
+    移动端没有 hover：真实项目用点击切换 class（第二张卡的做法）。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 02 · 3D 翻转卡片</title>
+<style>
+  :root {
+    --brand: #4361ee; --accent: #f72585; --ink: #232c3d;
+    --muted: #7c8aa0; --line: #e3e8f1; --bg: #f4f6fb; --card: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.65;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 4px; }
+  h3 { font-size: .92rem; margin: 12px 0 8px; }
+  .tip {
+    font-size: .82rem; color: var(--muted); background: #f1f5ff;
+    border-left: 3px solid var(--brand); padding: 6px 10px; margin: 8px 0 14px;
+    border-radius: 0 6px 6px 0;
+  }
+  code { background: #eef1f8; padding: 1px 5px; border-radius: 4px;
+         font-size: .85em; font-family: ui-monospace, Consolas, monospace; }
+  button {
+    padding: 8px 16px; border: 0; border-radius: 8px; cursor: pointer;
+    background: var(--brand); color: #fff; font-size: .84rem;
+  }
+  button.ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  .row { display: grid; grid-template-columns: 150px 1fr 58px; align-items: center; gap: 8px;
+         font-size: .82rem; margin-bottom: 8px; }
+  .row output { font-family: ui-monospace, Consolas, monospace; color: var(--brand); text-align: right; font-size: .76rem; }
+  input[type="range"] { accent-color: var(--brand); width: 100%; }
+
+  /* ============ 翻转卡通用结构（三层：场景 → 翻转层 → 面） ============ */
+  .flip-scene  { perspective: 900px; }          /* ① 舞台给透视：所有卡共享灭点 */
+  .flip-card {
+    width: 200px; height: 270px;
+    cursor: pointer;
+  }
+  .flip-inner {
+    position: relative; width: 100%; height: 100%;
+    transform-style: preserve-3d;               /* ② 内部保留 3D：正反两面同处一个空间 */
+    transition: transform .7s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .flip-face {
+    position: absolute; inset: 0;
+    backface-visibility: hidden;                /* ③ 背对观察者时隐藏 */
+    -webkit-backface-visibility: hidden;        /* Safari 老版本需要前缀，双写最稳 */
+    border-radius: 14px;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    gap: 8px; padding: 18px; text-align: center;
+  }
+  .face-front { background: #fff; border: 1px solid var(--line); }
+  .face-back  { background: linear-gradient(150deg, var(--brand), #7209b7); color: #fff;
+                transform: rotateY(180deg); }   /* 背面预翻 180°：整体翻过来时刚好朝前 */
+  .flip-face .avatar {
+    width: 72px; height: 72px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 1.6rem; color: #fff;
+  }
+  .flip-face h4 { font-size: 1rem; }
+  .flip-face p { font-size: .78rem; color: var(--muted); }
+  .face-back p { color: rgba(255,255,255,.85); }
+
+  /* 卡 1：hover 翻转（桌面端习惯） */
+  .hover-flip:hover .flip-inner { transform: rotateY(180deg); }
+
+  /* 卡 2：点击翻转（移动端友好：JS 切 class） */
+  .clicked .flip-inner { transform: rotateY(180deg); }
+
+  /* 卡 3：垂直翻转（rotateX）+ 点击触发 */
+  .flip-x.clicked-x .flip-inner { transform: rotateX(180deg); }
+  .flip-x .face-back { transform: rotateX(180deg); } /* 垂直版的背面预翻用 rotateX */
+
+  /* ============ 透视实验台 ============ */
+  .persp-stage {
+    height: 240px; display: grid; place-items: center;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: repeating-linear-gradient(45deg, #f6f8ff 0 12px, #fbfcff 12px 24px);
+  }
+  .persp-box {
+    width: 120px; height: 120px; border-radius: 14px;
+    background: conic-gradient(from 30deg, var(--brand), #4cc9f0, var(--accent), var(--brand));
+    transform: rotateY(30deg) rotateX(8deg);
+    /* perspective 由 JS 写在舞台的 style 上（作为父级属性） */
+  }
+
+  /* ============ 拍平实验 ============ */
+  .flatten-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  .mini-scene { perspective: 600px; text-align: center; }
+  .mini-card {
+    position: relative; width: 140px; height: 100px; margin: 0 auto;
+    transform-style: preserve-3d;
+    transition: transform .8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .mini-scene:hover .mini-card { transform: rotateY(150deg); } /* 翻过头一点，背面应该露脸 */
+  .mini-face {
+    position: absolute; inset: 0; border-radius: 10px;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    display: grid; place-items: center; font-size: .8rem;
+  }
+  .mini-front { background: #e9edf8; color: var(--muted); }
+  .mini-back  { background: var(--brand); color: #fff; transform: rotateY(180deg); }
+  .mini-scene p { font-size: .72rem; color: var(--muted); margin-top: 8px; }
+
+  /* 元凶演示：overflow:hidden 与 filter 都会强制打平 preserve-3d */
+  .flat-overflow .mini-card { overflow: hidden; }
+  .flat-filter   .mini-card { filter: drop-shadow(0 6px 10px rgba(0,0,0,.2)); }
+</style>
+</head>
+<body>
+<h1>3D 翻转卡片</h1>
+<p class="sub">perspective 给深度、preserve-3d 保结构、backface-visibility 藏背面——三层结构缺一不可。</p>
+
+<!-- ① 三张翻转卡 -->
+<section>
+  <h2>① 三种翻转：hover / 点击 / 垂直</h2>
+  <div class="tip">
+    结构公式：<code>.scene{perspective} &gt; .inner{preserve-3d; transition} &gt; .front/.back{backface-visibility:hidden}</code>，
+    背面多写一句 <code>transform: rotateY(180deg)</code> 预翻。
+  </div>
+  <div style="display:flex; gap:22px; flex-wrap:wrap; justify-content:center">
+    <!-- 卡 1：hover 翻转 -->
+    <div class="flip-scene">
+      <div class="flip-card hover-flip">
+        <div class="flip-inner">
+          <div class="flip-face face-front">
+            <div class="avatar" style="background:#4361ee">🧑‍💻</div>
+            <h4>林小码</h4><p>前端工程师<br>悬停翻转 →</p>
+          </div>
+          <div class="flip-face face-back">
+            <h4>关于我</h4>
+            <p>写了 8 年 CSS，最爱的属性是 transform——因为它从不惊动文档流。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 卡 2：点击翻转（移动端友好） -->
+    <div class="flip-scene">
+      <div class="flip-card" id="tapCard">
+        <div class="flip-inner">
+          <div class="flip-face face-front">
+            <div class="avatar" style="background:#f72585">🎨</div>
+            <h4>点击翻转</h4><p>触屏设备没有 hover，点击切换 class 是通用方案</p>
+          </div>
+          <div class="flip-face face-back">
+            <h4>翻过来了！</h4>
+            <p>再点一次翻回去。transition 写在 .flip-inner 上，正反程共用。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 卡 3：垂直翻转 -->
+    <div class="flip-scene">
+      <div class="flip-card flip-x" id="flipXCard">
+        <div class="flip-inner">
+          <div class="flip-face face-front">
+            <div class="avatar" style="background:#06d6a0">🔄</div>
+            <h4>垂直翻转</h4><p>rotateX 绕水平轴转<br>点击体验 →</p>
+          </div>
+          <div class="flip-face face-back">
+            <h4>rotateX(180deg)</h4>
+            <p>背面预翻同样换成 rotateX。两轴可以组合出斜向翻页。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ② 透视实验台 -->
+<section>
+  <h2>② perspective 数值与灭点位置实验台</h2>
+  <div class="tip">
+    perspective = <b>观察者到屏幕的距离</b>：小（如 300px）近大远小极夸张，
+    大（如 2400px）接近平行投影。<b>perspective-origin</b> 是灭点位置——
+    把它移到左上角，卡片就像被"从右下方看"。
+  </div>
+  <div class="row">
+    <label for="persp">perspective</label>
+    <input id="persp" type="range" min="200" max="2400" step="50" value="900">
+    <output id="perspOut">900px</output>
+  </div>
+  <div class="row">
+    <label for="pox">origin X</label>
+    <input id="pox" type="range" min="0" max="100" step="1" value="50">
+    <output id="poxOut">50%</output>
+  </div>
+  <div class="row">
+    <label for="poy">origin Y</label>
+    <input id="poy" type="range" min="0" max="100" step="1" value="50">
+    <output id="poyOut">50%</output>
+  </div>
+  <div class="persp-stage" id="perspStage">
+    <div class="persp-box"></div>
+  </div>
+  <div class="code-out" id="perspCode" style="margin-top:10px">perspective: 900px; perspective-origin: 50% 50%;</div>
+</section>
+
+<!-- ③ 拍平实验 -->
+<section>
+  <h2>③ "拍平实验"：什么会杀死 preserve-3d</h2>
+  <div class="tip">
+    三张迷你卡结构相同，悬停时都应翻转 150°（露出背面）。但第二张加了
+    <code>overflow: hidden</code>、第三张加了 <code>filter</code>——
+    两者都会把 preserve-3d <b>强制打平</b>，3D 失效后背面永远朝里。
+  </div>
+  <div class="flatten-grid">
+    <div class="mini-scene">
+      <div class="mini-card">
+        <div class="mini-face mini-front">正常 · preserve-3d</div>
+        <div class="mini-face mini-back">✔ 3D 生效</div>
+      </div>
+      <p>对照组：一切正常</p>
+    </div>
+    <div class="mini-scene flat-overflow">
+      <div class="mini-card">
+        <div class="mini-face mini-front">overflow: hidden</div>
+        <div class="mini-face mini-back">✘ 被拍平</div>
+      </div>
+      <p>overflow 强制 flat → 只能正转，看不到背面</p>
+    </div>
+    <div class="mini-scene flat-filter">
+      <div class="mini-card">
+        <div class="mini-face mini-front">filter: drop-shadow</div>
+        <div class="mini-face mini-back">✘ 被拍平</div>
+      </div>
+      <p>filter 同样触发打平 → 想要阴影就放到场景层</p>
+    </div>
+  </div>
+  <h3>修复思路</h3>
+  <p style="font-size:.84rem;color:var(--muted)">
+    需要裁剪或滤镜时，把属性挪到<b>不参与 3D 的外层</b>（如 .mini-scene 上加 filter），
+    或用 <code>clip-path</code> 替代 overflow（clip-path 不拍平 3D）。
+  </p>
+</section>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- 卡 2 / 卡 3：点击翻转 ----------
+  $('tapCard').addEventListener('click', () => $('tapCard').classList.toggle('clicked'));
+  $('flipXCard').addEventListener('click', () => $('flipXCard').classList.toggle('clicked-x'));
+
+  // ---------- 透视实验台：参数写入舞台元素 ----------
+  const stage = $('perspStage');
+  function applyPersp() {
+    const p = $('persp').value + 'px';
+    const ox = $('pox').value + '%', oy = $('poy').value + '%';
+    stage.style.perspective = p;                 // 父级 perspective 作用于所有子元素
+    stage.style.perspectiveOrigin = ox + ' ' + oy; // 灭点位置
+    $('perspOut').value = p; $('poxOut').value = ox; $('poyOut').value = oy;
+    $('perspCode').textContent =
+      `/* 写在父级（舞台）上，子元素共享灭点 */\nperspective: ${p};\nperspective-origin: ${ox} ${oy};\n\n/* 对照：写成变换函数则每个元素独立灭点 */\ntransform: perspective(${p}) rotateY(30deg);`;
+  }
+  ['persp', 'pox', 'poy'].forEach((id) => $(id).addEventListener('input', applyPersp));
+  applyPersp();
+</script>
+</body>
+</html>

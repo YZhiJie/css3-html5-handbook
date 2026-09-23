@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 01：linear-gradient / radial-gradient 参数实验台
+  ------------------------------------------------------------
+  【知识点】
+    1. linear-gradient：角度（0deg 向上、顺时针增大）、to 方向关键词、
+       多色标、双位置色标（hard-stop 条纹）
+    2. radial-gradient：形状（circle/ellipse）、尺寸关键字
+       （farthest-corner/side、closest-corner/side）、中心位置 at
+    3. 色标省略时的均分规则；双位置写法 `red 0 30%` 的含义
+    4. hard-stop：两色标位置相同 → 插值区间为 0 → 锐利分界
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    上半部：linear 实验台——拖角度滑杆、增删色标、开启"条纹模式"
+    （自动生成等距 hard-stop），实时看到渐变与生成的 CSS 代码；
+    下半部：radial 实验台——切换形状/尺寸关键字、拖动中心点
+    （在预览图上点击移动），观察等色线如何从圆/椭圆向外扩展。
+  【注意事项】
+    to top right 与 45deg 不等价：关键词方向的轴线会平移到
+    "穿过中心且垂直于对角"，长方形上色带更宽，可切换对比。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>示例 01 · linear / radial 渐变实验台</title>
+  <style>
+    :root {
+      --brand: #4361ee;
+      --accent: #f72585;
+      --ink: #232c3d;
+      --muted: #7c8aa0;
+      --line: #e3e8f1;
+      --bg: #f4f6fb;
+      --card: #fff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      padding: 24px;
+      line-height: 1.65;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 4px;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: .9rem;
+      margin-bottom: 18px;
+    }
+
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+
+    h2 {
+      font-size: 1.05rem;
+      margin-bottom: 10px;
+    }
+
+    .tip {
+      font-size: .82rem;
+      color: var(--muted);
+      background: #f1f5ff;
+      border-left: 3px solid var(--brand);
+      padding: 6px 10px;
+      margin-bottom: 14px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    code {
+      background: #eef1f8;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: .85em;
+      font-family: ui-monospace, Consolas, monospace;
+    }
+
+    .lab {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 18px;
+    }
+
+    @media (max-width: 760px) {
+      .lab {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ---------- 控制台通用控件 ---------- */
+    .ctl {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 96px 1fr 56px;
+      align-items: center;
+      gap: 8px;
+      font-size: .82rem;
+    }
+
+    .row output {
+      font-family: ui-monospace, Consolas, monospace;
+      color: var(--brand);
+      text-align: right;
+      font-size: .76rem;
+    }
+
+    input[type="range"] {
+      accent-color: var(--brand);
+      width: 100%;
+    }
+
+    select {
+      width: 100%;
+      padding: 5px 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      font-size: .82rem;
+      color: var(--ink);
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .84rem;
+    }
+
+    .check input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--brand);
+    }
+
+    .code-out {
+      margin-top: 10px;
+      padding: 9px 11px;
+      border-radius: 9px;
+      background: #101726;
+      color: #cfe0ff;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: .74rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* ---------- 预览舞台 ---------- */
+    .preview {
+      height: 260px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      cursor: crosshair;
+      /* radial 模式下点击可移动中心 */
+    }
+
+    .preview-label {
+      font-size: .78rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* ---------- 色标列表 ---------- */
+    .stops {
+      display: grid;
+      gap: 6px;
+    }
+
+    .stop {
+      display: grid;
+      grid-template-columns: 30px 1fr 58px 26px;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .stop input[type="color"] {
+      width: 30px;
+      height: 26px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0;
+      background: none;
+      cursor: pointer;
+    }
+
+    .stop input[type="range"] {
+      accent-color: var(--brand);
+      width: 100%;
+    }
+
+    .stop button {
+      width: 24px;
+      height: 24px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--accent);
+      cursor: pointer;
+      font-size: .9rem;
+      line-height: 1;
+    }
+
+    .add-stop {
+      padding: 6px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      background: #fbfcff;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: .8rem;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>linear / radial 渐变实验台</h1>
+  <p class="sub">拖参数、加色标、开条纹——所有变化实时反映在预览与生成的 CSS 代码里。</p>
+
+  <!-- ① linear-gradient 实验台 -->
+  <section>
+    <h2>① linear-gradient 实验台</h2>
+    <div class="tip">
+      角度以 <b>0deg = 向上、顺时针增大</b>（90deg 向右）。勾选<b>条纹模式</b>后，
+      色标会按等距 hard-stop 生成（相邻两色位置相同 → 锐利分界），这是画条纹的全部原理。
+    </div>
+    <div class="lab">
+      <div class="ctl">
+        <div class="row">
+          <label for="angle">角度 angle</label>
+          <input id="angle" type="range" min="0" max="360" step="1" value="90">
+          <output id="angleOut">90deg</output>
+        </div>
+        <div class="row">
+          <label for="kwDir">方向关键词</label>
+          <select id="kwDir">
+            <option value="">不使用（用角度）</option>
+            <option value="to right">to right</option>
+            <option value="to bottom">to bottom</option>
+            <option value="to top right">to top right（对比 45deg）</option>
+          </select>
+          <span></span>
+        </div>
+        <label class="check">
+          <input type="checkbox" id="stripe"> 条纹模式（hard-stop 等距条纹）
+        </label>
+        <label class="check">
+          <input type="checkbox" id="wide" checked> 双位置色标写法（red 0 30%）
+        </label>
+        <div class="stops" id="stops"></div>
+        <button class="add-stop" id="addStop">＋ 添加色标</button>
+        <div class="code-out" id="linCode"></div>
+      </div>
+      <div>
+        <div class="preview" id="linPreview"></div>
+        <div class="preview-label">预览：随左侧参数实时更新（渐变没有固有尺寸，天然铺满容器并随其缩放）</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ② radial-gradient 实验台 -->
+  <section>
+    <h2>② radial-gradient 实验台（点击预览图移动中心）</h2>
+    <div class="tip">
+      尺寸关键字决定"最后一个色标落在哪"：<code>farthest-corner</code>（默认）延伸到最远的角、
+      <code>closest-side</code> 只到最近的边（做局部光斑常用）。形状切换 circle / ellipse
+      观察等色线是"同心圆"还是"贴着盒子比例的同心椭圆"。
+    </div>
+    <div class="lab">
+      <div class="ctl">
+        <div class="row">
+          <label for="rShape">形状 shape</label>
+          <select id="rShape">
+            <option value="ellipse" selected>ellipse（椭圆，默认）</option>
+            <option value="circle">circle（正圆）</option>
+          </select>
+          <span></span>
+        </div>
+        <div class="row">
+          <label for="rSize">尺寸 size</label>
+          <select id="rSize">
+            <option value="farthest-corner" selected>farthest-corner</option>
+            <option value="farthest-side">farthest-side</option>
+            <option value="closest-corner">closest-corner</option>
+            <option value="closest-side">closest-side</option>
+          </select>
+          <span></span>
+        </div>
+        <div class="row">
+          <label for="rX">中心 X</label>
+          <input id="rX" type="range" min="0" max="100" step="1" value="50">
+          <output id="rXOut">50%</output>
+        </div>
+        <div class="row">
+          <label for="rY">中心 Y</label>
+          <input id="rY" type="range" min="0" max="100" step="1" value="50">
+          <output id="rYOut">50%</output>
+        </div>
+        <label class="check">
+          <input type="checkbox" id="rRings"> 同心环模式（repeating）
+        </label>
+        <div class="code-out" id="radCode"></div>
+      </div>
+      <div>
+        <div class="preview" id="radPreview"></div>
+        <div class="preview-label">预览：点击任意位置把渐变中心移过去（中心点坐标写入 at x% y%）</div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    // ================= ① linear-gradient 实验台 =================
+    // 色标数据源：颜色 + 位置(%)。渲染与 CSS 生成都从这份数据派生。
+    let stops = [
+      { color: '#f72585', pos: 0 },
+      { color: '#7209b7', pos: 50 },
+      { color: '#4cc9f0', pos: 100 },
+    ];
+
+    function renderStops() {
+      const box = $('stops');
+      box.innerHTML = '';
+      stops.forEach((s, i) => {
+        const row = document.createElement('div');
+        row.className = 'stop';
+        row.innerHTML = `
+        <input type="color" value="${s.color}" data-i="${i}">
+        <input type="range" min="0" max="100" step="1" value="${s.pos}" data-i="${i}">
+        <output>${s.pos}%</output>
+        <button title="删除该色标" data-i="${i}">×</button>`;
+        box.appendChild(row);
+      });
+    }
+
+    // 生成 linear-gradient 字符串。
+    // stripe 模式：把色标改写为等距 hard-stop（i/n ~ (i+1)/n），colors 保留原色相。
+    function buildLinear() {
+      const useKw = $('kwDir').value;
+      const dir = useKw || $('angle').value + 'deg';
+      let colorStops;
+      if ($('stripe').checked) {
+        const n = stops.length;
+        // 条纹 = 每色占 1/n，双位置写法保证边界锐利
+        colorStops = stops.map((s, i) => `${s.color} ${(i / n * 100).toFixed(1)}% ${((i + 1) / n * 100).toFixed(1)}%`).join(', ');
+      } else if ($('wide').checked) {
+        // 双位置写法：同色拉成色带（red 0 30%），比重复列两个色标简洁
+        colorStops = stops.map((s, i) => `${s.color} ${s.pos}% ${s.pos}%`).join(', ');
+      } else {
+        colorStops = stops.map((s) => `${s.color} ${s.pos}%`).join(', ');
+      }
+      return `linear-gradient(${dir}, ${colorStops})`;
+    }
+
+    function applyLinear() {
+      const g = buildLinear();
+      $('linPreview').style.background = g;
+      $('linCode').textContent = `background: ${g};`;
+    }
+
+    // 事件委托：色标行的颜色/位置/删除操作
+    $('stops').addEventListener('input', (e) => {
+      const i = +e.target.dataset.i;
+      if (e.target.type === 'color') stops[i].color = e.target.value;
+      if (e.target.type === 'range') stops[i].pos = +e.target.value;
+      renderStops(); applyLinear();
+    });
+    $('stops').addEventListener('click', (e) => {
+      if (e.target.tagName !== 'BUTTON') return;
+      if (stops.length <= 2) return; // 渐变至少要 2 个色标
+      stops.splice(+e.target.dataset.i, 1);
+      renderStops(); applyLinear();
+    });
+    $('addStop').addEventListener('click', () => {
+      // 新色标取现有色标平均值，避免突兀；位置取最大位置向后顺延
+      const last = stops[stops.length - 1];
+      stops.push({ color: last.color, pos: Math.min(100, last.pos === 100 ? 100 : last.pos + 20) });
+      renderStops(); applyLinear();
+    });
+    $('angle').addEventListener('input', () => { $('angleOut').value = $('angle').value + 'deg'; applyLinear(); });
+    $('kwDir').addEventListener('change', applyLinear);
+    $('stripe').addEventListener('change', applyLinear);
+    $('wide').addEventListener('change', applyLinear);
+
+    // ================= ② radial-gradient 实验台 =================
+    function buildRadial() {
+      const shape = $('rShape').value, size = $('rSize').value;
+      const at = `at ${$('rX').value}% ${$('rY').value}%`;
+      if ($('rRings').checked) {
+        // 同心环：repeating + 双位置 hard-stop，周期 18%
+        return `repeating-radial-gradient(${shape} ${size} ${at},\n  #4361ee 0 6%, #ffffff 6% 12%)`;
+      }
+      // 三段透明光斑：中心亮 → 边缘透明（0%中心色 70%透明，等色线即同心圆/椭圆）
+      return `radial-gradient(${shape} ${size} ${at},\n  #4361ee 0%, #7b8cf5 40%, #dfe6ff 70%, transparent 100%)`;
+    }
+
+    function applyRadial() {
+      $('rXOut').value = $('rX').value + '%';
+      $('rYOut').value = $('rY').value + '%';
+      const g = buildRadial();
+      const p = $('radPreview');
+      p.style.background = '#eef2fb';            // 底色（transparent 段透出的颜色）
+      p.style.backgroundImage = g.replace(/\n\s*/g, ' '); // 渐变图（平铺/尺寸由表达式自含）
+      $('radCode').textContent = `background: ${g.replace(/\n\s*/g, ' ')};`;
+    }
+
+    // 点击预览图 → 把点击位置换算成百分比写入中心点。
+    // getBoundingClientRect 是唯一可靠手段（预览宽度会随窗口变化）
+    $('radPreview').addEventListener('click', (e) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      $('rX').value = Math.round((e.clientX - rect.left) / rect.width * 100);
+      $('rY').value = Math.round((e.clientY - rect.top) / rect.height * 100);
+      applyRadial();
+    });
+    ['rShape', 'rSize'].forEach((id) => $(id).addEventListener('change', applyRadial));
+    ['rX', 'rY'].forEach((id) => $(id).addEventListener('input', applyRadial));
+    $('rRings').addEventListener('change', applyRadial);
+
+    renderStops(); applyLinear(); applyRadial(); // 初始化
+  </script>
+</body>
+
+</html>

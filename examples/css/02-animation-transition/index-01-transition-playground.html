@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 01：transition 全参数实验台 + 缓动函数可视化
+  ------------------------------------------------------------
+  【知识点】
+    1. transition 四要素：property / duration / timing-function / delay
+    2. cubic-bezier(x1,y1,x2,y2) 曲线可视化：曲线即"时间→进度"映射
+    3. steps(n, start|end) 阶梯缓动：start 先跳 / end 后跳的区别
+    4. hover 触发 vs class 切换触发；transition-property 显式声明的意义
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    左侧是参数控制台：拖动滑杆调节时长/延迟，选择预设曲线或自定义
+    贝塞尔，点击"播放"按钮观察方块运动；中间是贝塞尔曲线实时绘制
+    （蓝点为控制点）；下方是 steps() 对比跑道：四个小球分别用
+    linear / steps(6,start) / steps(6,end) / ease 跑完同一段路程。
+  【注意事项】
+    示例动画全部只使用 transform（合成器动画），不触碰 width/left
+    等布局属性；自定义贝塞尔的 y 值可超出 [0,1] 制造回弹。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 01 · transition 参数实验台</title>
+<style>
+  :root {
+    --brand: #4361ee; --accent: #f72585; --ink: #232c3d;
+    --muted: #7c8aa0; --line: #e3e8f1; --bg: #f4f6fb; --card: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.65;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 10px; }
+  .tip {
+    font-size: .82rem; color: var(--muted); background: #f1f5ff;
+    border-left: 3px solid var(--brand); padding: 6px 10px; margin-bottom: 14px;
+    border-radius: 0 6px 6px 0;
+  }
+  code { background: #eef1f8; padding: 1px 5px; border-radius: 4px;
+         font-size: .85em; font-family: ui-monospace, Consolas, monospace; }
+
+  /* ---------- 实验台布局：左控制台，右舞台 ---------- */
+  .lab { display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
+  @media (max-width: 760px) { .lab { grid-template-columns: 1fr; } }
+
+  .ctl { display: grid; gap: 10px; align-content: start; }
+  .row { display: grid; grid-template-columns: 108px 1fr 58px; align-items: center; gap: 8px; font-size: .84rem; }
+  .row output { font-family: ui-monospace, Consolas, monospace; color: var(--brand); text-align: right; font-size: .78rem; }
+  input[type="range"] { accent-color: var(--brand); width: 100%; }
+  select {
+    width: 100%; padding: 6px 8px; border: 1px solid var(--line);
+    border-radius: 8px; background: #fff; font-size: .84rem; color: var(--ink);
+  }
+  .presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .presets button {
+    padding: 6px 4px; font-size: .76rem; border: 1px solid var(--line);
+    background: #f8fafd; border-radius: 8px; cursor: pointer; color: var(--ink);
+  }
+  .presets button:hover { border-color: var(--brand); color: var(--brand); }
+  .play {
+    margin-top: 6px; padding: 10px; border: 0; border-radius: 10px;
+    background: var(--brand); color: #fff; font-size: .9rem; cursor: pointer;
+  }
+  .play:hover { background: #3450d4; }
+
+  /* 舞台：跑道 + 方块。方块用 transform: translateX() 位移，
+     transition 的参数由 JS 实时写入 */
+  .stage { position: relative; }
+  .track {
+    position: relative; height: 120px; border-radius: 12px;
+    background: repeating-linear-gradient(90deg, #f0f3fa 0 24px, #e9edf7 24px 25px);
+    overflow: hidden;
+  }
+  .box {
+    position: absolute; left: 16px; top: 50%; margin-top: -28px;
+    width: 56px; height: 56px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--brand), #738aec);
+    display: grid; place-items: center; color: #fff; font-size: .72rem;
+    /* JS 会写入：transition: transform <dur>s <ease> <delay>s */
+  }
+  .stage .readout {
+    margin-top: 10px; font-family: ui-monospace, Consolas, monospace;
+    font-size: .78rem; color: var(--muted); word-break: break-all;
+  }
+
+  /* ---------- 贝塞尔曲线可视化画布 ---------- */
+  .curve-wrap { display: grid; grid-template-columns: 220px 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 700px) { .curve-wrap { grid-template-columns: 1fr; } }
+  canvas { width: 100%; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+  .curve-note { font-size: .84rem; color: var(--muted); }
+  .curve-note b { color: var(--ink); }
+
+  /* ---------- steps() 对比跑道 ---------- */
+  .lanes { display: grid; gap: 14px; margin-top: 6px; }
+  .lane { position: relative; height: 44px; background: #f0f3fa; border-radius: 10px; overflow: hidden; }
+  .lane .label {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    font-size: .74rem; color: var(--muted); z-index: 1;
+    font-family: ui-monospace, Consolas, monospace;
+  }
+  .lane .runner {
+    position: absolute; left: 0; top: 50%; margin-top: -12px;
+    width: 24px; height: 24px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), #b5179e);
+    /* 位移距离由 CSS 变量 --dist 控制；缓动由各自类指定 */
+    transform: translateX(var(--dist, 0px));
+  }
+  /* 四条跑道四种缓动：同一段路程、同一时长，节奏截然不同 */
+  .r-linear { transition: transform 3s linear; }
+  .r-steps-start { transition: transform 3s steps(6, start); }
+  .r-steps-end { transition: transform 3s steps(6, end); }
+  .r-ease { transition: transform 3s ease; }
+
+  .lane-btns { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .lane-btns button {
+    padding: 8px 16px; border: 0; border-radius: 8px; cursor: pointer;
+    background: var(--ink); color: #fff; font-size: .84rem;
+  }
+  .lane-btns .reset { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+
+  /* 无障碍：系统开启"减弱动态效果"时压缩所有过渡（真实项目必备兜底） */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+<h1>transition 参数实验台</h1>
+<p class="sub">拖动参数 → 点击播放，观察方块运动节奏；贝塞尔曲线即"时间 → 进度"的映射函数。</p>
+
+<!-- 实验台：控制台 + 舞台 -->
+<section>
+  <h2>① 参数实验台（transition 全四要素）</h2>
+  <div class="tip">
+    方块的位移使用 <code>transform: translateX()</code>（合成器动画）；<br>
+    过渡声明由 JS 拼装写入，注意观察下方 <code>transition: …</code> 实时生成的代码。
+  </div>
+  <div class="lab">
+    <!-- 左：控制台 -->
+    <div class="ctl">
+      <div class="row">
+        <label for="dur">时长 duration</label>
+        <input id="dur" type="range" min="0.1" max="3" step="0.1" value="1.2">
+        <output id="durOut">1.2s</output>
+      </div>
+      <div class="row">
+        <label for="delay">延迟 delay</label>
+        <input id="delay" type="range" min="0" max="2" step="0.1" value="0">
+        <output id="delayOut">0.0s</output>
+      </div>
+      <div class="row">
+        <label for="ease">缓动函数</label>
+        <select id="ease">
+          <option value="linear">linear（匀速）</option>
+          <option value="ease" selected>ease（默认）</option>
+          <option value="ease-in">ease-in（慢进）</option>
+          <option value="ease-out">ease-out（慢出）</option>
+          <option value="ease-in-out">ease-in-out（两端慢）</option>
+          <option value="steps(6, end)">steps(6, end)</option>
+          <option value="cubic-bezier(0.22, 1, 0.36, 1)">bezier(0.22,1,0.36,1) 收尾</option>
+          <option value="custom">自定义贝塞尔 ↓</option>
+        </select>
+        <span></span>
+      </div>
+      <!-- 自定义贝塞尔四个控制点坐标：x 必须在 [0,1]，y 可越界制造回弹 -->
+      <div class="row">
+        <label for="bx1">bezier x1</label>
+        <input id="bx1" type="range" min="0" max="1" step="0.01" value="0.34">
+        <output id="bx1Out">0.34</output>
+      </div>
+      <div class="row">
+        <label for="by1">bezier y1</label>
+        <input id="by1" type="range" min="-0.5" max="1.5" step="0.01" value="1.56">
+        <output id="by1Out">1.56</output>
+      </div>
+      <div class="row">
+        <label for="bx2">bezier x2</label>
+        <input id="bx2" type="range" min="0" max="1" step="0.01" value="0.64">
+        <output id="bx2Out">0.64</output>
+      </div>
+      <div class="row">
+        <label for="by2">bezier y2</label>
+        <input id="by2" type="range" min="-0.5" max="1.5" step="0.01" value="1">
+        <output id="by2Out">1.00</output>
+      </div>
+      <!-- 常用预设曲线：一线开发的高频选择 -->
+      <div class="presets">
+        <button data-p="0.22,1,0.36,1">收尾丝滑</button>
+        <button data-p="0.34,1.56,0.64,1">回弹过冲</button>
+        <button data-p="0.4,0,0.2,1">Material</button>
+      </div>
+      <button class="play" id="play">▶ 播放（触发一次往返）</button>
+    </div>
+
+    <!-- 右：舞台 -->
+    <div class="stage">
+      <div class="track"><div class="box" id="box">GO</div></div>
+      <div class="readout" id="readout"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 贝塞尔可视化：把抽象的缓动函数画出来 -->
+<section>
+  <h2>② 缓动曲线可视化</h2>
+  <div class="curve-wrap">
+    <canvas id="curve" width="440" height="440"></canvas>
+    <div class="curve-note">
+      <b>怎么读这张图</b>：横轴是<b>时间进度</b>（0→1），纵轴是<b>属性进度</b>（0→1）。
+      实际值 = 起点 + (终点 − 起点) × 纵坐标。曲线越陡，该时刻变化越快。<br><br>
+      两个控制点（蓝点）就是 <code>cubic-bezier(x1,y1,x2,y2)</code> 的参数——
+      <b>x 必须</b>落在 [0,1]（否则浏览器报错忽略），<b>y 可以越界</b>：
+      y&gt;1 会先冲过终点再回落（回弹），y&lt;0 会先反向再前进（蓄力感）。
+      <br><br>对比参照：灰色虚线为 linear（对角直线）。
+    </div>
+  </div>
+</section>
+
+<!-- steps 对比跑道：直观理解 start / end 的差别 -->
+<section>
+  <h2>③ steps() 阶梯缓动对比跑道</h2>
+  <div class="tip">
+    同一段路、同样 3 秒：<code>linear</code> 匀速滑行；<code>steps(6,start)</code>
+    <b>时间一到立刻跳</b>（首帧即新值）；<code>steps(6,end)</code> <b>时间走完才跳</b>
+    （首帧保持旧值）。逐帧动画/打字机用 <code>end</code> 更自然。
+  </div>
+  <div class="lanes">
+    <div class="lane"><span class="label">linear</span><div class="runner r-linear"></div></div>
+    <div class="lane"><span class="label">steps(6, start)</span><div class="runner r-steps-start"></div></div>
+    <div class="lane"><span class="label">steps(6, end)</span><div class="runner r-steps-end"></div></div>
+    <div class="lane"><span class="label">ease</span><div class="runner r-ease"></div></div>
+  </div>
+  <div class="lane-btns">
+    <button id="race">▶ 出发</button>
+    <button id="raceReset" class="reset">↩ 归位</button>
+  </div>
+</section>
+
+<script>
+  // ============ 实验台：参数读取与写入 ============
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    dur: $('dur'), delay: $('delay'), ease: $('ease'),
+    bx1: $('bx1'), by1: $('by1'), bx2: $('bx2'), by2: $('by2'),
+    box: $('box'), readout: $('readout'),
+  };
+
+  // 当前缓动值：select 选内置项时直接用其 value；选"自定义"时拼贝塞尔
+  function easeValue() {
+    if (els.ease.value !== 'custom') return els.ease.value;
+    return `cubic-bezier(${els.bx1.value}, ${els.by1.value}, ${els.bx2.value}, ${els.by2.value})`;
+  }
+
+  // 把四个参数拼成完整 transition 声明写进元素。
+  // 关键点：只过渡 transform 一个属性——显式声明比 all 更可控、更可预期。
+  function applyTransition() {
+    const css = `transform ${els.dur.value}s ${easeValue()} ${els.delay.value}s`;
+    els.box.style.transition = css;
+    els.readout.textContent = `/* 当前声明 */ .box { transition: ${css}; }`;
+    drawCurve(); // 缓动变了，曲线图同步重画
+  }
+
+  // 播放 = 改一次属性值触发"去"，动画结束后再改回来触发"回"。
+  // 用 transform 而不是 left：位移完全发生在合成器线程。
+  function play() {
+    // 强制回流读取一次，确保"先应用新 transition 声明再变更属性"，
+    // 否则连续两次修改会被浏览器合并、看不出参数差异
+    void els.box.offsetWidth;
+    els.box.style.transform = `translateX(${innerWidth > 760 ? 340 : 160}px)`;
+    const total = (parseFloat(els.dur.value) + parseFloat(els.delay.value)) * 1000;
+    setTimeout(() => { els.box.style.transform = 'translateX(0px)'; }, total + 300);
+  }
+
+  // 滑杆与下拉变化 → 实时回显数值 + 重新写入过渡声明
+  ['dur', 'delay', 'bx1', 'by1', 'bx2', 'by2'].forEach((k) => {
+    els[k].addEventListener('input', () => { $(k + 'Out').value = els[k].value; applyTransition(); });
+  });
+  els.ease.addEventListener('change', () => {
+    // 自定义模式下才显示贝塞尔四滑杆区域（简化：始终可见，仅更新曲线）
+    applyTransition();
+  });
+  $('play').addEventListener('click', play);
+  // 预设按钮：一键写入四个贝塞尔控制点
+  document.querySelectorAll('.presets button').forEach((b) => {
+    b.addEventListener('click', () => {
+      const [x1, y1, x2, y2] = b.dataset.p.split(',');
+      els.bx1.value = x1; els.by1.value = y1; els.bx2.value = x2; els.by2.value = y2;
+      ['bx1', 'by1', 'bx2', 'by2'].forEach((k) => $(k + 'Out').value = els[k].value);
+      els.ease.value = 'custom';
+      applyTransition(); play();
+    });
+  });
+
+  // ============ 贝塞尔曲线绘制（Canvas 自绘，零依赖） ============
+  const cv = $('curve'), ctx = cv.getContext('2d');
+  const PAD = 40; // 画布内边距：为坐标轴与刻度留白
+
+  function drawCurve() {
+    const W = cv.width, H = cv.height;
+    const x1 = +els.bx1.value, y1 = +els.by1.value, x2 = +els.bx2.value, y2 = +els.by2.value;
+    // 物理坐标 → 画布像素坐标；y 取反（画布向下为正），
+    // 并把 y 放大到 [-0.6, 1.6] 视野，让越界的回弹部分可见
+    const px = (x) => PAD + x * (W - PAD * 2);
+    const py = (y) => H - PAD - (y + 0.6) / 2.2 * (H - PAD * 2);
+
+    ctx.clearRect(0, 0, W, H);
+
+    // 网格与坐标轴：浅色格线帮助读数
+    ctx.strokeStyle = '#eef1f8';
+    for (let i = 0; i <= 10; i++) {
+      ctx.beginPath(); ctx.moveTo(px(i / 10), py(-0.6)); ctx.lineTo(px(i / 10), py(1.6)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(px(0), py(i / 10)); ctx.lineTo(px(1), py(i / 10)); ctx.stroke();
+    }
+    // linear 参照线（对角虚线）
+    ctx.strokeStyle = '#c9d2e3'; ctx.setLineDash([5, 5]);
+    ctx.beginPath(); ctx.moveTo(px(0), py(0)); ctx.lineTo(px(1), py(1)); ctx.stroke();
+    ctx.setLineDash([]);
+    // 坐标轴
+    ctx.strokeStyle = '#9aa7bd';
+    ctx.beginPath(); ctx.moveTo(px(0), py(-0.6)); ctx.lineTo(px(0), py(1.6)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px(0), py(0)); ctx.lineTo(px(1), py(0)); ctx.stroke();
+
+    // 贝塞尔曲线：canvas 的 bezierCurveTo 正好与 CSS 的 cubic-bezier 同构
+    ctx.strokeStyle = '#4361ee'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(px(0), py(0));
+    ctx.bezierCurveTo(px(x1), py(y1), px(x2), py(y2), px(1), py(1));
+    ctx.stroke();
+    ctx.lineWidth = 1;
+
+    // 控制点与辅助线
+    ctx.strokeStyle = '#b9c4dd';
+    ctx.beginPath(); ctx.moveTo(px(0), py(0)); ctx.lineTo(px(x1), py(y1)); ctx.lineTo(px(x2), py(y2)); ctx.lineTo(px(1), py(1)); ctx.stroke();
+    [[x1, y1], [x2, y2]].forEach(([cx, cy]) => {
+      ctx.fillStyle = '#f72585';
+      ctx.beginPath(); ctx.arc(px(cx), py(cy), 7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#7c8aa0'; ctx.font = '16px monospace';
+      ctx.fillText(`(${cx}, ${cy})`, px(cx) + 10, py(cy) - 10);
+    });
+    // 端点
+    ctx.fillStyle = '#232c3d';
+    ctx.beginPath(); ctx.arc(px(0), py(0), 5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(px(1), py(1), 5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // ============ steps 对比跑道 ============
+  $('race').addEventListener('click', () => {
+    void document.body.offsetWidth; // 强制回流，确保归位状态已生效
+    document.querySelectorAll('.runner').forEach((r) => {
+      // 跑道宽度减去球宽，作为位移距离写入 CSS 变量
+      r.style.setProperty('--dist', (r.parentElement.clientWidth - 34) + 'px');
+    });
+  });
+  $('raceReset').addEventListener('click', () => {
+    document.querySelectorAll('.runner').forEach((r) => r.style.setProperty('--dist', '0px'));
+  });
+
+  applyTransition(); // 初始化：写入默认参数并画出曲线
+</script>
+</body>
+</html>

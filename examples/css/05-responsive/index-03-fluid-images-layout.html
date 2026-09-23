@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：响应式图片（srcset/sizes/picture）+ 常用响应式布局模式
+  ------------------------------------------------------------
+  【知识点】
+    1. srcset 的 w 描述符 + sizes 声明：浏览器按"显示宽度 × DPR"选图
+    2. picture + source 的 art direction：不同视口换不同构图/格式
+    3. 本示例为满足"零网络依赖"用内联 SVG data URI 模拟不同分辨率
+       的图片文件；真实项目的完整写法见页面内注释
+    4. aspect-ratio 固定占位防 CLS（布局抖动）
+    5. 布局模式：auto-fit 自适应卡片 / 圣杯布局 / 粘性侧栏 / 
+       堆叠到并排的"内容优先"模式
+  【运行方式】
+    双击本文件即可在浏览器中打开；拖拽窗口宽度观察：
+    图片提示文字会告诉你"当前浏览器会选择哪个文件"；
+    布局模式区随宽度从堆叠到多列。
+  【效果说明】
+    区块 1：srcset/sizes 演示（SVG 模拟 400/800/1600w 三档，
+    每档颜色和角标不同，能直观看出浏览器选中了哪个）；
+    区块 2：picture 宽幅/方形构图切换；区块 3：四种布局模式。
+  【注意事项】
+    DevTools 的 Network 面板才能看到真实请求；页面上我们用
+    getComputedStyle 的经验公式模拟浏览器的选择逻辑做提示。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 03 · 响应式图片与布局模式</title>
+<style>
+  :root {
+    --brand: #4361ee; --accent: #f72585; --ink: #232c3d;
+    --muted: #7c8aa0; --line: #e3e8f1; --bg: #f4f6fb; --card: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.65;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 4px; }
+  h3 { font-size: .92rem; margin: 14px 0 8px; }
+  .tip {
+    font-size: .82rem; color: var(--muted); background: #f1f5ff;
+    border-left: 3px solid var(--brand); padding: 6px 10px; margin: 8px 0 14px;
+    border-radius: 0 6px 6px 0;
+  }
+  code { background: #eef1f8; padding: 1px 5px; border-radius: 4px;
+         font-size: .85em; font-family: ui-monospace, Consolas, monospace; }
+
+  /* ---------- ① 响应式图片 ---------- */
+  /* aspect-ratio：提前锁定宽高比 —— 图片未加载时占位不塌，
+     加载后不跳动（CLS 是 Core Web Vitals 硬指标） */
+  .img-frame {
+    width: 100%; aspect-ratio: 2 / 1;
+    border-radius: 12px; overflow: hidden;
+    background: #eef1f8;          /* 加载前的占位色 */
+    display: grid; place-items: center;
+  }
+  .img-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .img-hint { font-size: .78rem; color: var(--muted); margin-top: 8px;
+              font-family: ui-monospace, Consolas, monospace; }
+  .img-hint b { color: var(--brand); }
+
+  /* 两种构图并排：桌面看宽幅 / 手机看方形（picture 切换的实际效果） */
+  .art-row { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  @media (min-width: 640px) { .art-row { grid-template-columns: 2fr 1fr; } }
+  .art-frame { aspect-ratio: 16/6; border-radius: 10px; overflow: hidden; }
+  .art-frame.square { aspect-ratio: 1; }
+
+  /* ---------- ② 布局模式 ---------- */
+  .pattern { margin-bottom: 22px; }
+
+  /* 模式 1：auto-fit 自适应卡片 —— 不写断点，列数由空间决定 */
+  .auto-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  .auto-cards .mini {
+    background: linear-gradient(150deg, #eef1fb, #dfe6fa);
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 10px; text-align: center; font-size: .78rem; color: var(--muted);
+  }
+
+  /* 模式 2：圣杯布局 —— 三栏：侧栏 / 主区 / 附加栏，窄屏折叠 */
+  .holy {
+    display: grid;
+    /* 中间主区 minmax(0,1fr)：min-width:0 防止内容撑爆（grid 安全带） */
+    grid-template-areas: "head head head" "nav main side" "foot foot foot";
+    grid-template-columns: 180px minmax(0, 1fr) 200px;
+    gap: 10px;
+  }
+  .holy > div {
+    border-radius: 10px; padding: 12px; font-size: .8rem;
+    background: #eef1fb; color: var(--muted); border: 1px solid var(--line);
+  }
+  .holy .h-head { grid-area: head; background: #4361ee; color: #fff; }
+  .holy .h-nav  { grid-area: nav; }
+  .holy .h-main { grid-area: main; background: #fbfcff; min-height: 90px; }
+  .holy .h-side { grid-area: side; }
+  .holy .h-foot { grid-area: foot; }
+  /* 窄屏折叠：单列堆叠，导航置顶 */
+  @media (max-width: 47.99em) {
+    .holy {
+      grid-template-areas: "head" "nav" "main" "side" "foot";
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* 模式 3：粘性侧栏 —— 桌面侧栏 sticky 跟随，窄屏取消 */
+  .sticky-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 12px; }
+  @media (max-width: 47.99em) { .sticky-wrap { grid-template-columns: 1fr; } }
+  .sticky-side {
+    align-self: start;
+    position: sticky; top: 12px;          /* 滚动时吸附在视口顶部 */
+    background: #fff7ed; border: 1px solid #fed7aa;
+    border-radius: 10px; padding: 12px; font-size: .78rem; color: #9a3412;
+  }
+  @media (max-width: 47.99em) { .sticky-side { position: static; } } /* 窄屏取消吸附 */
+  .sticky-main {
+    background: #fbfcff; border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px; font-size: .8rem; color: var(--muted);
+    height: 220px; /* 拉长主区制造滚动空间（演示 sticky 用） */
+  }
+
+  /* 模式 4：内容优先堆叠 → 并排（图文混排的最常用模式） */
+  .media-obj {
+    display: flex; flex-direction: column; gap: 12px;   /* 窄屏：图上文下 */
+    padding: 12px; border: 1px solid var(--line); border-radius: 10px;
+    background: #fbfcff; font-size: .8rem; color: var(--muted);
+  }
+  @media (min-width: 40em) {
+    .media-obj { flex-direction: row; align-items: center; } /* 宽屏：图左文右 */
+    .media-obj .thumb { flex: 0 0 160px; }
+  }
+  .media-obj .thumb {
+    aspect-ratio: 4/3; border-radius: 8px;
+    background: linear-gradient(135deg, var(--brand), #4cc9f0);
+  }
+</style>
+</head>
+<body>
+<h1>响应式图片与布局模式</h1>
+<p class="sub">图片按需加载 + 四种最常用的响应式布局模式，全部可拖窗口验证。</p>
+
+<!-- ① srcset / sizes -->
+<section>
+  <h2>① srcset + sizes：分辨率自适应</h2>
+  <div class="tip">
+    三档图片（400w / 800w / 1600w）颜色不同——<b>拖窗口宽度</b>，
+    下方提示会显示浏览器当前的选图逻辑（显示宽度 × DPR → 选最小够用的档）。
+    本示例用 SVG data URI 模拟图片文件；真实项目写法见代码注释。
+  </div>
+  <div class="img-frame">
+    <!-- 真实项目写法（文件为 jpg/avif）：
+      <img srcset="shoe-400.jpg 400w, shoe-800.jpg 800w, shoe-1600.jpg 1600w"
+           sizes="(min-width: 1024px) 60vw, 100vw"
+           src="shoe-800.jpg" alt="跑鞋" width="800" height="400">
+      sizes 告诉浏览器"这张图最终显示多宽"：≥1024px 视口占 60% 宽，否则全宽。
+      浏览器再用 显示宽 × devicePixelRatio 找到最小的够用文件。 -->
+    <img
+      srcset="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1600' height='800'><rect width='1600' height='800' fill='%23f72585'/><text x='50%25' y='50%25' font-size='120' fill='white' text-anchor='middle' dominant-baseline='middle'>1600w 档</text></svg> 1600w,
+             data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='400'><rect width='800' height='400' fill='%234361ee'/><text x='50%25' y='50%25' font-size='80' fill='white' text-anchor='middle' dominant-baseline='middle'>800w 档</text></svg> 800w,
+             data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='200'><rect width='400' height='200' fill='%2306d6a0'/><text x='50%25' y='50%25' font-size='52' fill='white' text-anchor='middle' dominant-baseline='middle'>400w 档</text></svg> 400w"
+      sizes="(min-width: 1024px) 60vw, 100vw"
+      src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='400'><rect width='800' height='400' fill='%234361ee'/><text x='50%25' y='50%25' font-size='80' fill='white' text-anchor='middle' dominant-baseline='middle'>800w 档</text></svg>"
+      alt="分辨率自适应演示图" width="800" height="400">
+  </div>
+  <p class="img-hint" id="srcsetHint">计算中……</p>
+</section>
+
+<!-- ② picture art direction -->
+<section>
+  <h2>② picture：构图自适应（art direction）</h2>
+  <div class="tip">
+    <code>picture</code> 的 <code>source</code> 从上到下匹配第一个命中的媒体条件。
+    下面左侧是"宽幅构图"（≥640px 时主位显示），右侧是"方形构图"（窄屏时全宽显示）——
+    真实项目里这是<b>两个不同的裁切文件</b>，不是 CSS 裁剪。
+  </div>
+  <div class="art-row">
+    <div>
+      <div class="img-frame art-frame">
+        <!-- 真实项目写法：
+          <picture>
+            <source media="(min-width: 640px)" srcset="banner-wide.avif" type="image/avif">
+            <source media="(min-width: 640px)" srcset="banner-wide.jpg">
+            <img src="banner-square.jpg" alt="促销 Banner">
+          </picture> -->
+        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='300'><rect width='800' height='300' fill='%237209b7'/><text x='50%25' y='50%25' font-size='64' fill='white' text-anchor='middle' dominant-baseline='middle'>宽幅构图 16:6</text></svg>"
+             alt="宽幅 Banner" width="800" height="300">
+      </div>
+      <p class="img-hint">≥640px 视口：宽幅构图占据主位（信息在两侧延伸）</p>
+    </div>
+    <div>
+      <div class="img-frame art-frame square">
+        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><rect width='400' height='400' fill='%23f72585'/><text x='50%25' y='46%25' font-size='52' fill='white' text-anchor='middle' dominant-baseline='middle'>方形构图</text><text x='50%25' y='58%25' font-size='30' fill='white' text-anchor='middle' dominant-baseline='middle'>&lt;640px 全宽显示</text></svg>"
+             alt="方形 Banner" width="400" height="400">
+      </div>
+      <p class="img-hint">&lt;640px 视口：换成方形构图（主体居中不被裁掉）</p>
+    </div>
+  </div>
+</section>
+
+<!-- ③ 布局模式 -->
+<section>
+  <h2>③ 四种常用响应式布局模式</h2>
+
+  <div class="pattern">
+    <h3>模式 1 · auto-fit 自适应卡片（零断点）</h3>
+    <div class="auto-cards">
+      <div class="mini">卡片</div><div class="mini">卡片</div><div class="mini">卡片</div>
+      <div class="mini">卡片</div><div class="mini">卡片</div><div class="mini">卡片</div>
+    </div>
+    <p style="font-size:.76rem;color:var(--muted);margin-top:6px">
+      <code>repeat(auto-fit, minmax(150px, 1fr))</code>：每张卡最窄 150px，
+      放得下几列就几列——拖窗口看列数连续变化，一行断点都没写。
+    </p>
+  </div>
+
+  <div class="pattern">
+    <h3>模式 2 · 圣杯布局（≤48em 折叠为单列）</h3>
+    <div class="holy">
+      <div class="h-head">头部 header</div>
+      <div class="h-nav">导航 nav</div>
+      <div class="h-main">主区 main · minmax(0,1fr) 防撑爆</div>
+      <div class="h-side">附加 side</div>
+      <div class="h-foot">页脚 footer</div>
+    </div>
+  </div>
+
+  <div class="pattern">
+    <h3>模式 3 · 粘性侧栏（窄屏取消 sticky）</h3>
+    <div class="sticky-wrap">
+      <div class="sticky-main">
+        主内容区（本块拉长以制造滚动空间）。<br><br>
+        滚动页面时右侧"摘要卡"会吸附在视口顶部 12px 处；
+        窗口窄于 48em 时取消吸附、回到普通文档流。
+      </div>
+      <div class="sticky-side">📌 摘要卡：position: sticky; top: 12px<br>（≤48em 改为 static）</div>
+    </div>
+  </div>
+
+  <div class="pattern">
+    <h3>模式 4 · 图文混排：堆叠 → 并排</h3>
+    <div class="media-obj">
+      <div class="thumb"></div>
+      <div>
+        <b style="color:var(--ink)">窄屏图上文下，宽屏图左文右。</b><br>
+        只有一条媒体查询：flex-direction 在 40em 处切换。
+        配合 aspect-ratio 的占位缩略图，加载全程零跳动。
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // ---------- srcset 选图模拟器 ----------
+  // 浏览器的真实算法：目标宽 = sizes 求值结果 × DPR，在候选集中选
+  // "第一个 ≥ 目标宽"的档位（近似说明，实际还考虑带宽等启发式）。
+  const hint = document.getElementById('srcsetHint');
+  function updateHint() {
+    // sizes="(min-width: 1024px) 60vw, 100vw" 的求值
+    const displayW = window.innerWidth >= 1024 ? window.innerWidth * 0.6 : window.innerWidth;
+    const target = displayW * window.devicePixelRatio; // 需要的物理像素宽
+    const picks = target <= 400 ? '400w（绿色）' : target <= 800 ? '800w（蓝色）' : '1600w（粉色）';
+    hint.innerHTML =
+      `视口 ${window.innerWidth}px × DPR ${window.devicePixelRatio} → ` +
+      `显示宽约 <b>${Math.round(displayW)}px</b> → 目标物理宽 <b>${Math.round(target)}px</b> → 选 <b>${picks}</b> 档` +
+      `（真实项目打开 Network 面板可看到浏览器实际只下载这一个文件）`;
+  }
+  let t = false;
+  window.addEventListener('resize', () => {
+    if (t) return;
+    t = true;
+    requestAnimationFrame(() => { updateHint(); t = false; }); // rAF 节流
+  });
+  updateHint();
+</script>
+</body>
+</html>

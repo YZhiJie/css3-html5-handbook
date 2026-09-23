@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：动画触发方式大全 + 性能对照 + 无障碍开关
+  ------------------------------------------------------------
+  【知识点】
+    1. 三种触发方式：:hover 伪类 / class 切换（JS 控制）/ 
+       IntersectionObserver 进入视口触发（滚动入场）
+    2. 动画性能对照：改 left（layout）vs 改 transform（composite）
+    3. 布局抖动（layout thrashing）：读写交替 vs 批处理读写
+    4. will-change 的正确用法：动画前提升、动画后回收
+    5. prefers-reduced-motion 无障碍兜底 + 模拟开关
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    区块 1：三张卡片分别演示 hover / 按钮 class 切换 / 滚动入场触发；
+    区块 2：两条"赛跑"轨道分别用 left 与 translateX 移动，
+    打开 DevTools Performance 面板录制可对比 reflow 差异；
+    区块 3：点击按钮现场演示"循环读写"造成的布局抖动并给出
+    批处理修正版（带耗时读数）；区块 4：无障碍开关模拟。
+  【注意事项】
+    IntersectionObserver 只在支持该 API 的浏览器中生效（Chrome 51+ /
+    Safari 12.1+），不支持时示例会自动降级为"页面加载即显示"。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 03 · 触发方式与动画性能</title>
+<style>
+  :root {
+    --brand: #4361ee; --accent: #f72585; --ok: #06d6a0; --warn: #ff9f1c;
+    --ink: #232c3d; --muted: #7c8aa0; --line: #e3e8f1; --bg: #f4f6fb; --card: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.65;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 4px; }
+  h3 { font-size: .95rem; margin: 14px 0 8px; }
+  .tip {
+    font-size: .82rem; color: var(--muted); background: #f1f5ff;
+    border-left: 3px solid var(--brand); padding: 6px 10px; margin: 8px 0 14px;
+    border-radius: 0 6px 6px 0;
+  }
+  code { background: #eef1f8; padding: 1px 5px; border-radius: 4px;
+         font-size: .85em; font-family: ui-monospace, Consolas, monospace; }
+  button {
+    padding: 8px 16px; border: 0; border-radius: 8px; cursor: pointer;
+    background: var(--brand); color: #fff; font-size: .84rem;
+  }
+  button.ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  /* ================= 区块 1：三种触发方式 ================= */
+  .triggers { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+  .trigger-card {
+    border: 1px solid var(--line); border-radius: 12px; padding: 14px;
+    background: #fbfcff; min-height: 190px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .trigger-card h3 { margin: 0; font-size: .9rem; }
+  .trigger-card .hint { font-size: .78rem; color: var(--muted); flex: 1; }
+  .chip {
+    align-self: center; padding: 10px 18px; border-radius: 999px;
+    background: var(--brand); color: #fff; font-size: .86rem;
+    transition: transform .25s cubic-bezier(0.34, 1.56, 0.64, 1),
+                background-color .25s ease;   /* 显式列出：不给意外属性"连坐" */
+  }
+
+  /* 触发方式 1：纯 CSS hover——状态在"指针进入/离开"时自动来回 */
+  .hover-demo:hover .chip { transform: scale(1.15) rotate(-4deg); background: var(--accent); }
+
+  /* 触发方式 2：JS 切换 class——适合"点击按钮/业务事件"驱动 */
+  .flip { transform: rotateY(180deg) !important; transition: transform .6s cubic-bezier(0.4, 0, 0.2, 1); }
+  .flip-btn { perspective: 400px; } /* 父级给透视，子元素的 rotateY 才有 3D 感 */
+
+  /* 触发方式 3：进入视口触发——初始隐藏，加 .is-inview 后过渡进场 */
+  .reveal {
+    opacity: 0;
+    transform: translateY(22px);
+    /* transition 同时声明 opacity/transform，入场时二者的变化被补间 */
+    transition: opacity .6s ease, transform .6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .reveal.is-inview { opacity: 1; transform: none; }
+  /* JS 不可用 / IO 不支持时的兜底：直接可见，内容永不丢失（渐进增强） */
+  .no-io .reveal, .no-js .reveal { opacity: 1; transform: none; }
+
+  /* 长滚动区：制造"需要滚一下才能看到第三张卡"的场景 */
+  .scroll-spacer { height: 46vh; display: grid; place-items: center; color: var(--muted); font-size: .84rem; }
+
+  /* ================= 区块 2：layout vs composite 赛跑 ================= */
+  .race-track {
+    position: relative; height: 56px; margin-bottom: 10px; border-radius: 10px;
+    background: repeating-linear-gradient(90deg, #f0f3fa 0 28px, #e8edf8 28px 29px);
+    overflow: hidden;
+  }
+  .race-runner {
+    position: absolute; top: 10px; width: 36px; height: 36px; border-radius: 10px;
+  }
+  /* 反面教材：动画 left 属于 layout 属性 → 每帧重排 */
+  .runner-left { left: 0; background: var(--warn); transition: left 2s linear; }
+  /* 正确做法：transform 属于 composite 属性 → 只动合成层 */
+  .runner-transform { left: 0; background: var(--ok); transition: transform 2s linear; }
+
+  /* ================= 区块 3：布局抖动演示 ================= */
+  .thrash-bars { display: flex; align-items: flex-end; gap: 8px; height: 130px; margin-top: 10px; }
+  .thrash-bars i {
+    width: 34px; border-radius: 6px 6px 0 0; background: linear-gradient(180deg, #738aec, var(--brand));
+    min-height: 6px;
+  }
+  .perf-readout {
+    font-family: ui-monospace, Consolas, monospace; font-size: .8rem;
+    color: var(--muted); margin-top: 8px; min-height: 1.4em;
+  }
+
+  /* ================= 区块 4：will-change 与 reduced-motion ================= */
+  .demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .will-change-box {
+    padding: 14px; border-radius: 12px; background: #fbfcff; border: 1px solid var(--line);
+    text-align: center; font-size: .8rem; color: var(--muted);
+  }
+  .will-change-box .sprite {
+    width: 54px; height: 54px; margin: 8px auto; border-radius: 14px;
+    background: conic-gradient(from 30deg, var(--brand), #4cc9f0, var(--accent), var(--brand));
+  }
+  /* will-change 写法对照：左盒在动画期间声明提升，右盒不声明；
+     高频动画下打开 Layers 面板可以看到左盒独立成层 */
+  .lifted .sprite { will-change: transform; }
+  .spin-active .sprite { animation: spin 1.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .rm-switch { display: flex; align-items: center; gap: 10px; font-size: .86rem; }
+  .rm-switch input { width: 18px; height: 18px; accent-color: var(--brand); }
+
+  /* 模拟"减弱动态效果"：勾选后给根节点加 .force-reduce 类，
+     与真实的 @media (prefers-reduced-motion: reduce) 等效，方便演示 */
+  .force-reduce *, .force-reduce *::before, .force-reduce *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  /* 真实的无障碍兜底（跟随系统设置） */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+<h1>动画触发方式与性能对照</h1>
+<p class="sub">hover / class / IntersectionObserver 三种触发；layout 与 composite 两条赛道；布局抖动现场演示。</p>
+
+<!-- ① 三种触发方式 -->
+<section>
+  <h2>① 三种触发方式</h2>
+  <div class="tip">
+    <b>hover</b>：纯 CSS、双向自动；<b>class 切换</b>：JS 控制时机，最常用；
+    <b>IntersectionObserver</b>：滚动到可视区才触发，营销页/信息流入场的标配。
+    第三张卡在下方空白区——<b>向下滚动</b>即可看到它入场。
+  </div>
+  <div class="triggers">
+    <!-- 方式 1：hover 触发 -->
+    <div class="trigger-card hover-demo">
+      <h3>方式 1 · :hover（纯 CSS）</h3>
+      <p class="hint">把指针移到卡片任意位置，胶囊放大变色；移开后自动回弹。状态由 CSS 引擎托管，零 JS。</p>
+      <span class="chip">悬停我</span>
+    </div>
+    <!-- 方式 2：class 切换触发 -->
+    <div class="trigger-card flip-btn">
+      <h3>方式 2 · class 切换（JS）</h3>
+      <p class="hint">点击按钮切换 <code>flip</code> 类，卡片沿 Y 轴翻转；再点一次翻回。适合业务事件驱动的状态机。</p>
+      <span class="chip" id="flipChip">翻转</span>
+      <button class="ghost" id="flipBtn">↻ 切换 class</button>
+    </div>
+    <!-- 方式 3：进入视口触发 -->
+    <div class="trigger-card reveal" id="ioCard">
+      <h3>方式 3 · IntersectionObserver</h3>
+      <p class="hint">此卡片初始 <code>opacity:0; translateY(22px)</code>，滚动进入视口 15% 后由 IO 回调加 <code>is-inview</code> 类。</p>
+      <span class="chip">我来自视口之外 👋</span>
+    </div>
+  </div>
+  <div class="scroll-spacer">↓ 往下滚动，观察第三张卡的入场（如果刚加载时已可见，说明它已在视口内直接触发了）</div>
+</section>
+
+<!-- ② layout vs composite 赛跑 -->
+<section>
+  <h2>② 性能对照：动 left（重排）vs 动 transform（合成）</h2>
+  <div class="tip">
+    两条轨道时长相同、路程相同。区别只在被动画的属性：
+    <code>left</code> 每帧触发 Layout→Paint；<code>transform</code> 只更新合成层的矩阵，
+    由 GPU 完成。用 DevTools → Performance 录制对比，橙色轨道每帧都有紫色的 Layout 条。
+  </div>
+  <h3 style="color:var(--warn)">反面：transition: left（每帧重排）</h3>
+  <div class="race-track"><div class="race-runner runner-left" id="rLeft"></div></div>
+  <h3 style="color:var(--ok)">正面：transition: transform（仅合成）</h3>
+  <div class="race-track"><div class="race-runner runner-transform" id="rTransform"></div></div>
+  <div class="btn-row">
+    <button id="raceStart">▶ 同时出发</button>
+    <button id="raceReset" class="ghost">↩ 归位</button>
+  </div>
+</section>
+
+<!-- ③ 布局抖动演示 -->
+<section>
+  <h2>③ 布局抖动（layout thrashing）现场演示</h2>
+  <div class="tip">
+    同一个循环里<b>交替"读 offsetHeight → 写 height"</b>会强制浏览器每次读都同步重排；
+    修正法是<b>读写分离</b>：先批量读完，再批量写。点击两个按钮对比耗时与柱状图动画。
+  </div>
+  <div class="btn-row">
+    <button id="thrashBtn" style="background:var(--warn)">⚠ 反面：读写交替（40 次）</button>
+    <button id="batchBtn" style="background:var(--ok)">✔ 正面：批量读写（40 次）</button>
+  </div>
+  <div class="thrash-bars" id="bars"></div>
+  <div class="perf-readout" id="perfOut">点击按钮开始（8 根柱子会被循环改高度）</div>
+</section>
+
+<!-- ④ will-change 与无障碍 -->
+<section>
+  <h2>④ will-change 用法对照 + prefers-reduced-motion 模拟</h2>
+  <div class="demo-grid">
+    <div class="will-change-box lifted">
+      <div class="sprite" id="spinLifted"></div>
+      声明了 <code>will-change: transform</code><br>（点按钮开转，提前成层）
+      <div class="btn-row" style="justify-content:center;margin-top:8px">
+        <button class="ghost" id="liftBtn">开转 / 停转</button>
+      </div>
+    </div>
+    <div class="will-change-box">
+      <div class="sprite" id="spinPlain"></div>
+      未声明 will-change<br>（首次转动时才提升，可能有轻微顿挫）
+      <div class="btn-row" style="justify-content:center;margin-top:8px">
+        <button class="ghost" id="plainBtn">开转 / 停转</button>
+      </div>
+    </div>
+  </div>
+  <h3>无障碍开关模拟</h3>
+  <div class="rm-switch">
+    <input type="checkbox" id="rmChk">
+    <label for="rmChk">模拟系统"减弱动态效果"（勾选后所有动画瞬时完成——等效于 <code>prefers-reduced-motion: reduce</code>）</label>
+  </div>
+</section>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- ① 触发方式 ----------
+  // 方式 2：点击按钮切换 class（事件驱动状态机）
+  $('flipBtn').addEventListener('click', () => {
+    $('flipChip').classList.toggle('flip');
+  });
+
+  // 方式 3：IntersectionObserver 进入视口触发入场
+  (function initIO() {
+    const card = $('ioCard');
+    // 特性检测：不支持 IO 时给根节点加 no-io 类，卡片直接可见（渐进增强）
+    if (!('IntersectionObserver' in window)) {
+      document.documentElement.classList.add('no-io');
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;      // 只关心"进入"
+        entry.target.classList.add('is-inview');
+        io.unobserve(entry.target);             // 入场只做一次，防止反复触发
+      });
+    }, {
+      threshold: 0.15,                 // 露出 15% 才算进入
+      rootMargin: '0px 0px -40px 0px', // 底部收 40px：略微"晚一点"触发更自然
+    });
+    io.observe(card);
+  })();
+
+  // ---------- ② 赛跑 ----------
+  $('raceStart').addEventListener('click', () => {
+    void document.body.offsetWidth; // 先应用归位状态，避免上一次过渡被合并
+    const dist = $('rLeft').parentElement.clientWidth - 46;
+    $('rLeft').style.left = dist + 'px';             // 动 left：每帧 Layout
+    $('rTransform').style.transform = `translateX(${dist}px)`; // 动 transform：仅合成
+  });
+  $('raceReset').addEventListener('click', () => {
+    $('rLeft').style.left = '0px';
+    $('rTransform').style.transform = 'translateX(0px)';
+  });
+
+  // ---------- ③ 布局抖动演示 ----------
+  const barsBox = $('bars');
+  // 初始化 8 根柱子：随机高度
+  const barEls = Array.from({ length: 8 }, () => {
+    const bar = document.createElement('i');
+    bar.style.height = (30 + Math.random() * 90) + 'px';
+    barsBox.appendChild(bar);
+    return bar;
+  });
+
+  // 反面模式：循环里读一次、写一次 → 每次读都触发强制同步重排。
+  // 柱子越多、页面越复杂，这里耗时会呈线性恶化。
+  $('thrashBtn').addEventListener('click', () => {
+    const t0 = performance.now();
+    for (let i = 0; i < 40; i++) {
+      const bar = barEls[i % barEls.length];
+      const h = bar.offsetHeight;               // 读：使前面的写立即失效并强制重排
+      bar.style.height = (h + (Math.random() > 0.5 ? 6 : -6)) + 'px'; // 写
+    }
+    $('perfOut').textContent = `反面（读写交替 40 次）耗时：${(performance.now() - t0).toFixed(1)}ms —— 每次读 offsetHeight 都强制同步 Layout`;
+  });
+
+  // 正面模式：先批量读出全部高度，再批量写入。
+  // 读阶段只发生一次重排（之后的读命中缓存），写阶段不再回读。
+  $('batchBtn').addEventListener('click', () => {
+    const t0 = performance.now();
+    const heights = barEls.map((bar) => bar.offsetHeight); // 批量读
+    barEls.forEach((bar, i) => {                            // 批量写
+      bar.style.height = (heights[i] + (Math.random() > 0.5 ? 6 : -6)) + 'px';
+    });
+    $('perfOut').textContent = `正面（批量读写 40 次）耗时：${(performance.now() - t0).toFixed(1)}ms —— 只有一次布局计算`;
+  });
+
+  // ---------- ④ will-change 对照 ----------
+  // 推荐 pattern：开始动画前声明 will-change，结束（animationend）后移除，
+  // 让浏览器及时回收合成层的显存占用。
+  function toggleSpin(boxEl, btn) {
+    const sprite = boxEl.querySelector('.sprite');
+    const running = boxEl.classList.toggle('spin-active');
+    if (running && boxEl.classList.contains('lifted')) {
+      // 动画开始：声明提示（对 lifted 盒生效）；监听若干轮后自动收回
+      sprite.style.willChange = 'transform';
+      sprite.addEventListener('animationiteration', function onIter(ev) {
+        if (ev.elapsedTime >= 1.6 * 5) {           // 转 5 轮后回收
+          sprite.style.willChange = 'auto';
+          sprite.removeEventListener('animationiteration', onIter);
+          boxEl.classList.remove('spin-active');
+        }
+      });
+    } else if (!running) {
+      sprite.style.willChange = 'auto'; // 停转即回收
+    }
+    btn.textContent = running ? '停转' : '开转 / 停转';
+  }
+  $('liftBtn').addEventListener('click', (e) => toggleSpin(e.target.closest('.will-change-box'), e.target));
+  $('plainBtn').addEventListener('click', (e) => toggleSpin(e.target.closest('.will-change-box'), e.target));
+
+  // 无障碍模拟开关：勾选 = 给根节点加 force-reduce（与系统设置等效）
+  $('rmChk').addEventListener('change', (e) => {
+    document.documentElement.classList.toggle('force-reduce', e.target.checked);
+  });
+</script>
+</body>
+</html>

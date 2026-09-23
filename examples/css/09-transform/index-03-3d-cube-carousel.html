@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：3D 立方体 / 3D 轮播 / translateZ 层深视差
+  ------------------------------------------------------------
+  【知识点】
+    1. 立方体拼装口诀："先转正、再推出"——rotate 后 translateZ 沿新法线走
+    2. 拖拽旋转 3D 场景：JS 只写两个角度变量（rotateX/rotateY）
+    3. 3D 轮播：N 张卡按 rotateY(i * 360/N) translateZ(R) 环形排布
+    4. translateZ 与层深：正值拉近（变大）、负值推远（变小需 scale 补偿）
+    5. 透视强度（perspective 值）对立体感的影响
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    区块 1：六面立方体，自动旋转 + 鼠标拖拽自由旋转（惯性衰减）；
+    区块 2：六卡 3D 轮播，按钮/拖拽切换，当前卡朝向观察者；
+    区块 3：三层视差场景，鼠标移动时各层按 translateZ 比例位移。
+  【注意事项】
+    拖拽用 Pointer Events（兼容鼠标与触屏）；所有运动均为
+    transform 合成器动画，主线程卡顿不影响流畅度。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 03 · 3D 立方体 / 轮播 / 层深</title>
+<style>
+  :root {
+    --brand: #4361ee; --accent: #f72585; --ink: #232c3d;
+    --muted: #7c8aa0; --line: #e3e8f1; --bg: #f4f6fb; --card: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.65;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 4px; }
+  .tip {
+    font-size: .82rem; color: var(--muted); background: #f1f5ff;
+    border-left: 3px solid var(--brand); padding: 6px 10px; margin: 8px 0 14px;
+    border-radius: 0 6px 6px 0;
+  }
+  code { background: #eef1f8; padding: 1px 5px; border-radius: 4px;
+         font-size: .85em; font-family: ui-monospace, Consolas, monospace; }
+  button {
+    padding: 8px 16px; border: 0; border-radius: 8px; cursor: pointer;
+    background: var(--brand); color: #fff; font-size: .84rem;
+  }
+  button.ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+
+  /* ================= ① 3D 立方体 ================= */
+  .cube-stage {
+    height: 320px; display: grid; place-items: center;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: radial-gradient(circle at 50% 42%, #eef2ff 0 40%, #fbfcff 75%);
+    perspective: 900px;                /* 舞台透视：立方体整体近大远小 */
+    cursor: grab; touch-action: none;  /* touch-action 让触屏拖拽不被滚动劫持 */
+  }
+  .cube-stage:active { cursor: grabbing; }
+  .cube {
+    position: relative; width: 130px; height: 130px;
+    transform-style: preserve-3d;      /* 关键：六个面保留 3D 关系 */
+    /* JS 会把 rotateX/rotateY 写进 CSS 变量，这里用变量组装 transform */
+    transform: rotateX(var(--rx, -22deg)) rotateY(var(--ry, 0deg));
+  }
+  .cube.auto { animation: cube-auto 10s linear infinite; } /* 自动旋转模式 */
+  @keyframes cube-auto {
+    from { transform: rotateX(-22deg) rotateY(0deg); }
+    to   { transform: rotateX(-22deg) rotateY(360deg); }
+  }
+  .cube__face {
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+    font-size: .84rem; color: #fff;
+    border: 1px solid rgba(255,255,255,.55);
+    background: rgba(67, 97, 238, .78);
+    backface-visibility: visible; /* 立方体不藏背面：半透明面能看到内部结构 */
+  }
+  /* 六面拼装：先转正（rotate），再沿新法线推出半边长（130/2=65px） */
+  .cube__face--front  { transform: translateZ(65px); }
+  .cube__face--back   { transform: rotateY(180deg) translateZ(65px); background: rgba(114,9,183,.78); }
+  .cube__face--right  { transform: rotateY(90deg)  translateZ(65px); background: rgba(247,37,133,.78); }
+  .cube__face--left   { transform: rotateY(-90deg) translateZ(65px); background: rgba(6,214,160,.78); }
+  .cube__face--top    { transform: rotateX(90deg)  translateZ(65px); background: rgba(255,190,11,.85); color: #5a4500; }
+  .cube__face--bottom { transform: rotateX(-90deg) translateZ(65px); background: rgba(76,201,240,.8); }
+
+  /* ================= ② 3D 轮播 ================= */
+  .carousel-stage {
+    height: 300px; display: grid; place-items: center;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: linear-gradient(180deg, #f6f8ff, #fbfcff);
+    perspective: 1100px;
+    overflow: hidden; /* 裁掉超出舞台的卡片边缘（只裁视觉，不影响 3D：拍平只作用于 overflow 所在层自身） */
+  }
+  .carousel {
+    position: relative; width: 190px; height: 220px;
+    transform-style: preserve-3d;
+    /* JS 写入 --ry：当前旋转角；transition 让"转盘"平滑转到目标卡 */
+    transform: translateZ(-330px) rotateY(var(--ry, 0deg));
+    transition: transform .7s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .carousel__item {
+    position: absolute; inset: 0;
+    border-radius: 14px;
+    display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px;
+    color: #fff; font-size: .9rem;
+    box-shadow: 0 16px 30px rgba(16, 23, 38, .25);
+    backface-visibility: hidden; /* 转到背面的卡不显示镜像文字 */
+  }
+  .carousel__item small { font-size: .72rem; opacity: .85; }
+
+  /* ================= ③ translateZ 层深视差 ================= */
+  .depth-scene {
+    height: 300px; position: relative; overflow: hidden;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: linear-gradient(180deg, #dbe7ff, #f6f9ff);
+    perspective: 700px;              /* 场景透视 */
+  }
+  .depth-world {
+    position: absolute; inset: 0;
+    transform-style: preserve-3d;    /* 让子层的 translateZ 真正生效 */
+    /* JS 写入 --mx/--my（-1~1）：整体轻微倾斜制造视角变化 */
+    transform: rotateY(calc(var(--mx, 0) * 8deg)) rotateX(calc(var(--my, 0) * -6deg));
+    transition: transform .25s ease-out;
+  }
+  .layer { position: absolute; border-radius: 12px; }
+  .layer--far {
+    inset: 8% 6%; background: linear-gradient(135deg, #b8c9f2, #d3e0fb);
+    transform: translateZ(-120px) scale(1.28);
+    /* 推远 120px：视觉变小，scale 1.28 把占位补回来（经验值≈1+z/p） */
+  }
+  .layer--mid {
+    inset: 22% 16%; background: linear-gradient(135deg, #738aec, #4361ee);
+    transform: translateZ(0);
+    box-shadow: 0 18px 36px rgba(67, 97, 238, .35);
+  }
+  .layer--near {
+    inset: 36% 30%; background: linear-gradient(135deg, #f72585, #b5179e);
+    transform: translateZ(90px);
+    box-shadow: 0 24px 44px rgba(247, 37, 133, .4);
+  }
+  .layer b { position: absolute; top: 10px; left: 12px; color: rgba(255,255,255,.9); font-size: .8rem; }
+  .depth-hint { position: absolute; bottom: 8px; width: 100%; text-align: center;
+                font-size: .74rem; color: var(--muted); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cube.auto { animation: none; }
+    .carousel, .depth-world { transition: none; }
+  }
+</style>
+</head>
+<body>
+<h1>3D 立方体 / 3D 轮播 / 层深视差</h1>
+<p class="sub">三个经典 3D 场景：拼装口诀 + 拖拽交互 + translateZ 层深，全部纯 CSS + 原生 JS。</p>
+
+<!-- ① 3D 立方体 -->
+<section>
+  <h2>① 六面立方体：自动旋转 + 拖拽</h2>
+  <div class="tip">
+    拼装口诀"先转正、再推出"：<code>rotateY(90deg) translateZ(65px)</code> 把面转到朝右再推出半边长。
+    推出距离 = <b>边长 / 2</b>。半透明面可以看到内部——六面交叠处就是 3D 结构的证明。
+    <b>直接用鼠标/手指拖动立方体试试。</b>
+  </div>
+  <div class="cube-stage" id="cubeStage">
+    <div class="cube auto" id="cube">
+      <div class="cube__face cube__face--front">front</div>
+      <div class="cube__face cube__face--back">back</div>
+      <div class="cube__face cube__face--right">right</div>
+      <div class="cube__face cube__face--left">left</div>
+      <div class="cube__face cube__face--top">top</div>
+      <div class="cube__face cube__face--bottom">bottom</div>
+    </div>
+  </div>
+  <div style="margin-top:10px">
+    <button id="cubeToggle" class="ghost">⏸ 停止自动旋转 / 开始拖拽</button>
+  </div>
+</section>
+
+<!-- ② 3D 轮播 -->
+<section>
+  <h2>② 3D 环形轮播（六卡）</h2>
+  <div class="tip">
+    排布公式：<code>rotateY(i × 360/N) translateZ(半径R)</code>。
+    R 的经验公式 = 卡片宽 / 2 / tan(π/N)（N=6 时约等于卡宽 1.87 倍）。
+    转盘本体再整体 <code>translateZ(-R)</code> 后移，让"当前卡"落在透视面上。
+  </div>
+  <div class="carousel-stage">
+    <div class="carousel" id="carousel"></div>
+  </div>
+  <div style="margin-top:12px; display:flex; gap:10px; justify-content:center">
+    <button id="prevBtn">← 上一张</button>
+    <button id="nextBtn">下一张 →</button>
+  </div>
+</section>
+
+<!-- ③ 层深视差 -->
+<section>
+  <h2>③ translateZ 层深：三层视差</h2>
+  <div class="tip">
+    三层分别位于 z = −120 / 0 / +90。<b>在场景上移动鼠标</b>：整个 world 轻微倾斜，
+    由于三层 z 不同，倾斜在屏幕上的投影位移量不同——这就是"视差"。
+    远层用 scale 补偿推远造成的视觉缩小。
+  </div>
+  <div class="depth-scene" id="depthScene">
+    <div class="depth-world" id="depthWorld">
+      <div class="layer layer--far"><b>远层 · translateZ(-120px) scale(1.28)</b></div>
+      <div class="layer layer--mid"><b>中层 · translateZ(0)</b></div>
+      <div class="layer layer--near"><b>近层 · translateZ(90px)</b></div>
+    </div>
+    <div class="depth-hint">移动鼠标观察三层位移速度差异（触屏：拖动）</div>
+  </div>
+</section>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  // ================= ① 立方体：自动旋转 + 拖拽 =================
+  const cube = $('cube'), cubeStage = $('cubeStage');
+  let autoOn = true;
+  $('cubeToggle').addEventListener('click', () => {
+    autoOn = !autoOn;
+    cube.classList.toggle('auto', autoOn); // 自动模式用 CSS 动画（合成器驱动）
+    $('cubeToggle').textContent = autoOn ? '⏸ 停止自动旋转 / 开始拖拽' : '▶ 恢复自动旋转';
+  });
+
+  // 拖拽：Pointer Events 同时覆盖鼠标与触屏。
+  // 思路：把指针位移量映射为 rotateY（水平拖）与 rotateX（垂直拖）增量。
+  let dragging = false, lastX = 0, lastY = 0, rx = -22, ry = 0;
+  cubeStage.addEventListener('pointerdown', (e) => {
+    if (autoOn) { autoOn = false; cube.classList.remove('auto'); } // 拖拽前先停自动转
+    dragging = true; lastX = e.clientX; lastY = e.clientY;
+    cubeStage.setPointerCapture(e.pointerId); // 后续 move/up 都派发给舞台
+  });
+  cubeStage.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    ry += dx * 0.5;           // 水平位移 → 绕 Y 轴旋转（灵敏度 0.5°/px）
+    rx -= dy * 0.5;           // 垂直位移 → 反向绕 X 轴（符合"拖哪边哪边走"直觉）
+    // 只写两个变量，transform 组装交给 CSS——JS 不碰具体变换语法
+    cube.style.setProperty('--rx', rx + 'deg');
+    cube.style.setProperty('--ry', ry + 'deg');
+  });
+  ;['pointerup', 'pointercancel'].forEach((ev) =>
+    cubeStage.addEventListener(ev, () => { dragging = false; }));
+
+  // ================= ② 3D 环形轮播 =================
+  const carousel = $('carousel');
+  const N = 6, R = 350;                       // 6 张卡，推离半径 350px（≈190/2/tan(30°)≈165 → 视觉余量取 350 更通透）
+  const colors = ['#4361ee', '#f72585', '#06d6a0', '#ffbe0b', '#7209b7', '#4cc9f0'];
+  // 生成六张卡：每张按 rotateY(i*60deg) translateZ(R) 环形排布
+  for (let i = 0; i < N; i++) {
+    const item = document.createElement('div');
+    item.className = 'carousel__item';
+    item.style.background = `linear-gradient(150deg, ${colors[i]}, ${colors[(i + 1) % N]})`;
+    item.style.transform = `rotateY(${i * 360 / N}deg) translateZ(${R}px)`;
+    item.innerHTML = `<strong>${i + 1} 号卡</strong><small>rotateY(${i * 60}deg) translateZ(${R}px)</small>`;
+    carousel.appendChild(item);
+  }
+  let cur = 0;
+  function go(dir) {
+    cur = (cur + dir + N) % N;                          // 环形取模
+    carousel.style.setProperty('--ry', -(cur * 360 / N) + 'deg'); // 反向转：把目标卡转到正面
+  }
+  $('nextBtn').addEventListener('click', () => go(1));
+  $('prevBtn').addEventListener('click', () => go(-1));
+
+  // ================= ③ 层深视差 =================
+  const scene = $('depthScene'), world = $('depthWorld');
+  scene.addEventListener('pointermove', (e) => {
+    const rect = scene.getBoundingClientRect();
+    // 指针位置归一化到 -1 ~ 1（中心为 0）
+    const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const my = ((e.clientY - rect.top) / rect.height) * 2 - 1;
+    world.style.setProperty('--mx', mx.toFixed(3));  // 写变量，CSS 里 calc 出倾斜角
+    world.style.setProperty('--my', my.toFixed(3));
+  });
+  scene.addEventListener('pointerleave', () => {     // 离开时回正
+    world.style.setProperty('--mx', 0);
+    world.style.setProperty('--my', 0);
+  });
+</script>
+</body>
+</html>

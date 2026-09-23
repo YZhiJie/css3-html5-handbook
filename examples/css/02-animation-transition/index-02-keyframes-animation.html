@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 02：@keyframes 与 animation 八个子属性实验台
+  ------------------------------------------------------------
+  【知识点】
+    1. @keyframes 关键帧定义：from/to、百分比帧、可省略端点帧
+    2. animation 八个子属性：name/duration/timing/delay/iteration/
+       direction/fill-mode/play-state
+    3. 简写陷阱：两个时间值，第一个是 duration、第二个是 delay
+    4. animation-play-state 播放/暂停控制 + 动画事件监听编排
+    5. 多动画叠加：逗号分隔，同名属性后写覆盖先写
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    上半部是"参数实验台"：右侧一排开关/下拉实时改变小球的
+    animation 声明，点击"重播"观察 fill-mode、direction 的差异；
+    中部是"播放控制台"：暂停/恢复/重播 + 动画事件日志；
+    底部是三个经典编排：呼吸光晕、来回漂浮、负 delay 错相波浪。
+  【注意事项】
+    fill-mode 差异要看清"动画开始前"和"结束后"两个阶段：
+    backwards 决定延迟期的状态，forwards 决定播完后的状态。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>示例 02 · @keyframes / animation 实验台</title>
+  <style>
+    :root {
+      --brand: #4361ee;
+      --accent: #f72585;
+      --ink: #232c3d;
+      --muted: #7c8aa0;
+      --line: #e3e8f1;
+      --bg: #f4f6fb;
+      --card: #fff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      padding: 24px;
+      line-height: 1.65;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 4px;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: .9rem;
+      margin-bottom: 18px;
+    }
+
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+
+    h2 {
+      font-size: 1.05rem;
+      margin-bottom: 10px;
+    }
+
+    h3 {
+      font-size: .95rem;
+      margin: 14px 0 8px;
+    }
+
+    .tip {
+      font-size: .82rem;
+      color: var(--muted);
+      background: #f1f5ff;
+      border-left: 3px solid var(--brand);
+      padding: 6px 10px;
+      margin-bottom: 14px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    code {
+      background: #eef1f8;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: .85em;
+      font-family: ui-monospace, Consolas, monospace;
+    }
+
+    /* ---------- 实验台 ---------- */
+    .lab {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 760px) {
+      .lab {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .ctl-grid {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 118px 1fr;
+      align-items: center;
+      gap: 8px;
+      font-size: .84rem;
+    }
+
+    select,
+    .lab input[type="number"] {
+      width: 100%;
+      padding: 5px 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      font-size: .84rem;
+      color: var(--ink);
+    }
+
+    .row input[type="range"] {
+      accent-color: var(--brand);
+      width: 100%;
+    }
+
+    .btns {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btns button {
+      padding: 9px 18px;
+      border: 0;
+      border-radius: 9px;
+      cursor: pointer;
+      background: var(--brand);
+      color: #fff;
+      font-size: .86rem;
+    }
+
+    .btns button.ghost {
+      background: #fff;
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+
+    /* 舞台：小球只动 transform 与 opacity（合成器友好） */
+    .stage {
+      position: relative;
+      min-height: 220px;
+      border-radius: 12px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 20% 30%, #eef2ff 0 2px, transparent 2px) 0 0/26px 26px,
+        radial-gradient(circle at 70% 60%, #eef2ff 0 2px, transparent 2px) 0 13px/26px 26px,
+        #f8faff;
+      display: grid;
+      place-items: center;
+    }
+
+    .ball {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 28%, #8fa4f8, var(--brand) 60%, #2c3fb8);
+      box-shadow: 0 14px 26px rgba(67, 97, 238, .35);
+    }
+
+    /* 实验台小球使用的关键帧：只动 transform 与 opacity（合成器友好）。
+     三段式：原地半透明 → 跳起放大 → 落回并恢复，方便观察 direction/fill-mode */
+    @keyframes demo-jump {
+      0% {
+        transform: translateY(0) scale(1);
+        opacity: .55;
+      }
+
+      45% {
+        transform: translateY(-46px) scale(1.15);
+        opacity: 1;
+      }
+
+      100% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+      }
+    }
+
+    .code-out {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #101726;
+      color: #cfe0ff;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: .76rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* ---------- 播放控制台 ---------- */
+    .console {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .log {
+      margin-top: 10px;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: .76rem;
+      color: var(--muted);
+      max-height: 108px;
+      overflow: auto;
+      background: #f8faff;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+
+    .log div {
+      padding: 1px 0;
+      border-bottom: 1px dotted #eef1f8;
+    }
+
+    /* ---------- 经典编排展示 ---------- */
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+    }
+
+    .demo {
+      height: 150px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(160deg, #f6f8ff, #eef1fa);
+      border: 1px solid var(--line);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .demo p {
+      position: absolute;
+      bottom: 8px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: .74rem;
+      color: var(--muted);
+      font-family: ui-monospace, Consolas, monospace;
+    }
+
+    /* 编排 1：呼吸光晕 —— scale + box-shadow（阴影静止不重绘，动的只有 transform） */
+    .glow-ring {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: breathe 1.8s ease-in-out infinite;
+    }
+
+    @keyframes breathe {
+
+      0%,
+      100% {
+        transform: scale(1);
+        opacity: .75;
+      }
+
+      50% {
+        transform: scale(1.28);
+        opacity: 1;
+      }
+    }
+
+    /* 编排 2：来回漂浮 —— direction: alternate 让"去程+回程"共用一段关键帧 */
+    .float-chip {
+      width: 58px;
+      height: 58px;
+      border-radius: 16px;
+      background: conic-gradient(from 45deg, #4361ee, #3a86ff, #4cc9f0, #4361ee);
+      animation: float 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+    }
+
+    @keyframes float {
+      from {
+        transform: translateY(-18px) rotate(-8deg);
+      }
+
+      to {
+        transform: translateY(18px) rotate(8deg);
+      }
+    }
+
+    /* 编排 3：三点波浪 —— 同一动画 + 负 delay 错相，负值 = "从半路开始播" */
+    .wave {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      height: 70px;
+    }
+
+    .wave i {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--brand);
+      animation: hop 0.9s ease-in-out infinite;
+    }
+
+    .wave i:nth-child(1) {
+      animation-delay: 0s;
+    }
+
+    .wave i:nth-child(2) {
+      animation-delay: -0.3s;
+    }
+
+    /* 负 delay：直接从进度 1/3 处接管 */
+    .wave i:nth-child(3) {
+      animation-delay: -0.6s;
+    }
+
+    @keyframes hop {
+
+      0%,
+      100% {
+        transform: translateY(10px) scaleY(.8);
+      }
+
+      40% {
+        transform: translateY(-14px) scaleY(1.1);
+      }
+    }
+
+    /* 无障碍兜底：系统减弱动态时全部瞬时完成（真实项目照抄即可） */
+    @media (prefers-reduced-motion: reduce) {
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <h1>@keyframes / animation 实验台</h1>
+  <p class="sub">八个子属性逐个调 → 观察"播前（backwards）/ 播后（forwards）/ 往返（alternate）/ 暂停（play-state）"的行为差异。</p>
+
+  <!-- ① 参数实验台 -->
+  <section>
+    <h2>① animation 子属性实验台</h2>
+    <div class="tip">
+      小球执行 <code>demo-jump</code> 关键帧：先起跳后落地。重点观察
+      <b>fill-mode</b>——<code>backwards</code> 让延迟期间停在第一帧（否则会先闪现原始位置），
+      <code>forwards</code> 让播完停在最后一帧（否则跳回原位），<code>both</code> = 两者兼得。
+    </div>
+    <div class="lab">
+      <div class="ctl-grid">
+        <div class="row">
+          <label for="aDur">时长 duration</label>
+          <input id="aDur" type="range" min="0.2" max="3" step="0.1" value="1.2">
+        </div>
+        <div class="row">
+          <label for="aDelay">延迟 delay</label>
+          <input id="aDelay" type="range" min="0" max="2" step="0.1" value="0.6">
+        </div>
+        <div class="row">
+          <label for="aEase">timing</label>
+          <select id="aEase">
+            <option value="ease" selected>ease</option>
+            <option value="linear">linear</option>
+            <option value="ease-in">ease-in</option>
+            <option value="ease-out">ease-out</option>
+            <option value="cubic-bezier(0.34, 1.56, 0.64, 1)">回弹贝塞尔</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="aIter">iteration</label>
+          <select id="aIter">
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="infinite">infinite</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="aDir">direction</label>
+          <select id="aDir">
+            <option value="normal" selected>normal（正播）</option>
+            <option value="reverse">reverse（倒播）</option>
+            <option value="alternate">alternate（往返）</option>
+            <option value="alternate-reverse">alternate-reverse</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="aFill">fill-mode</label>
+          <select id="aFill">
+            <option value="none">none</option>
+            <option value="forwards">forwards</option>
+            <option value="backwards">backwards</option>
+            <option value="both" selected>both</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div class="stage">
+          <div class="ball" id="ball">▶ 重播看差异</div>
+        </div>
+        <div class="code-out" id="codeOut"></div>
+        <div class="btns" style="margin-top:10px">
+          <button id="replay">↻ 重播</button>
+          <button id="showOrigin" class="ghost">切回原始态（对比 fill 效果）</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ② 播放控制 + 事件日志 -->
+  <section>
+    <h2>② 播放控制台（play-state + 动画事件）</h2>
+    <div class="tip">
+      <code>animation-play-state: paused</code> 可以随时冻结时间线；JS 侧监听
+      <code>animationstart / animationiteration / animationend</code> 即可做纯 CSS 驱动、JS 编排的流水线。
+    </div>
+    <div class="console">
+      <div class="btns">
+        <button id="btnPause">⏸ 暂停</button>
+        <button id="btnResume" class="ghost">▶ 恢复</button>
+        <button id="btnRestart" class="ghost">↻ 从头播放（3 次）</button>
+      </div>
+      <div class="log" id="log">
+        <div>— 事件日志（animationstart / iteration / end）—</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ③ 经典编排 -->
+  <section>
+    <h2>③ 三个最常用的 keyframes 编排</h2>
+    <div class="gallery">
+      <div class="demo">
+        <div class="glow-ring"></div>
+        <p>呼吸：ease-in-out + infinite</p>
+      </div>
+      <div class="demo">
+        <div class="float-chip"></div>
+        <p>漂浮：alternate 共用一段关键帧</p>
+      </div>
+      <div class="demo">
+        <div class="wave"><i></i><i></i><i></i></div>
+        <p>波浪：负 delay 错相</p>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const ball = $('ball'), codeOut = $('codeOut');
+
+    // 实验台的 6 个参数控件
+    const ctl = {
+      dur: $('aDur'), delay: $('aDelay'), ease: $('aEase'),
+      iter: $('aIter'), dir: $('aDir'), fill: $('aFill')
+    };
+
+    // 把 8 个子属性拼成简写声明写入小球。
+    // 注意顺序坑：简写中"第一个时间=duration，第二个时间=delay"，
+    // 名称、次数、方向等关键字位置可互换但两个时间值必须按序。
+    function apply() {
+      const d = ctl.dur.value + 's', dl = ctl.delay.value + 's';
+      const shorthand = `demo-jump ${d} ${ctl.ease.value} ${dl} ${ctl.iter.value} ${ctl.dir.value} ${ctl.fill.value}`;
+      ball.style.animation = 'none';     // 先清空动画……
+      void ball.offsetWidth;             // ……强制回流，让浏览器忘记上一次的动画状态
+      ball.style.animation = shorthand;  // 再重新赋值：实现"一键重播"
+      codeOut.textContent = `/* 当前声明（简写） */\nanimation: ${shorthand};\n\n/* 等价展开 */\nanimation-name: demo-jump;\nanimation-duration: ${d};\nanimation-timing-function: ${ctl.ease.value};\nanimation-delay: ${dl};\nanimation-iteration-count: ${ctl.iter.value};\nanimation-direction: ${ctl.dir.value};\nanimation-fill-mode: ${ctl.fill.value};\nanimation-play-state: running;`;
+    }
+    Object.values(ctl).forEach((el) => el.addEventListener('input', apply));
+
+    // 关键帧 demo-jump 定义在上方 <style> 中（见 .ball 规则后的 @keyframes）：
+    // 0%：原地半透明 → 45%：跳起并放大 → 100%：落回原地
+
+    $('replay').addEventListener('click', apply);
+    // 切回"原始态"：移除动画，观察 forwards/both 是否把元素留在了最后一帧
+    $('showOrigin').addEventListener('click', () => { ball.style.animation = 'none'; });
+
+    // ---------- 播放控制台 ----------
+    const log = $('log');
+    function addLog(msg) {
+      const div = document.createElement('div');
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      log.prepend(div);            // 新事件放最上面
+      while (log.children.length > 8) log.lastChild.remove(); // 最多留 8 条
+    }
+
+    // 监听小球的三类动画事件：开始 / 每一轮迭代结束 / 整体结束
+    ;['animationstart', 'animationiteration', 'animationend'].forEach((type) => {
+      ball.addEventListener(type, (e) => {
+        const name = { animationstart: '开始', animationiteration: '完成一轮迭代', animationend: '整体结束' }[type];
+        addLog(`${name}：${e.animationName}（elapsed=${e.elapsedTime.toFixed(2)}s）`);
+      });
+    });
+
+    $('btnPause').addEventListener('click', () => { ball.style.animationPlayState = 'paused'; addLog('→ play-state: paused'); });
+    $('btnResume').addEventListener('click', () => { ball.style.animationPlayState = 'running'; addLog('→ play-state: running'); });
+    $('btnRestart').addEventListener('click', () => {
+      ctl.iter.value = '3'; ctl.fill.value = 'none'; apply();
+    });
+
+    apply(); // 初始化
+  </script>
+</body>
+
+</html>
