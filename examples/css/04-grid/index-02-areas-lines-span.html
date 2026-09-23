@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 02：grid-template-areas 页面骨架 + 网格线定位与 span
+  ------------------------------------------------------------
+  【知识点】
+    1. grid-template-areas：用 ASCII 字符串画页面地图，命名区域落位
+    2. 网格线编号（含负数倒数线）与 grid-column / grid-row 定位
+    3. span 关键字："跨 N 条轨道"比"到第 N 条线"更抗重构
+    4. grid-auto-rows 为隐式轨道定高（配合跨行排版）
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    第一区：三套可切换的 areas 地图（后台三栏 / 文章双栏 / 单列移动端），
+            点击按钮整页重排——所有落位规则一行不改；
+    第二区：4×4 标尺网格，演示线号定位、span 跨轨、负数线贴角，
+            每个演示块上标注了它所占的线号区间。
+  【注意事项】
+    命名区域必须组成矩形（不能拼出 L 形）；areas 字符串每行的
+    格子数必须相等，否则整条声明失效；线号从 1 开始，0 不是合法线号。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 02 · areas 页面骨架 + 网格线定位与 span</title>
+<style>
+  /* ---------- 基础层 ---------- */
+  :root {
+    --brand: #4361ee; --bg: #f4f6fb; --card: #fff;
+    --ink: #243244; --muted: #7d8da3; --line: #e4e9f2;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.6;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 8px; }
+  .tip {
+    font-size: .82rem; color: var(--muted); background: #f2f6ff;
+    border-left: 3px solid var(--brand); padding: 6px 10px; margin-bottom: 14px;
+    border-radius: 0 6px 6px 0;
+  }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .bar button {
+    font: inherit; font-size: .8rem; cursor: pointer; padding: 4px 12px;
+    border-radius: 999px; border: 1px solid var(--line); background: #f7f9fc; transition: all .15s;
+  }
+  .bar button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+  code { background: #f0f3f9; border-radius: 4px; padding: 1px 6px; font-size: .85em; }
+  .foot { color: var(--muted); font-size: .8rem; margin-top: 10px; }
+
+  /* ============================================================
+     第一区：areas 页面骨架
+     三套布局共用同一组 DOM（header/nav/main/aside/footer），
+     切换只发生在"地图字符串"上 —— 结构与布局解耦的核心演示
+     ============================================================ */
+  .layout {
+    display: grid;
+    gap: 10px;                          /* 轨道间距：areas 地图之外的统一缝 */
+    min-height: 460px;
+    /* 布局 A：后台三栏 —— 两列三行，header/status 通栏 */
+    grid-template-columns: 180px 1fr;
+    grid-template-rows: 56px 1fr 36px;
+    grid-template-areas:
+      "header header"
+      "nav    main"
+      "status status";
+  }
+  /* 布局 B：文章双栏 —— 侧栏挪到右侧，主体变文章流 */
+  .layout.layout-article {
+    grid-template-columns: 1fr 260px;
+    grid-template-areas:
+      "header header"
+      "main   nav"
+      "status status";
+  }
+  /* 布局 C：移动端单列 —— 四行堆叠，行高 auto 自适应内容 */
+  .layout.layout-mobile {
+    grid-template-columns: 1fr;
+    grid-template-rows: 48px auto 1fr 32px;
+    grid-template-areas: "header" "nav" "main" "status";
+  }
+  /* 落位只写一次：换地图不用改这些选择器 —— areas 的最大红利 */
+  .layout > .z-header { grid-area: header; }
+  .layout > .z-nav    { grid-area: nav; }
+  .layout > .z-main   { grid-area: main; }
+  .layout > .z-status { grid-area: status; }
+  /* 各区块配色：仅用于区分视觉区域 */
+  .layout > div {
+    border-radius: 8px; padding: 10px 12px; font-size: .85rem;
+    display: flex; align-items: center;
+  }
+  .z-header { background: #2c3e63; color: #fff; justify-content: space-between; }
+  .z-nav    { background: #eef2ff; border: 1px solid #c7d4fb; }
+  .z-main   { background: #fbfcff; border: 1px solid var(--line); align-items: flex-start;
+              flex-direction: column; gap: 6px; }
+  .z-status { background: #f0f3f9; color: var(--muted); font-size: .78rem; }
+  .z-main .ph {
+    width: 100%; flex: 1; min-height: 60px;
+    background: repeating-linear-gradient(45deg, #f4f6fb 0 10px, #e9eef7 10px 20px);
+    border: 1px dashed var(--line); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: .78rem;
+  }
+
+  /* ============================================================
+     第二区：网格线定位标尺（4×4 显式网格）
+     ============================================================ */
+  .ruler {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 90px;            /* 隐式行定高：跨行的块才整齐 */
+    gap: 8px; position: relative;
+  }
+  .ruler .cell {
+    border-radius: 8px; padding: 8px; font-size: .78rem;
+    background: #eef2ff; border: 1px solid #c7d4fb; color: #24457e;
+  }
+  /* hero：线号精确定位，占 2×2 —— "从 1 到 3"写成 1 / 3 */
+  .ruler .hero   { grid-column: 1 / 3; grid-row: 1 / 3; background: #ffe3d6; border-color: #ffb894; color: #8a4b23; }
+  /* wide：span 跨列，无需知道终点线号 —— 推荐写法 */
+  .ruler .wide   { grid-column: span 2; }
+  /* tall：跨 2 行 */
+  .ruler .tall   { grid-row: span 2; background: #e8f7ef; border-color: #bfe8d2; color: #2c6e49; }
+  /* corner：负数线定位 —— 永远贴右下角，轨道数变化也不漂移 */
+  .ruler .corner { grid-column: -2 / -1; grid-row: -3 / -1; background: #fff4e8; border-color: #ffd9b3; color: #8a5a23; }
+</style>
+</head>
+<body>
+<h1>areas 页面骨架 + 网格线定位与 span</h1>
+<p class="sub">命名区域负责"整页结构"，线号与 span 负责"个别元素的特殊位置"。</p>
+
+<!-- ================= 第一区：三套 areas 地图 ================= -->
+<section>
+  <h2>1. grid-template-areas：改一行地图 = 整页重排</h2>
+  <div class="tip">三套布局共用同一组 DOM。切到"文章双栏"看 <code>nav</code> 从左跑到右、
+      切到"移动端单列"看四块堆叠——所有 <code>grid-area</code> 落位规则零改动。</div>
+  <div class="bar" id="layoutSwitch">
+    <button class="on" data-v="default">A · 后台三栏</button>
+    <button data-v="article">B · 文章双栏</button>
+    <button data-v="mobile">C · 移动端单列</button>
+  </div>
+  <div class="layout" id="layout">
+    <div class="z-header"><b>header 通栏</b><span style="font-size:.75rem;opacity:.75">grid-area: header</span></div>
+    <div class="z-nav">nav 侧栏<br>grid-area: nav</div>
+    <div class="z-main">
+      <b>main 主区</b>
+      <span style="font-size:.78rem;color:var(--muted)">grid-area: main</span>
+      <div class="ph">主内容占位</div>
+    </div>
+    <div class="z-status">status 状态栏 · grid-area: status · 通栏</div>
+  </div>
+  <p class="foot" id="layoutNote">当前地图：3 行 × 2 列，"header header / nav main / status status"。</p>
+</section>
+
+<!-- ================= 第二区：线号 / span / 负数线 ================= -->
+<section>
+  <h2>2. 网格线定位与 span（4×4 标尺网格）</h2>
+  <div class="tip">线号从 1 开始、负数从 -1 倒数。<code>hero</code> 用线号 1/3 精确圈地；
+      <code>wide</code>/<code>tall</code> 用 <code>span 2</code> 跨轨；<code>corner</code> 用负数线永远贴右下角。</div>
+  <div class="ruler">
+    <!-- 每个块上的小字标注它占用的线号区间，方便对照观察 -->
+    <div class="cell hero">hero：列 1→3 · 行 1→3（占 2×2）</div>
+    <div class="cell wide">wide：列 span 2</div>
+    <div class="cell">自动放置</div>
+    <div class="cell tall">tall：行 span 2</div>
+    <div class="cell">自动放置</div>
+    <div class="cell wide">wide：列 span 2</div>
+    <div class="cell">自动放置</div>
+    <div class="cell">自动放置</div>
+    <div class="cell">自动放置</div>
+    <div class="cell corner">corner：列 -2→-1 · 行 -3→-1（贴右下角）</div>
+  </div>
+  <p class="foot">往本网格里加/删普通块，hero 与 corner 位置始终不变：
+     正数线锚定左上、负数线锚定右下，中间交给自动放置算法。</p>
+</section>
+
+<script>
+  // ---------- 第一区：地图切换 ----------
+  const layout = document.getElementById('layout');
+  const layoutNote = document.getElementById('layoutNote');
+  // 三套地图的文字说明：与 CSS 中三组 grid-template-areas 一一对应
+  const mapDesc = {
+    default: '当前地图：3 行 × 2 列，"header header / nav main / status status"。',
+    article: '当前地图：nav 与 main 对调列位（"main nav"）——只改了地图字符串。',
+    mobile:  '当前地图：单列四行堆叠（"header / nav / main / status"）。'
+  };
+  document.getElementById('layoutSwitch').addEventListener('click', e => {
+    if (e.target.tagName !== 'BUTTON') return;
+    const v = e.target.dataset.v;
+    // 类切换即完成重排：.layout-article / .layout-mobile 覆盖 areas 定义
+    layout.classList.toggle('layout-article', v === 'article');
+    layout.classList.toggle('layout-mobile', v === 'mobile');
+    layoutNote.textContent = mapDesc[v];
+    e.currentTarget.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === e.target));
+  });
+</script>
+</body>
+</html>

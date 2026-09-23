@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 04：无媒体查询响应式画廊 + auto-flow: dense 密集回填
+  ------------------------------------------------------------
+  【知识点】
+    1. repeat(auto-fill, minmax(220px, 1fr))：一行代码覆盖全断点响应式
+    2. auto-fill vs auto-fit 在真实内容流中的行为差异
+    3. grid-auto-rows + aspect-ratio 控制格子形状；跨行块制造杂志感
+    4. grid-auto-flow: dense：自动放置算法回填空洞（深挖排布）
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    一个图片画廊（渐变色块模拟图片，含标题与标签）：
+    ① 拖动窗口：列数自动增减，全程零媒体查询；
+    ② 切换 auto-fill / auto-fit：观察"项目数不满一行"时的差异；
+    ③ 点击某张卡变为"焦点卡"（跨 2×2），再开关 dense：
+       关——焦点卡后面的网格留下空洞；开——算法回填空洞，
+       布局更紧凑但视觉顺序与 DOM 顺序不再一致。
+  【注意事项】
+    dense 会打破视觉阅读顺序（第 5 张卡可能出现在第 2 位），
+    对读屏用户与"按序浏览"的内容（教程步骤等）不友好；
+    图片类时间线内容慎用 dense，或给每个 item 显式线号定位。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 04 · 无媒体查询响应式画廊 + dense 回填</title>
+<style>
+  /* ---------- 基础层 ---------- */
+  :root {
+    --brand: #4361ee; --bg: #f4f6fb; --card: #fff;
+    --ink: #243244; --muted: #7d8da3; --line: #e4e9f2;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.6;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 8px; }
+  .tip {
+    font-size: .82rem; color: var(--muted); background: #f2f6ff;
+    border-left: 3px solid var(--brand); padding: 6px 10px; margin-bottom: 14px;
+    border-radius: 0 6px 6px 0;
+  }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .bar button {
+    font: inherit; font-size: .8rem; cursor: pointer; padding: 4px 12px;
+    border-radius: 999px; border: 1px solid var(--line); background: #f7f9fc; transition: all .15s;
+  }
+  .bar button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+  code { background: #f0f3f9; border-radius: 4px; padding: 1px 6px; font-size: .85em; }
+  .foot { color: var(--muted); font-size: .8rem; margin-top: 10px; }
+
+  /* ============================================================
+     画廊核心：这一行就是"无媒体查询响应式"的全部
+     ============================================================ */
+  .gallery {
+    display: grid;
+    gap: 12px;
+    /* 逐词翻译：重复(自动填充, [最小 220px, 最大 1 份])——
+       容器每多出 232px（220 + gap）就多一列 */
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    /* 隐式行统一定高：网格里没被显式定位的项目都进隐式行，
+       不定高的话跨行块与普通块的高度基准就乱了 */
+    grid-auto-rows: 150px;
+    /* 排布算法方向：dense 让后面的"小卡"回填前面的空洞 */
+    grid-auto-flow: row;
+  }
+  .gallery.dense { grid-auto-flow: row dense; }
+
+  /* 画廊卡片：内层再做一个纵向 flex 摆放文字（网格 + 局部 flex 混用是常态） */
+  .shot {
+    border-radius: 10px; overflow: hidden; position: relative;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    color: #fff; font-size: .82rem; cursor: pointer;
+    transition: transform .15s;
+  }
+  .shot:hover { transform: translateY(-2px); }
+  /* 用渐变色块模拟图片：零网络依赖，颜色由 JS 按序号注入 */
+  .shot .art { position: absolute; inset: 0; }
+  .shot .meta {
+    position: relative; padding: 10px 12px;
+    background: linear-gradient(transparent, rgba(0,0,0,.55));  /* 底部压暗保证文字可读 */
+  }
+  .shot .meta b { display: block; font-size: .88rem; }
+  .shot .meta span { font-size: .72rem; opacity: .85; }
+  /* 焦点卡：跨 2 列 2 行，制造杂志感焦点 */
+  .shot.focus { grid-column: span 2; grid-row: span 2; }
+  .shot.focus .meta b { font-size: 1.05rem; }
+  /* 角标：提示"当前是焦点卡，点击取消" */
+  .shot.focus::after {
+    content: "焦点卡 2×2"; position: absolute; top: 8px; right: 8px;
+    background: rgba(255,255,255,.9); color: #243244;
+    font-size: .68rem; padding: 2px 8px; border-radius: 999px;
+  }
+</style>
+</head>
+<body>
+<h1>无媒体查询响应式画廊 + dense 回填</h1>
+<p class="sub">一条 repeat(auto-fill, minmax()) 应对从手机到 4K 的全部宽度；一条 dense 修掉焦点卡留下的洞。</p>
+
+<section>
+  <h2>交互画廊（12 张卡，渐变色块模拟图片）</h2>
+  <div class="tip">① 拖动窗口宽度看列数自动增减；② 把某张卡点成"焦点卡"（2×2），
+      再开关 <code>dense</code>：关→焦点卡后方留下空洞；开→后续小卡自动回填空洞；
+      ③ 切换 fill/fit 观察项目不满一行时的行为差异。</div>
+  <div class="bar">
+    <button class="on" data-v="auto-fill">auto-fill</button>
+    <button data-v="auto-fit">auto-fit</button>
+    <button id="denseBtn">dense 回填：关</button>
+    <button id="resetBtn">取消全部焦点卡</button>
+  </div>
+  <!-- 画廊：卡片由 JS 生成，保证颜色/标题有序且代码简短 -->
+  <div class="gallery" id="gallery"></div>
+  <p class="foot" id="note">当前：auto-fill + 普通 row 流。焦点卡留下的空洞由"自动放置"顺序流过，不回填。</p>
+</section>
+
+<script>
+  // ---------- 生成画廊卡片 ----------
+  const gallery = document.getElementById('gallery');
+  const titles = ['晨雾山谷', '城市天际', '极光之夜', '沙漠驼影', '雨后石阶', '海湾灯塔',
+                  '林间木屋', '雪山垭口', '稻田日落', '老城街角', '湖面倒影', '星空帐篷'];
+  const tags = ['风光', '人文', '夜拍', '旅行', '胶片', '航拍'];
+  // HSL 渐变色板：色相按序号递增，视觉上像一组风格统一的照片
+  for (let i = 0; i < 12; i++) {
+    const el = document.createElement('figure');
+    el.className = 'shot';
+    const hue = (i * 47) % 360;                       // 47°步长避免相邻色相过近
+    el.innerHTML = `
+      <div class="art" style="background:linear-gradient(135deg,
+        hsl(${hue} 62% 58%), hsl(${(hue + 42) % 360} 55% 40%))"></div>
+      <figcaption class="meta"><b>${titles[i]}</b><span>#${tags[i % tags.length]} · NO.${String(i + 1).padStart(2, '0')}</span></figcaption>`;
+    // 点击切换焦点卡：焦点卡占 2×2，是"制造空洞"的源头
+    el.addEventListener('click', () => {
+      el.classList.toggle('focus');
+      updateNote();
+    });
+    gallery.appendChild(el);
+  }
+
+  // ---------- fill / fit 切换 ----------
+  let mode = 'auto-fill';
+  document.querySelectorAll('.bar button[data-v]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      mode = btn.dataset.v;
+      gallery.style.gridTemplateColumns = `repeat(${mode}, minmax(220px, 1fr))`;
+      document.querySelectorAll('.bar button[data-v]').forEach(b => b.classList.toggle('on', b === btn));
+      updateNote();
+    });
+  });
+
+  // ---------- dense 开关 ----------
+  const denseBtn = document.getElementById('denseBtn');
+  let dense = false;
+  denseBtn.addEventListener('click', () => {
+    dense = !dense;
+    gallery.classList.toggle('dense', dense);
+    denseBtn.classList.toggle('on', dense);
+    denseBtn.textContent = `dense 回填：${dense ? '开' : '关'}`;
+    updateNote();
+  });
+
+  // ---------- 重置 ----------
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    document.querySelectorAll('.shot.focus').forEach(el => el.classList.remove('focus'));
+    updateNote();
+  });
+
+  // ---------- 说明文案：随三组状态联动 ----------
+  const note = document.getElementById('note');
+  function updateNote() {
+    const focusCount = document.querySelectorAll('.shot.focus').length;
+    const modeText = mode === 'auto-fill'
+      ? 'auto-fill：末行不满时空轨道保留，卡片不拉伸。'
+      : 'auto-fit：空轨道折叠，现有卡片拉伸铺满（注意末行变宽）。';
+    const denseText = dense
+      ? 'dense：自动放置算法回填空洞——注意视觉顺序可能与 DOM 顺序不一致（读屏/按序内容慎用）。'
+      : '普通 row 流：空洞保留，布局松散但视觉顺序 = DOM 顺序。';
+    note.textContent =
+      `当前：${mode} + ${dense ? 'row dense' : 'row'} 流，焦点卡 × ${focusCount}。${modeText}${denseText}`;
+  }
+  updateNote();
+</script>
+</body>
+</html>

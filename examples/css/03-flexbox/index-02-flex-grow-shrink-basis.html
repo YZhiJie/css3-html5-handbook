@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 02：flex-grow / shrink / basis 与简写陷阱
+  ------------------------------------------------------------
+  【知识点】
+    1. flex: 1（=1 1 0%）与 flex: auto（=1 1 auto）的本质区别：basis 起点
+    2. flex: initial / none 的语义；简写会重置未写的属性
+    3. min-width:auto（automatic minimum size）导致的溢出坑与 min-width:0 修复
+    4. flex-shrink 的"加权收缩"：基准尺寸大的项目收缩得更多
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    第一区：四个按钮切换同一组三列的 flex 写法，直观对比
+           "flex:1 等宽" 与 "flex:auto 按内容变宽"；
+    第二区：滑杆调节中间列的 grow 值，观察剩余空间按权重瓜分；
+    第三区：一行内放"长标题 + 按钮"，点开关切到 min-width:0，
+           看标题从"撑破容器"变为省略号截断。
+  【注意事项】
+    flex:1 与 flex:auto 在内容短时看起来一样，只有内容长短不一时
+    差异才显现；min-width:auto 坑同样存在于 column 方向（min-height:auto）。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 02 · flex 三属性与简写陷阱</title>
+<style>
+  /* ---------- 基础层 ---------- */
+  :root {
+    --brand: #4361ee; --bg: #f4f6fb; --card: #fff;
+    --ink: #243244; --muted: #7d8da3; --line: #e4e9f2;
+    --bad: #e84118; --good: #2fbf71;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.6;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 8px; }
+  .tip {
+    font-size: .82rem; color: var(--muted); background: #f2f6ff;
+    border-left: 3px solid var(--brand); padding: 6px 10px; margin-bottom: 14px;
+    border-radius: 0 6px 6px 0;
+  }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .bar button {
+    font: inherit; font-size: .8rem; cursor: pointer; padding: 4px 12px;
+    border-radius: 999px; border: 1px solid var(--line); background: #f7f9fc; transition: all .15s;
+  }
+  .bar button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+  code { background: #f0f3f9; border-radius: 4px; padding: 1px 6px; font-size: .85em; }
+  .foot { color: var(--muted); font-size: .8rem; margin-top: 10px; }
+
+  /* ---------- 第一区：flex:1 vs flex:auto 对照容器 ---------- */
+  .cols { display: flex; gap: 10px; min-height: 74px; }
+  .cols .col {
+    padding: 10px; border-radius: 8px; font-size: .85rem;
+    background: #eef2ff; border: 1px solid #c7d4fb; overflow: hidden;
+  }
+  /* 三列内容刻意长短不一：这是让 flex:1 / flex:auto 显出差异的关键 */
+  .cols .col:nth-child(1) { background: #e8f7ef; border-color: #bfe8d2; }
+  .cols .col:nth-child(3) { background: #fff4e8; border-color: #ffd9b3; }
+
+  /* ---------- 第二区：grow 滑杆 ---------- */
+  .grow-stage { display: flex; gap: 10px; }
+  .grow-stage .fixed { flex: none; width: 110px; padding: 10px;
+    background: #f0f3f9; border-radius: 8px; font-size: .85rem; text-align: center; }
+  .grow-stage .elastic {
+    padding: 10px; border-radius: 8px; font-size: .85rem; text-align: center;
+    background: #eef2ff; border: 1px solid #c7d4fb;
+    /* grow 值由滑杆动态写入：0 时完全不参与分配，3 时吃掉 3/4 剩余空间 */
+  }
+  input[type="range"] { width: 200px; vertical-align: middle; }
+  .val { display: inline-block; min-width: 2ch; font-weight: 700; color: var(--brand); }
+
+  /* ---------- 第三区：min-width:auto 溢出坑 ---------- */
+  .toolbar {
+    display: flex; align-items: center; gap: 10px;
+    border: 2px dashed var(--line); border-radius: 8px; padding: 10px;
+  }
+  /* 标题项：flex:1 期望"占满剩余并被压缩"，但 min-width:auto 挡住了压缩 */
+  .toolbar .title { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  /* 修复类：通过开关给标题挂上 min-width:0，允许它收缩到内容以下 */
+  .toolbar.fix .title { min-width: 0; }
+  .toolbar .btn { flex: none; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--line);
+                  background: #f7f9fc; font-size: .82rem; }
+  /* 长字符串用"伪长标题"：一串不换行的中文 + 英文单词，模拟真实长标题 */
+  .state-bad { color: var(--bad); font-weight: 700; }
+  .state-good { color: var(--good); font-weight: 700; }
+</style>
+</head>
+<body>
+<h1>flex 三属性与简写陷阱</h1>
+<p class="sub">flex-grow（放大权重）· flex-shrink（收缩权重）· flex-basis（分配前基准）——一切差异都从 basis 起点开始。</p>
+
+<!-- ================= 第一区：flex:1 vs flex:auto ================= -->
+<section>
+  <h2>1. <code>flex: 1</code> 与 <code>flex: auto</code> 的区别</h2>
+  <div class="tip">三列内容长短刻意不同。<code>flex: 1</code> 展开为 <code>1 1 0%</code>（基准 0，剩余空间纯均分 → 等宽）；
+      <code>flex: auto</code> 展开为 <code>1 1 auto</code>（基准 = 内容宽，先按内容占位再分剩余 → 内容多者更宽）。</div>
+  <div class="bar" id="flexMode">
+    <button class="on" data-v="1">flex: 1</button>
+    <button data-v="auto">flex: auto</button>
+    <button data-v="initial">flex: initial</button>
+    <button data-v="none">flex: none</button>
+  </div>
+  <div class="cols" id="cols">
+    <div class="col">短内容</div>
+    <div class="col">中间列的内容比较长一些，用来观察分配差异</div>
+    <div class="col">末列较短</div>
+  </div>
+  <p class="foot">当前写法：<code id="curFlex">.col { flex: 1 } → 展开为 flex: 1 1 0%</code></p>
+</section>
+
+<!-- ================= 第二区：grow 权重滑杆 ================= -->
+<section>
+  <h2>2. flex-grow 权重实验</h2>
+  <div class="tip">左右两块为 <code>flex: none</code> 刚性块，中间块 grow 值可调：
+      剩余空间按 grow 权重（此处其余项为 0）全部分给中间块；拖到 0 观察它"退回内容宽"。</div>
+  <div class="bar">
+    <label>中间块 flex-grow = <span class="val" id="growVal">1</span></label>
+    <input type="range" id="growRange" min="0" max="5" step="1" value="1">
+  </div>
+  <div class="grow-stage">
+    <div class="fixed">固定块<br>flex: none</div>
+    <div class="elastic" id="elastic">弹性块（grow 可调）</div>
+    <div class="fixed">固定块<br>flex: none</div>
+  </div>
+</section>
+
+<!-- ================= 第三区：min-width:auto 溢出坑 ================= -->
+<section>
+  <h2>3. min-width: auto 溢出坑与修复</h2>
+  <div class="tip">flex item 的默认最小尺寸是内容的 min-content：<span class="state-bad">关闭修复</span>时，
+      标题把"删除"按钮挤出容器；<span class="state-good">开启修复</span>后 <code>min-width: 0</code>
+      允许标题收缩，配合 <code>overflow: hidden + text-overflow: ellipsis</code> 出省略号。</div>
+  <div class="bar">
+    <button class="on" id="fixBtn">修复：min-width: 0（点击切换）</button>
+    <span class="foot" id="fixState">当前：未修复 → 容器被撑破，按钮溢出</span>
+  </div>
+  <div class="toolbar" id="toolbar">
+    <!-- 长标题内容为真实感文案：不换行的中英混排是生产中最常见的引爆点 -->
+    <span class="title">电商中台-商品库存同步任务-跨境仓批次回传流水号ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</span>
+    <button class="btn">删除</button>
+    <button class="btn">导出</button>
+  </div>
+  <p class="foot">原理：flex item 的 min-width 初始值不是 0 而是 auto（automatic minimum size），
+     overflow 为 visible 时解析为内容 min-content → "压不下去"。
+     column 方向同样存在 min-height: auto，修法一致。</p>
+</section>
+
+<script>
+  // ---------- 第一区：flex 写法切换 ----------
+  const cols = document.getElementById('cols');
+  const curFlex = document.getElementById('curFlex');
+  // 四种写法的"展开值"解释，点击时同步展示，帮助记忆简写 ↔ 长属性映射
+  const expand = {
+    '1':       'flex: 1 1 0%   —— 基准 0：剩余空间纯均分，三列等宽',
+    'auto':    'flex: 1 1 auto —— 基准 auto：先按内容占位，再均分剩余，内容多者更宽',
+    'initial': 'flex: 0 1 auto —— 不放大、可收缩：初始份额全看内容',
+    'none':    'flex: 0 0 auto —— 完全不弹：既不放大也不收缩，可能溢出'
+  };
+  document.getElementById('flexMode').addEventListener('click', e => {
+    if (e.target.tagName !== 'BUTTON') return;
+    const v = e.target.dataset.v;
+    cols.querySelectorAll('.col').forEach(c => c.style.flex = v);  // 三列统一写法
+    curFlex.textContent = `.col { flex: ${v} } → ${expand[v]}`;
+    e.currentTarget.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === e.target));
+  });
+
+  // ---------- 第二区：grow 滑杆 ----------
+  const elastic = document.getElementById('elastic');
+  const growRange = document.getElementById('growRange');
+  const growVal = document.getElementById('growVal');
+  // input 事件实时写 flex-grow：滑杆是观察"权重瓜分剩余空间"最直接的仪器
+  growRange.addEventListener('input', () => {
+    elastic.style.flexGrow = growRange.value;
+    growVal.textContent = growRange.value;
+  });
+
+  // ---------- 第三区：min-width 修复开关 ----------
+  const toolbar = document.getElementById('toolbar');
+  const fixBtn = document.getElementById('fixBtn');
+  const fixState = document.getElementById('fixState');
+  let fixed = true;                       // 默认开启修复，避免首屏就"坏"
+  fixBtn.addEventListener('click', () => {
+    fixed = !fixed;
+    toolbar.classList.toggle('fix', fixed);   // fix 类控制 min-width: 0
+    fixBtn.classList.toggle('on', fixed);
+    fixState.innerHTML = fixed
+      ? '当前：<span class="state-good">已修复</span> → 标题省略号截断，按钮完整可见'
+      : '当前：<span class="state-bad">未修复</span> → 标题撑破容器，按钮被挤出';
+  });
+  // 初始化为修复态，与按钮默认高亮保持一致
+  toolbar.classList.add('fix');
+</script>
+</body>
+</html>

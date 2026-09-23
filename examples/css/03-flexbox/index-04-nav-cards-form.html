@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 04：Flex 实战三合体 —— 导航栏 / 等高分栏卡片 / 表单行
+  ------------------------------------------------------------
+  【知识点】
+    1. 响应式导航栏：logo + 居中菜单 + 操作按钮，flex-wrap 保底换行
+    2. 等高卡片：外层 stretch 默认等高 + 卡片内 column 布局
+       + margin-top:auto 把按钮压到卡片底部
+    3. 表单行：align-items: baseline 基线对齐 label 与输入框，
+       输入框 flex:1 + min-width:0 占满剩余宽度
+    4. gap 统一间距：告别 :not(:last-child) margin 技巧
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    三个小节对应三种高频生产组件：
+    ① 导航栏——拖窄窗口观察菜单换行而非溢出；
+    ② 卡片组——三张卡描述字数不同但高度一致、按钮底线对齐；
+    ③ 表单行——点击"放大 label 字号"，输入框文字仍与 label 同一基线。
+  【注意事项】
+    等高卡片有两条路线：让中间描述元素 flex:1 吃高度，或按钮
+    margin-top:auto 推底（本示例用后者，无需指定"谁吃高度"）；
+    卡片组窄屏折行依赖 flex-wrap: wrap，注意同时给卡片设置
+    min-width 或 flex-basis，否则 flex:1 卡片会被压到不可读。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 04 · 导航栏 / 等高卡片 / 表单行</title>
+<style>
+  /* ---------- 基础层 ---------- */
+  :root {
+    --brand: #4361ee; --bg: #f4f6fb; --card: #fff;
+    --ink: #243244; --muted: #7d8da3; --line: #e4e9f2; --danger: #e84118;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.6;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 8px; }
+  .tip {
+    font-size: .82rem; color: var(--muted); background: #f2f6ff;
+    border-left: 3px solid var(--brand); padding: 6px 10px; margin-bottom: 14px;
+    border-radius: 0 6px 6px 0;
+  }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .bar button {
+    font: inherit; font-size: .8rem; cursor: pointer; padding: 5px 12px;
+    border-radius: 999px; border: 1px solid var(--line); background: #f7f9fc; transition: all .15s;
+  }
+  .bar button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+  code { background: #f0f3f9; border-radius: 4px; padding: 1px 6px; font-size: .85em; }
+  .foot { color: var(--muted); font-size: .8rem; margin-top: 10px; }
+  button { font-family: inherit; }
+
+  /* ============================================================
+     组件一：响应式导航栏
+     ============================================================ */
+  .nav {
+    display: flex;
+    align-items: center;    /* 三块高度不一时垂直居中 */
+    flex-wrap: wrap;        /* 窄屏放不下时换行，是"保底响应式"的关键 */
+    gap: 16px;              /* 模块间距统一走 gap */
+    background: #2c3e63; color: #fff;
+    padding: 12px 20px; border-radius: 10px;
+  }
+  /* logo：刚性元素 flex:none，防止被拉伸/压缩变形 */
+  .nav .logo { flex: none; font-weight: 700; letter-spacing: 1px; font-size: 1.05rem; }
+  /* 菜单：flex:1 吃掉中间剩余空间；自身再是 flex 容器让菜单项居中 */
+  .nav .menu {
+    flex: 1;
+    display: flex;
+    justify-content: center;  /* 菜单项组在自身空间内水平居中 */
+    flex-wrap: wrap;          /* 菜单项过多时先在组内换行 */
+    gap: 4px; list-style: none;
+  }
+  .nav .menu a {
+    display: block; padding: 6px 14px; border-radius: 6px;
+    color: #cdd7ee; text-decoration: none; font-size: .88rem;
+  }
+  .nav .menu a:hover, .nav .menu a.active { background: #40598c; color: #fff; }
+  .nav .actions { flex: none; display: flex; gap: 8px; }
+  .nav .actions button {
+    padding: 6px 14px; border-radius: 6px; border: none; font-size: .85rem; cursor: pointer;
+  }
+  .nav .btn-ghost { background: transparent; color: #cdd7ee; border: 1px solid #5b739f !important; }
+  .nav .btn-main  { background: var(--brand); color: #fff; }
+
+  /* ============================================================
+     组件二：等高分栏卡片（按钮贴底）
+     ============================================================ */
+  .cards { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; }
+  .card {
+    /* flex:1 1 240px：可放大可收缩、最小期望 240px —— 窄屏折行时
+       仍保证可读下限，比纯 flex:1 更稳 */
+    flex: 1 1 240px;
+    display: flex;               /* 卡片自身是纵向 flex：标题/描述/按钮 */
+    flex-direction: column;
+    background: #fbfcff; border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px;
+  }
+  .card h3 { font-size: 1rem; margin-bottom: 6px; }
+  .card .tag { font-size: .72rem; color: var(--brand); background: #eef2ff;
+               align-self: flex-start; padding: 2px 8px; border-radius: 999px; margin-bottom: 8px; }
+  .card p { font-size: .85rem; color: var(--muted); }
+  /* 关键技巧：margin-top:auto 吸收所有剩余空间，把按钮压到卡片底部。
+     无论描述文字多少，三张卡的按钮永远在同一条底线上 */
+  .card .buy { margin-top: auto; }
+  .card .buy button {
+    width: 100%; padding: 8px 0; border: none; border-radius: 8px;
+    background: var(--brand); color: #fff; font-size: .88rem; cursor: pointer;
+  }
+  .card .price { font-size: 1.1rem; font-weight: 700; color: var(--danger); margin: 8px 0; }
+
+  /* ============================================================
+     组件三：表单行（baseline 对齐）
+     ============================================================ */
+  .form-row {
+    display: flex;
+    align-items: baseline;   /* 基线对齐：label 字号变化时文字仍贴同一条线 */
+    gap: 10px; margin-bottom: 14px;
+  }
+  /* label 刚性；label-big 由演示按钮切换字号，用于验证 baseline 的威力 */
+  .form-row label { flex: none; min-width: 72px; font-size: .88rem; }
+  .form-row label.big { font-size: 1.4rem; font-weight: 700; color: var(--brand); }
+  /* 输入框：占满剩余宽度；min-width:0 解除自动最小尺寸，
+     否则 input 的固有尺寸会阻止收缩、把整行撑破 */
+  .form-row input {
+    flex: 1; min-width: 0;
+    padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px;
+    font: inherit; font-size: .88rem;
+  }
+  .form-row input:focus { outline: 2px solid #b9cff8; border-color: var(--brand); }
+  .form-row .hint { flex: none; font-size: .72rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<h1>Flex 实战三合体</h1>
+<p class="sub">导航栏 · 等高卡片 · 表单行——生产中出现频率最高的三个 Flex 组件模式。</p>
+
+<!-- ================= 组件一：导航栏 ================= -->
+<section>
+  <h2>1. 响应式导航栏</h2>
+  <div class="tip">结构：<code>logo（flex:none）</code> + <code>菜单（flex:1 内部居中）</code> +
+      <code>按钮组（flex:none）</code>。拖窄窗口：菜单项先组内换行，再整块掉行，永不溢出。</div>
+  <nav class="nav">
+    <span class="logo">◆ LOGO</span>
+    <ul class="menu">
+      <li><a href="#" class="active">首页</a></li>
+      <li><a href="#">商品</a></li>
+      <li><a href="#">订单</a></li>
+      <li><a href="#">数据</a></li>
+      <li><a href="#">设置</a></li>
+    </ul>
+    <div class="actions">
+      <button class="btn-ghost">登录</button>
+      <button class="btn-main">注册</button>
+    </div>
+  </nav>
+  <p class="foot">菜单能精确居中，是因为左右两块刚性、中间块 flex:1 吃掉全部剩余空间——
+     左右宽度不等也不会导致菜单偏移（剩余空间被夹逼居中）。</p>
+</section>
+
+<!-- ================= 组件二：等高卡片 ================= -->
+<section>
+  <h2>2. 等高分栏卡片（按钮贴底）</h2>
+  <div class="tip">三张卡描述字数差异巨大，但卡高一致（外层默认 <code>align-items: stretch</code>），
+      按钮靠 <code>margin-top: auto</code> 统一压到底部。</div>
+  <div class="cards">
+    <article class="card">
+      <span class="tag">新品</span>
+      <h3>无线机械键盘 K7</h3>
+      <p class="price">¥ 399</p>
+      <p>三模连接，Gasket 结构，热插拔轴座，PBT 键帽，出厂润轴，手感炸裂。</p>
+      <div class="buy"><button>加入购物车</button></div>
+    </article>
+    <article class="card">
+      <span class="tag">热销</span>
+      <h3>人体工学椅</h3>
+      <p class="price">¥ 1299</p>
+      <p>腰背分离支撑。长描述警告：这张卡的描述文字明显比左右两张长得多，用来演示——
+         等高不是靠 JS 量出来的，是外层 flex 容器 align-items: stretch 的默认行为；
+         描述差异被 margin-top:auto 产生的留白吸收，按钮底线严格对齐。</p>
+      <div class="buy"><button>加入购物车</button></div>
+    </article>
+    <article class="card">
+      <span class="tag">清仓</span>
+      <h3>桌面支架</h3>
+      <p class="price">¥ 59</p>
+      <p>铝合金。</p>
+      <div class="buy"><button>加入购物车</button></div>
+    </article>
+  </div>
+  <p class="foot">另一条等价路线：让描述 <code>flex: 1</code> 吃掉剩余高度。<code>margin-top: auto</code>
+     的优势是无需指定"谁吃高度"，任何元素都能靠 auto margin 推到边缘。</p>
+</section>
+
+<!-- ================= 组件三：表单行 ================= -->
+<section>
+  <h2>3. 表单行（基线对齐）</h2>
+  <div class="tip">点下方按钮把 label 字号放大，观察输入框文字仍与 label 贴在同一条基线上——
+      这正是 <code>align-items: baseline</code> 与 <code>center</code> 的排版级差别。</div>
+  <div class="bar">
+    <button id="bigLabel">放大 label 字号（验证 baseline）</button>
+  </div>
+  <div class="form-row">
+    <label id="labelEl">邮箱</label>
+    <input type="text" placeholder="请输入邮箱地址">
+    <span class="hint">必填</span>
+  </div>
+  <div class="form-row">
+    <label>手机号</label>
+    <input type="text" placeholder="请输入手机号">
+    <span class="hint">11 位</span>
+  </div>
+  <p class="foot">输入框 <code>flex: 1; min-width: 0</code>：占满剩余宽度且允许收缩。
+     去掉 min-width:0 再拖窄窗口，会发现 input 的固有尺寸把"必填"提示挤出容器。</p>
+</section>
+
+<script>
+  // ---------- baseline 演示开关：label 字号切换 ----------
+  const labelEl = document.getElementById('labelEl');
+  const bigBtn = document.getElementById('bigLabel');
+  let big = false;
+  bigBtn.addEventListener('click', () => {
+    big = !big;
+    labelEl.classList.toggle('big', big);          // 切换大字号样式
+    bigBtn.classList.toggle('on', big);
+    bigBtn.textContent = big
+      ? '恢复 label 字号（当前：1.4rem，基线仍对齐）'
+      : '放大 label 字号（验证 baseline）';
+  });
+</script>
+</body>
+</html>

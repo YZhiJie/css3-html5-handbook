@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：place-* 对齐体系 + 嵌套网格与子网格 subgrid
+  ------------------------------------------------------------
+  【知识点】
+    1. 三组六个对齐属性：place-items / place-content / place-self
+    2. align 管块轴（垂直）、justify 管内联轴（水平）——Grid 中不随方向变化
+    3. 嵌套网格：子网格默认与父网格轨道互相独立
+    4. subgrid：grid-template-rows/columns: subgrid 透传父轨道，
+       配合 grid-column: span n 使用，@supports 渐进增强
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    第一区：九宫格演示 place-items 各取值（center/start/end/stretch）；
+    第二区：place-content 在"轨道总尺寸 < 容器"时的空隙分配；
+    第三区：两列卡片，标题行数不同——开关 subgrid 后，
+            支持的浏览器中两卡首行严格对齐，不支持的浏览器走
+            min-height 兜底（@supports 探测结果会显示在页面上）。
+  【注意事项】
+    subgrid 兼容基线：Firefox 71+ / Safari 16+ / Chrome & Edge 117+；
+    使用 subgrid 的维度必须先声明 span 足够的轨道数，否则无轨道可继承；
+    place-content 只有在网格总尺寸小于容器时才有空隙可分配。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>示例 03 · place-* 对齐与 subgrid</title>
+  <style>
+    /* ---------- 基础层 ---------- */
+    :root {
+      --brand: #4361ee;
+      --bg: #f4f6fb;
+      --card: #fff;
+      --ink: #243244;
+      --muted: #7d8da3;
+      --line: #e4e9f2;
+      --good: #2fbf71;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      padding: 24px;
+      line-height: 1.6;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 4px;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: .9rem;
+      margin-bottom: 18px;
+    }
+
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+
+    h2 {
+      font-size: 1.05rem;
+      margin-bottom: 8px;
+    }
+
+    .tip {
+      font-size: .82rem;
+      color: var(--muted);
+      background: #f2f6ff;
+      border-left: 3px solid var(--brand);
+      padding: 6px 10px;
+      margin-bottom: 14px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .bar button {
+      font: inherit;
+      font-size: .8rem;
+      cursor: pointer;
+      padding: 4px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #f7f9fc;
+      transition: all .15s;
+    }
+
+    .bar button.on {
+      background: var(--brand);
+      border-color: var(--brand);
+      color: #fff;
+    }
+
+    code {
+      background: #f0f3f9;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: .85em;
+    }
+
+    .foot {
+      color: var(--muted);
+      font-size: .8rem;
+      margin-top: 10px;
+    }
+
+    /* ---------- 第一区：place-items 九宫格 ---------- */
+    /* 格子尺寸固定且大于内容：让"项目在格子内怎么放"可见 */
+    .nine {
+      display: grid;
+      grid-template-columns: repeat(3, 150px);
+      grid-template-rows: repeat(3, 90px);
+      gap: 8px;
+      place-items: start start;
+      /* 默认由按钮切换 */
+    }
+
+    .nine .k {
+      background: #eef2ff;
+      border: 1px solid #c7d4fb;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: .78rem;
+      color: #24457e;
+    }
+
+    /* 投影格子：虚线框表示"格子本身"，实体块表示"项目"，
+     直观呈现项目在格子内的位置变化 */
+    .nine .ghost {
+      background: transparent;
+      border: 2px dashed var(--line);
+      color: var(--muted);
+    }
+
+    /* ---------- 第二区：place-content ---------- */
+    /* 轨道总尺寸刻意小于容器：产生可分配的剩余空隙 */
+    .content-stage {
+      display: grid;
+      grid-template-columns: 120px 120px;
+      /* 固定轨道：总宽 248px（含 gap） */
+      grid-template-rows: 80px;
+      gap: 8px;
+      height: 200px;
+      /* 容器高于轨道 → 垂直方向有空隙 */
+      border: 2px dashed var(--line);
+      border-radius: 10px;
+      place-content: start start;
+      /* 默认由按钮切换 */
+    }
+
+    .content-stage .k {
+      background: #fff4e8;
+      border: 1px solid #ffd9b3;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .82rem;
+      color: #8a5a23;
+    }
+
+    /* ============================================================
+     第三区：嵌套网格 vs subgrid
+     外层两列卡片；卡片三个直接子元素 = 标题 / 描述 / 操作区，
+     正好映射到父网格的 3 条行轨道。
+     标题行数不同时：独立嵌套网格各排各的（描述起点错位），
+     subgrid 让所有卡片的行轨道对齐到同一水平线。
+     ============================================================ */
+    .cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    /* subgrid 模式下父网格提供 3 条"公共行轨道"（标题/描述/操作各一条），
+     行高 auto 由所有卡片内容统一求解 → 跨卡对齐 */
+    .cards.sub-mode {
+      grid-template-rows: repeat(3, auto);
+    }
+
+    /* 兜底（普通嵌套）模式：卡片行轨道独立求解，
+     auto 1fr auto 让描述吃掉剩余高度、按钮贴底 */
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+      background: #fbfcff;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 8px;
+    }
+
+    /* subgrid 模式：卡片行轨道透传父网格 → 跨卡片的行严格对齐。
+     卡片自身的边框/内边距照常保留，不影响共享轨道求解 */
+    .cards.sub-mode .card {
+      grid-row: span 3;
+      /* 必须：先声明占用父网格 3 行，才有轨道可继承 */
+      grid-template-rows: subgrid;
+      /* 核心：行方向沿用父轨道 */
+      gap: 8px;
+    }
+
+    .card h3 {
+      font-size: .95rem;
+    }
+
+    .card .desc {
+      font-size: .82rem;
+      color: var(--muted);
+    }
+
+    .card .act {
+      margin-top: auto;
+    }
+
+    .card .act button {
+      width: 100%;
+      padding: 7px 0;
+      border: none;
+      border-radius: 8px;
+      background: var(--brand);
+      color: #fff;
+      font-size: .82rem;
+      cursor: pointer;
+    }
+
+    /* 兜底：不支持 subgrid 时给标题行一个最小高度，肉眼上仍大致对齐 */
+    .card h3 {
+      min-height: 1.5em;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>place-* 对齐体系与子网格 subgrid</h1>
+  <p class="sub">align 管块轴（垂直）· justify 管内联轴（水平）——Grid 中这两根轴永远各司其职。</p>
+
+  <!-- ================= 第一区：place-items ================= -->
+  <section>
+    <h2>1. place-items：项目在格子内怎么放</h2>
+    <div class="tip">九宫格 = 9 个固定格子，每个格子里放一个小块。
+      <code>place-items: &lt;align-items&gt; / &lt;justify-items&gt;</code>，第一个值管垂直、第二个管水平。
+    </div>
+    <div class="bar" id="itemsSwitch">
+      <button class="on">start start</button><button>center center</button><button>end end</button>
+      <button>start center</button><button>stretch stretch</button>
+    </div>
+    <div class="nine" id="nine">
+      <div class="k ghost">格子(虚线)</div>
+      <div class="k ghost">格子(虚线)</div>
+      <div class="k ghost">格子(虚线)</div>
+      <div class="k ghost">格子(虚线)</div>
+      <div class="k">项目 K</div>
+      <div class="k ghost">格子(虚线)</div>
+      <div class="k ghost">格子(虚线)</div>
+      <div class="k ghost">格子(虚线)</div>
+      <div class="k ghost">格子(虚线)</div>
+    </div>
+    <p class="foot">stretch 时项目块被拉满整个格子（拉伸的只有非 auto 尺寸的盒子）；
+      这是 place-items 最常用的四个值。最速记法：<code>place-items: center</code> = 格子内绝对居中。</p>
+  </section>
+
+  <!-- ================= 第二区：place-content ================= -->
+  <section>
+    <h2>2. place-content：整个网格在容器里怎么分空隙</h2>
+    <div class="tip">固定轨道总尺寸 &lt; 容器尺寸 → 剩余空隙由 <code>place-content</code> 分配。
+      注意它与 place-items 的区别：content 管"轨道群"，items 管"格子里的项目"。</div>
+    <div class="bar" id="contentSwitch">
+      <button class="on">start start</button><button>center center</button>
+      <button>end end</button><button>space-evenly space-evenly</button>
+    </div>
+    <div class="content-stage" id="contentStage">
+      <div class="k">轨道 1</div>
+      <div class="k">轨道 2</div>
+    </div>
+    <p class="foot">切到 space-evenly：轨道之间、以及轨道与容器边缘之间的空隙完全相等。</p>
+  </section>
+
+  <!-- ================= 第三区：subgrid ================= -->
+  <section>
+    <h2>3. 嵌套网格 → 子网格 subgrid：跨卡片行对齐</h2>
+    <div class="tip">A 卡标题一行、B 卡标题两行。
+      <b>关</b>（独立嵌套）：两卡的"描述区"起点各自为政；
+      <b>开</b>（subgrid）：两卡标题/正文落在同一条父网格行线上，肉眼严格对齐。
+    </div>
+    <div class="bar">
+      <button class="on" id="subBtn">开启 subgrid（点击切换）</button>
+      <span class="foot" id="subState" style="margin:0"></span>
+    </div>
+    <div class="cards" id="cards">
+      <div class="card">
+        <h3>A 卡：短标题</h3>
+        <p class="desc">描述文字。A 卡标题只有一行。</p>
+        <div class="act"><button>操作 A</button></div>
+      </div>
+      <div class="card">
+        <h3>B 卡：这是一个长标题它一定会折行变成两行的高度</h3>
+        <p class="desc">描述文字。B 卡标题折成两行——独立嵌套时 A 卡的描述区会显得"偏高"。</p>
+        <div class="act"><button>操作 B</button></div>
+      </div>
+    </div>
+    <p class="foot">subgrid 写法三要素：父网格提供公共行轨道 → 卡片 <code>grid-row: span 3</code> 占轨 →
+      卡片 <code>grid-template-rows: subgrid</code> 透传。不支持的浏览器自动回落为独立嵌套网格 + min-height 兜底。</p>
+  </section>
+
+  <script>
+    // ---------- 第一区：place-items 切换 ----------
+    const nine = document.getElementById('nine');
+    document.getElementById('itemsSwitch').addEventListener('click', e => {
+      if (e.target.tagName !== 'BUTTON') return;
+      const v = e.target.textContent;                 // 按钮文本即 place-items 值
+      nine.style.placeItems = v;                      // 写入九宫格
+      e.currentTarget.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === e.target));
+    });
+
+    // ---------- 第二区：place-content 切换 ----------
+    const contentStage = document.getElementById('contentStage');
+    document.getElementById('contentSwitch').addEventListener('click', e => {
+      if (e.target.tagName !== 'BUTTON') return;
+      contentStage.style.placeContent = e.target.textContent;
+      e.currentTarget.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === e.target));
+    });
+
+    // ---------- 第三区：subgrid 开关 + 能力探测 ----------
+    const cards = document.getElementById('cards');
+    const subBtn = document.getElementById('subBtn');
+    const subState = document.getElementById('subState');
+
+    // 运行时能力探测：与 @supports 同源，把结果反馈到页面而不是静默降级
+    const supportsSubgrid = CSS.supports('grid-template-rows', 'subgrid');
+    subState.innerHTML = supportsSubgrid
+      ? '<span style="color:var(--good)">当前浏览器支持 subgrid ✔</span>'
+      : '当前浏览器不支持 subgrid（基线：Chrome/Edge 117+、Firefox 71+、Safari 16+），将展示兜底效果。';
+
+    let subOn = true;                                   // 支持时默认开启
+    function applySub(on) {
+      // 能力不足时强制回落：避免"按钮显示开了、布局没变"的困惑
+      if (on && !supportsSubgrid) on = false;
+      cards.classList.toggle('sub-mode', on);
+      subBtn.classList.toggle('on', on);
+      subBtn.textContent = on ? '关闭 subgrid（点击切换）' : '开启 subgrid（点击切换）';
+      subState.innerHTML = on
+        ? '<span style="color:var(--good)">subgrid 生效：两卡行轨道共享父网格 → 标题/描述起点严格对齐</span>'
+        : (supportsSubgrid
+          ? '独立嵌套网格：两卡行轨道各自求解 → B 卡描述被两行标题下推'
+          : '当前浏览器不支持 subgrid，恒为独立嵌套 + min-height 兜底。');
+    }
+    subBtn.addEventListener('click', () => { subOn = !subOn; applySub(subOn); });
+    applySub(subOn);                                    // 初始化
+  </script>
+</body>
+
+</html>

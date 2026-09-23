@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：圣杯布局 + 粘性页脚（Sticky Footer）
+  ------------------------------------------------------------
+  【知识点】
+    1. 圣杯布局：源码中主内容在最前（利于 SEO/读屏），order 控制视觉列序
+    2. flex: 0 0 Npx 定宽侧栏 与 flex: 1 自适应主列的配合
+    3. 粘性页脚三行式：min-height:100vh + column 方向 + 中段 flex:1
+    4. 移动端单列重排：只改 flex-direction 与 order，不动结构
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    页面上半部分是完整圣杯布局（顶栏 / 左栏 180px / 主内容 / 右栏 240px / 底栏），
+    可点击"短内容 / 长内容"切换主列内容量，观察：
+    a) 短内容时页脚依然贴住视口底部（sticky footer 生效）；
+    b) 长内容时整页正常滚开，页脚跟在内容之后；
+    c) 点击"切换单列模式"模拟移动端：侧栏堆叠到主内容上下。
+  【注意事项】
+    粘性页脚必须用 min-height 而非 height，否则长内容会把容器撑破；
+    order 只改视觉顺序，读屏与 Tab 焦点仍按 DOM 源码顺序，勿滥用。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 03 · 圣杯布局与粘性页脚</title>
+<style>
+  /* ---------- 基础层 ---------- */
+  :root {
+    --brand: #4361ee; --bg: #f4f6fb; --card: #fff;
+    --ink: #243244; --muted: #7d8da3; --line: #e4e9f2;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.6;
+    /* 粘性页脚三件套之一：纵向主轴 + 至少一屏（min-height 不能是 height，
+       否则内容超长时容器无法被撑开，页脚会与内容重叠） */
+    display: flex; flex-direction: column; min-height: 100vh;
+  }
+  h1 { font-size: 1.5rem; margin: 0; }
+  .sub { color: var(--muted); font-size: .9rem; margin: 4px 0 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 16px 18px; margin-bottom: 18px;
+  }
+  .tip {
+    font-size: .82rem; color: var(--muted); background: #f2f6ff;
+    border-left: 3px solid var(--brand); padding: 6px 10px; margin-bottom: 14px;
+    border-radius: 0 6px 6px 0;
+  }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .bar button {
+    font: inherit; font-size: .8rem; cursor: pointer; padding: 5px 12px;
+    border-radius: 999px; border: 1px solid var(--line); background: #f7f9fc; transition: all .15s;
+  }
+  .bar button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+  /* ============================================================
+     圣杯布局核心
+     页面骨架 = body（纵向 flex）内的 header / main / footer。
+     main 是第二层 flex（横向），三列在这里排布。
+     ============================================================ */
+
+  /* 顶栏 / 底栏：flex 布局下默认占满容器宽度，无需 width:100% */
+  header.hg {
+    background: #2c3e63; color: #fff; padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  footer.hg {
+    background: #2c3e63; color: #cdd7ee; padding: 12px 20px; font-size: .85rem;
+    text-align: center;
+  }
+  /* 中段：flex:1 吃掉视口剩余高度（sticky footer 的另一半），
+     min-height:0 防 column 方向自动最小尺寸把容器撑破（双滚动条根因） */
+  main.hg {
+    display: flex; flex: 1; min-height: 0;
+    gap: 16px; padding: 16px; width: 100%;
+  }
+  /* 主内容列：写在 HTML 源码最前，靠 order:2 摆到视觉中间。
+     flex:1 吃掉左右侧栏之外的剩余宽度；
+     min-width:0 解除自动最小尺寸，长内容才能触发自身滚动/截断而非撑破布局 */
+  .hg-main  { flex: 1; min-width: 0; order: 2; }
+  /* 侧栏：flex: 0 0 Npx = 不放大不收缩、基准定宽 —— "刚性列"标准写法 */
+  .hg-left  { flex: 0 0 180px; order: 1; }
+  .hg-right { flex: 0 0 240px; order: 3; }
+  .hg-main, .hg-left, .hg-right {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px; font-size: .88rem;
+  }
+  .hg-left  { background: #eef2ff; }
+  .hg-right { background: #fff7ef; }
+  .hg-left h3, .hg-right h3 { font-size: .9rem; margin-bottom: 8px; }
+  .hg-left ul { list-style: none; font-size: .85rem; color: var(--muted); }
+  .hg-left li { padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+  .hg-left li:hover { background: #dde5ff; color: var(--brand); }
+
+  /* 单列模式：模拟移动端 —— 只换方向与次序，DOM 与列宽声明零改动 */
+  .single main.hg { flex-direction: column; }
+  .single .hg-left, .single .hg-right { flex: 0 0 auto; order: 0; }  /* 归零让源码序接管 */
+
+  .hg-main p { margin-bottom: 10px; }
+  .placeholder-box {
+    background: repeating-linear-gradient(45deg, #f0f3f9 0 12px, #e8edf6 12px 24px);
+    border: 1px dashed var(--line); border-radius: 8px;
+    padding: 12px; font-size: .82rem; color: var(--muted);
+  }
+</style>
+</head>
+<body>
+  <!-- 页面骨架：主内容在源码中第一个出现（利于 SEO 与读屏顺序），
+       视觉位置由 order 决定 —— 这就是"圣杯"相对于浮动时代方案的进步 -->
+  <header class="hg">
+    <h1>圣杯布局 · Demo</h1>
+    <span style="font-size:.82rem;opacity:.75">header 通栏</span>
+  </header>
+
+  <main class="hg">
+    <article class="hg-main">
+      <h2 style="font-size:1.05rem;margin-bottom:10px">主内容（源码第一，视觉居中）</h2>
+      <!-- 内容容器：短/长内容都渲染在这里，用于演示 sticky footer 的两种状态 -->
+      <div id="content">
+        <div class="placeholder-box">短内容模式：几行文字。</div>
+        <p>主列宽度 = 容器 − 左栏 180px − 右栏 240px − gap，由 <code>flex: 1</code> 自动求解。</p>
+      </div>
+    </article>
+    <aside class="hg-left">
+      <h3>左栏 180px</h3>
+      <ul>
+        <li>flex: 0 0 180px</li>
+        <li>order: 1 → 视觉最左</li>
+        <li>不放大也不收缩</li>
+      </ul>
+    </aside>
+    <aside class="hg-right">
+      <h3>右栏 240px</h3>
+      <p style="font-size:.85rem;color:var(--muted)">
+        侧栏用 <code>flex: 0 0 Npx</code> 定宽，主列用 <code>flex: 1; min-width: 0</code> 自适应，
+        这是三栏布局的黄金三件套。
+      </p>
+    </aside>
+  </main>
+
+  <footer class="hg">© 粘性页脚：内容不足一屏时贴底，超过一屏时正常跟随 · footer 通栏</footer>
+
+  <!-- 控制面板独立成节：布局本体不受影响，避免演示控件干扰骨架观察 -->
+  <section style="margin-top:4px">
+    <div class="tip">粘性页脚 = body 上 <code>min-height: 100vh + flex-direction: column</code>，
+        中段 <code>flex: 1</code> 吃掉全部剩余高度，页脚被自然推到底部——不需要任何定位 hack。</div>
+    <div class="bar">
+      <button class="on" id="btnShort">短内容</button>
+      <button id="btnLong">长内容（页面滚动）</button>
+      <button id="btnSingle">切换单列模式（模拟移动端）</button>
+    </div>
+    <p class="sub" id="modeNote" style="margin:0">
+      当前：短内容 + 三栏。观察页脚位置：它在视口底部，不贴着内容走。
+    </p>
+  </section>
+
+<script>
+  // ---------- 内容长短切换：观察 sticky footer 的两种状态 ----------
+  const content = document.getElementById('content');
+  const modeNote = document.getElementById('modeNote');
+  const btnShort = document.getElementById('btnShort');
+  const btnLong  = document.getElementById('btnLong');
+
+  // 长内容生成器：重复段落制造足够高度，让页面出现纵向滚动
+  function longHTML() {
+    let html = '<div class="placeholder-box">长内容模式：页面整体滚动，页脚跟在内容之后。</div>';
+    for (let i = 1; i <= 14; i++) {
+      html += `<p>第 ${i} 段：圣杯布局的中段由 flex:1 撑满剩余视口高度；当内容超过一屏，min-height 允许容器被撑开，页脚自然回到文档流末尾——这正是 min-height 与 height 的本质区别。</p>`;
+    }
+    return html;
+  }
+  function shortHTML() {
+    return `<div class="placeholder-box">短内容模式：几行文字。</div>
+      <p>主列宽度 = 容器 − 左栏 180px − 右栏 240px − gap，由 <code>flex: 1</code> 自动求解。</p>`;
+  }
+  function setMode(long) {
+    content.innerHTML = long ? longHTML() : shortHTML();
+    btnLong.classList.toggle('on', long);
+    btnShort.classList.toggle('on', !long);
+    modeNote.textContent = long
+      ? '当前：长内容 + 三栏。页脚不再贴视口底部，而是跟在内容末尾（正常文档流）。'
+      : '当前：短内容 + 三栏。观察页脚位置：它在视口底部，不贴着内容走。';
+  }
+  btnShort.addEventListener('click', () => setMode(false));
+  btnLong.addEventListener('click', () => setMode(true));
+
+  // ---------- 单列模式切换：模拟移动端重排 ----------
+  // 核心演示点：重排只改 flex-direction 与 order，不触碰 HTML 结构
+  const btnSingle = document.getElementById('btnSingle');
+  let single = false;
+  btnSingle.addEventListener('click', () => {
+    single = !single;
+    document.body.classList.toggle('single', single);
+    btnSingle.classList.toggle('on', single);
+    btnSingle.textContent = single ? '切回三栏模式' : '切换单列模式（模拟移动端）';
+    modeNote.textContent = single
+      ? '当前：单列模式。main 的 flex-direction 变为 column，侧栏 flex-basis 归 auto 堆叠排列。'
+      : (content.innerHTML.length > 300 ? '当前：长内容 + 三栏。' : '当前：短内容 + 三栏。');
+  });
+</script>
+</body>
+</html>

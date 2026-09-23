@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 01：Flexbox 主轴 / 交叉轴交互实验台
+  ------------------------------------------------------------
+  【知识点】
+    1. flex-direction 决定主轴方向（row / row-reverse / column / column-reverse）
+    2. justify-content 管主轴对齐；align-items / align-self 管交叉轴对齐
+    3. align-content 只在"多行"（flex-wrap 生效）时参与行间分配
+    4. flex-wrap 换行与 align-items: baseline 基线对齐
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    页面提供 4 组参数面板，点击按钮实时切换容器属性；
+    容器内绘制了主轴（橙色箭头）与交叉轴（蓝色箭头），
+    切换 direction 时箭头方向同步变化，帮助建立"两根轴"的直觉。
+    底部还有 align-self 单项特立独行 与 baseline 对齐两个小演示。
+  【注意事项】
+    align-content 在单行容器中无效（演示区特意开启了 wrap）；
+    justify-* 永远沿主轴、align-* 永远沿交叉轴——换 direction
+    后两者分工对象随之对调，这是初学者最大困惑点。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>示例 01 · Flexbox 主轴/交叉轴实验台</title>
+  <style>
+    /* ---------- 基础层：统一视觉基调 ---------- */
+    :root {
+      /* 变量集中管理：主轴用橙色、交叉轴用蓝色，全文保持一致，形成色彩记忆 */
+      --main: #ff7a18;
+      /* 主轴颜色 */
+      --cross: #2f6fed;
+      /* 交叉轴颜色 */
+      --bg: #f4f6fb;
+      --card: #fff;
+      --ink: #243244;
+      --muted: #7d8da3;
+      --line: #e4e9f2;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      padding: 24px;
+      line-height: 1.6;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 4px;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: .9rem;
+      margin-bottom: 18px;
+    }
+
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+
+    h2 {
+      font-size: 1.05rem;
+      margin-bottom: 10px;
+    }
+
+    .tip {
+      font-size: .82rem;
+      color: var(--muted);
+      background: #fff7ef;
+      border-left: 3px solid var(--main);
+      padding: 6px 10px;
+      margin-bottom: 14px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    /* ---------- 参数面板：每个属性一排切换按钮 ---------- */
+    .panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .panel>label {
+      font-size: .82rem;
+      color: var(--muted);
+      min-width: 132px;
+      flex: none;
+    }
+
+    /* 属性值按钮：当前生效值高亮为对应轴的颜色 */
+    .panel button {
+      font: inherit;
+      font-size: .8rem;
+      cursor: pointer;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #f7f9fc;
+      color: var(--ink);
+      transition: all .15s;
+    }
+
+    .panel button:hover {
+      border-color: var(--main);
+    }
+
+    .panel button.on {
+      background: var(--main);
+      border-color: var(--main);
+      color: #fff;
+    }
+
+    /* ---------- 实验容器：被面板动态改写属性的目标 ---------- */
+    .stage-wrap {
+      position: relative;
+    }
+
+    /* 包一层以便给轴箭头定位 */
+    .stage {
+      display: flex;
+      /* 核心声明：目标容器 */
+      flex-wrap: wrap;
+      /* 默认开启换行，让 align-content 有意义 */
+      align-content: stretch;
+      min-height: 300px;
+      /* 给交叉轴留出观察高度 */
+      border: 2px dashed var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      background: #fbfcff;
+    }
+
+    /* 轴指示箭头：position:absolute 叠加在容器上，方向由 JS 切换 class 控制 */
+    .axis {
+      position: absolute;
+      left: 8px;
+      top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: .72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      color: #fff;
+      pointer-events: none;
+    }
+
+    .axis b {
+      font-size: .9rem;
+    }
+
+    /* 箭头字符单独放大：方向变化一目了然且文字不倾斜 */
+    .axis.main {
+      background: var(--main);
+    }
+
+    .axis.cross {
+      background: var(--cross);
+      top: 40px;
+    }
+
+    /* flex item：统一样式便于观察对齐差异，宽度刻意不同以区分 space 分配 */
+    .item {
+      min-width: 72px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #dde9ff;
+      border: 1px solid #b9cff8;
+      color: #24457e;
+      font-size: .85rem;
+      text-align: center;
+    }
+
+    .item:nth-child(1) {
+      width: 96px;
+    }
+
+    .item:nth-child(2) {
+      width: 72px;
+    }
+
+    .item:nth-child(3) {
+      width: 120px;
+    }
+
+    /* 演示"每行等高拉伸"：stretch 时可见各行内的 item 高度被拉平 */
+    .stage.stretch-items .item {
+      border-style: dashed;
+    }
+
+    /* ---------- 小演示区：align-self 与 baseline ---------- */
+    .row {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .demo-self {
+      display: flex;
+      align-items: flex-start;
+      /* 容器级对齐：全部顶对齐 */
+      height: 120px;
+      border: 2px dashed var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      gap: 10px;
+    }
+
+    /* 单个项目"造反"：align-self 优先级高于容器 align-items */
+    .demo-self .rebel {
+      align-self: flex-end;
+      background: #ffe3d6;
+      border-color: #ffb894;
+    }
+
+    /* baseline 对齐：容器高度自适应，label 字号不同但文字贴同一条基线 */
+    .demo-baseline {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      border: 2px dashed var(--line);
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+
+    code {
+      background: #f0f3f9;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: .85em;
+    }
+
+    .foot {
+      color: var(--muted);
+      font-size: .8rem;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Flexbox 主轴 / 交叉轴实验台</h1>
+  <p class="sub">点击按钮切换容器属性，观察轴箭头方向与项目排列方式的联动变化。</p>
+
+  <!-- ================= 主实验区 ================= -->
+  <section>
+    <h2>1. 四组属性联动实验</h2>
+    <div class="tip">align-content 仅在多行时有效（本实验容器已开启 <code>flex-wrap: wrap</code>）；
+      切换 <code>flex-direction</code> 后注意：橙/蓝两根箭头的方向会跟着转，justify 与 align 的"分工"不变。</div>
+
+    <!-- flex-direction 面板：决定主轴方向，JS 把所选值写入容器样式 -->
+    <div class="panel" data-prop="flexDirection">
+      <label>flex-direction（主轴）</label>
+      <button class="on">row</button><button>row-reverse</button>
+      <button>column</button><button>column-reverse</button>
+    </div>
+    <!-- justify-content 面板：主轴对齐与剩余空间分配 -->
+    <div class="panel" data-prop="justifyContent">
+      <label>justify-content（主轴）</label>
+      <button class="on">flex-start</button><button>flex-end</button><button>center</button>
+      <button>space-between</button><button>space-around</button><button>space-evenly</button>
+    </div>
+    <!-- align-items 面板：交叉轴对齐（每行内部） -->
+    <div class="panel" data-prop="alignItems">
+      <label>align-items（交叉轴）</label>
+      <button class="on">stretch</button><button>flex-start</button><button>flex-end</button>
+      <button>center</button><button>baseline</button>
+    </div>
+    <!-- align-content 面板：多行之间的分配，单行时无效 -->
+    <div class="panel" data-prop="alignContent">
+      <label>align-content（行间）</label>
+      <button class="on">stretch</button><button>flex-start</button><button>center</button>
+      <button>space-between</button><button>space-evenly</button>
+    </div>
+    <!-- flex-wrap 面板：是否换行，配合 direction 观察行的"流向" -->
+    <div class="panel" data-prop="flexWrap">
+      <label>flex-wrap</label>
+      <button class="on">wrap</button><button>nowrap</button><button>wrap-reverse</button>
+    </div>
+
+    <div class="stage-wrap">
+      <!-- 两根轴的箭头指示：箭头字符跟随 direction 实时切换 -->
+      <span class="axis main" id="axisMain"><b id="axisMainArrow">→</b> 主轴 main</span>
+      <span class="axis cross" id="axisCross"><b id="axisCrossArrow">↓</b> 交叉轴 cross</span>
+      <div class="stage stretch-items" id="stage">
+        <div class="item">1</div>
+        <div class="item">2</div>
+        <div class="item">3</div>
+        <div class="item">4</div>
+        <div class="item">5</div>
+        <div class="item">6</div>
+        <div class="item">7</div>
+      </div>
+    </div>
+    <p class="foot">当前生效样式：<code id="curStyle">flex-direction: row; justify-content: flex-start;
+    align-items: stretch; align-content: stretch; flex-wrap: wrap;</code></p>
+  </section>
+
+  <!-- ================= align-self 小演示 ================= -->
+  <section>
+    <h2>2. align-self：单个项目特立独行</h2>
+    <div class="tip">容器级 <code>align-items: flex-start</code> 让所有项目顶对齐；
+      只有 3 号项目声明了 <code>align-self: flex-end</code>，它贴到了底边——self 优先级高于容器。</div>
+    <div class="demo-self">
+      <div class="item">1 顶对齐</div>
+      <div class="item">2 顶对齐</div>
+      <div class="item rebel">3 align-self: flex-end</div>
+      <div class="item">4 顶对齐</div>
+    </div>
+  </section>
+
+  <!-- ================= baseline 小演示 ================= -->
+  <section>
+    <h2>3. baseline：按文字基线对齐</h2>
+    <div class="tip">三个元素字号不同，但文字贴在同一条基线上——表单 label、图文标题对齐的
+      正确姿势，<code>align-items: center</code> 做不到这种排版级精确。</div>
+    <div class="demo-baseline">
+      <!-- font-size 差异故意拉大：center 会让大字下沉小字上浮，baseline 则严丝合缝 -->
+      <span style="font-size: 1.6rem; font-weight: 700;">大标题</span>
+      <span>正文说明文字</span>
+      <span style="font-size: .72rem; color: var(--muted);">小号辅助信息</span>
+    </div>
+  </section>
+
+  <script>
+    // ---------- 面板 → 容器样式 的联动逻辑 ----------
+    // 每个面板用 data-prop 声明"控制哪个属性"，按钮文本即属性值，
+    // 点击时把值写入 stage，同时维护按钮高亮与底部当前样式摘要。
+    const stage = document.getElementById('stage');
+    const curStyle = document.getElementById('curStyle');
+
+    document.querySelectorAll('.panel').forEach(panel => {
+      const prop = panel.dataset.prop;               // 如 flexDirection → CSS 属性名 flex-direction
+      panel.addEventListener('click', e => {
+        if (e.target.tagName !== 'BUTTON') return;   // 只响应按钮点击
+        const val = e.target.textContent;            // 按钮文本 = 属性值
+        stage.style[prop] = val;                     // 写入实验容器
+        panel.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === e.target));
+        refreshSummary();
+        // stretch（含未设置的默认值）时保留标记类，虚线边框提示"项目被拉满行高"
+        stage.classList.toggle('stretch-items', (stage.style.alignItems || 'stretch') === 'stretch');
+      });
+    });
+
+    // 刷新底部"当前生效样式"摘要，方便直接抄回项目里
+    function refreshSummary() {
+      const s = stage.style;
+      curStyle.textContent =
+        `flex-direction: ${s.flexDirection || 'row'}; ` +
+        `justify-content: ${s.justifyContent || 'flex-start'}; ` +
+        `align-items: ${s.alignItems || 'stretch'}; ` +
+        `align-content: ${s.alignContent || 'stretch'}; ` +
+        `flex-wrap: ${s.flexWrap || 'wrap'};`;
+    }
+
+    // ---------- 轴箭头方向跟随 flex-direction ----------
+    // 只换箭头字符、不旋转整个标签：文字保持水平，方向语义更直观。
+    // row→水平右、row-reverse→水平左、column→垂直下、column-reverse→垂直上；
+    // 交叉轴永远与主轴垂直（column 系交叉轴转为水平向右）。
+    const mainArrow = document.getElementById('axisMainArrow');
+    const crossArrow = document.getElementById('axisCrossArrow');
+    // key = flexDirection 值，value = [主轴箭头字符, 交叉轴箭头字符]
+    const axisMap = {
+      'row': ['→', '↓'],
+      'row-reverse': ['←', '↓'],
+      'column': ['↓', '→'],
+      'column-reverse': ['↑', '→']
+    };
+    // 拦截 direction 面板点击，同步箭头
+    const dirPanel = document.querySelector('.panel[data-prop="flexDirection"]');
+    dirPanel.addEventListener('click', e => {
+      if (e.target.tagName !== 'BUTTON') return;
+      const [m, c] = axisMap[e.target.textContent];
+      mainArrow.textContent = m;    // 主轴箭头
+      crossArrow.textContent = c;   // 交叉轴箭头
+    });
+  </script>
+</body>
+
+</html>

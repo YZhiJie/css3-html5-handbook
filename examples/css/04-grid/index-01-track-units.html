@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 01：Grid 轨道尺寸 —— fr / minmax / auto-fit vs auto-fill
+  ------------------------------------------------------------
+  【知识点】
+    1. fr 是"剩余空间份数"，下限是内容 min-content（minmax(0,1fr) 才是严格等分）
+    2. minmax(min, max) 给轨道设置尺寸区间
+    3. repeat(auto-fill, minmax(240px,1fr))：能塞几列塞几列，优先保留空轨道
+    4. repeat(auto-fit,  minmax(240px,1fr))：空轨道折叠，项目拉伸铺满
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    第一区：拖动滑杆改变容器宽度，切换 auto-fill / auto-fit 观察
+            "项目只有 3 个但能装 6 列"时两种算法的差异；
+    第二区：切换轨道写法（1fr 1fr / minmax(0,1fr) minmax(0,1fr) /
+            200px 1fr），并在格子里注入超长单词，
+            验证"fr 下限 = 内容 min-content"导致的不等宽现象。
+  【注意事项】
+    auto-fill 与 auto-fit 只在"项目数 < 可容纳列数"时有可见差异；
+    多列 + 百分比轨道 + gap 会溢出，生产中轨道单位首选 fr。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 01 · 轨道尺寸：fr / minmax / auto-fit vs auto-fill</title>
+<style>
+  /* ---------- 基础层 ---------- */
+  :root {
+    --brand: #4361ee; --bg: #f4f6fb; --card: #fff;
+    --ink: #243244; --muted: #7d8da3; --line: #e4e9f2;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.6;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 8px; }
+  .tip {
+    font-size: .82rem; color: var(--muted); background: #f2f6ff;
+    border-left: 3px solid var(--brand); padding: 6px 10px; margin-bottom: 14px;
+    border-radius: 0 6px 6px 0;
+  }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .bar button {
+    font: inherit; font-size: .8rem; cursor: pointer; padding: 4px 12px;
+    border-radius: 999px; border: 1px solid var(--line); background: #f7f9fc; transition: all .15s;
+  }
+  .bar button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+  code { background: #f0f3f9; border-radius: 4px; padding: 1px 6px; font-size: .85em; }
+  .foot { color: var(--muted); font-size: .8rem; margin-top: 10px; }
+
+  /* ---------- 第一区：auto-fill / auto-fit 对照 ---------- */
+  /* 容器宽度由滑杆控制：只有"宽度可变"才能观察列数增减与空轨道行为 */
+  .resizer {
+    width: 100%;                       /* 滑杆同步写入 */
+    resize: horizontal;                /* 原生拖拽右下角也能改宽，双保险 */
+    overflow: auto; min-width: 320px; max-width: 100%;
+    border: 2px dashed var(--line); border-radius: 10px; padding: 12px;
+    background: #fbfcff;
+  }
+  .cards-a {
+    display: grid; gap: 10px;
+    /* 列定义由 JS 在 auto-fill / auto-fit 间切换 */
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  .cell {
+    padding: 12px 8px; border-radius: 8px; text-align: center;
+    background: #eef2ff; border: 1px solid #c7d4fb; font-size: .85rem;
+  }
+  /* 第 4 个之后的"幽灵格"仅用于演示空轨道：它们不存在，
+     空出来的轨道宽度会以空白形式呈现 */
+  .ghost-note { font-size: .78rem; color: var(--muted); margin-top: 8px; }
+
+  /* ---------- 第二区：fr 下限实验 ---------- */
+  .cols {
+    display: grid; gap: 10px;
+    grid-template-columns: 1fr 1fr;    /* 初始写法，由按钮切换 */
+  }
+  .cols .col {
+    padding: 10px; border-radius: 8px; font-size: .85rem;
+    background: #e8f7ef; border: 1px solid #bfe8d2; overflow-wrap: break-word;
+  }
+  /* 超长不可断字符串：min-content 的引爆点 */
+  .cols .col .longword {
+    word-break: normal; overflow-wrap: normal;   /* 关键：禁止换行，顶出 min-content */
+    font-family: monospace; background: #fff; padding: 2px 4px; border-radius: 4px;
+    display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+  }
+</style>
+</head>
+<body>
+<h1>轨道尺寸：fr / minmax / auto-fit vs auto-fill</h1>
+<p class="sub">Grid 的响应式核心全部写在 grid-template-columns 这一行里。</p>
+
+<!-- ================= 第一区：auto-fill vs auto-fit ================= -->
+<section>
+  <h2>1. auto-fill vs auto-fit（拖动滑杆改变容器宽度）</h2>
+  <div class="tip">固定放 <b>3 个项目</b>。容器足够宽（能装 6 列）时：
+      <code>auto-fill</code> 保留 3 条空轨道（卡片不被拉伸）；
+      <code>auto-fit</code> 把空轨道折叠为 0，3 张卡片拉伸铺满整行。</div>
+  <div class="bar">
+    <label style="font-size:.82rem;color:var(--muted)">容器宽度：
+      <input type="range" id="widthRange" min="320" max="1000" value="1000" style="width:200px">
+      <span class="foot" id="widthVal" style="margin:0">1000px</span>
+    </label>
+    <button class="on" data-v="auto-fill">auto-fill</button>
+    <button data-v="auto-fit">auto-fit</button>
+  </div>
+  <!-- .resizer 是"宽度被控"的演示容器，内部才是 grid -->
+  <div class="resizer" id="resizer">
+    <div class="cards-a" id="cardsA">
+      <div class="cell">卡片 1</div>
+      <div class="cell">卡片 2</div>
+      <div class="cell">卡片 3</div>
+      <!-- 只有 3 个项目：空轨道行为全部由算法决定，与内容无关 -->
+    </div>
+  </div>
+  <p class="ghost-note" id="noteA">当前：auto-fill —— 拖窄滑杆看列数减少；拉宽后右侧空轨道占位，卡片保持内容宽度分配。</p>
+</section>
+
+<!-- ================= 第二区：fr 下限实验 ================= -->
+<section>
+  <h2>2. <code>1fr</code> 不是严格等分（min-content 下限）</h2>
+  <div class="tip">点"注入超长单词"后：<code>1fr 1fr</code> 的两列不再等宽——
+      fr 轨道的下限是内容 min-content；换成 <code>minmax(0, 1fr)</code> 把下限钳到 0，恢复严格等分。</div>
+  <div class="bar">
+    <button class="on" data-v="1fr 1fr" id="bFr">1fr 1fr</button>
+    <button data-v="minmax(0, 1fr) minmax(0, 1fr)">minmax(0, 1fr)</button>
+    <button data-v="200px 1fr">200px 1fr</button>
+    <button id="injectBtn">注入超长单词</button>
+  </div>
+  <div class="cols" id="cols">
+    <div class="col" id="colA">左列：内容很短</div>
+    <div class="col" id="colB">右列：<span class="longword" id="longword">short</span></div>
+  </div>
+  <p class="foot" id="noteB">当前轨道：<code>1fr 1fr</code>。右列单词很短，两列看起来等分。</p>
+</section>
+
+<script>
+  // ---------- 第一区：宽度滑杆 + fill/fit 切换 ----------
+  const resizer = document.getElementById('resizer');
+  const cardsA = document.getElementById('cardsA');
+  const widthRange = document.getElementById('widthRange');
+  const widthVal = document.getElementById('widthVal');
+  const noteA = document.getElementById('noteA');
+
+  // 滑杆直接控制演示容器宽度：实时改 style.width
+  widthRange.addEventListener('input', () => {
+    const w = widthRange.value + 'px';
+    resizer.style.width = w;
+    widthVal.textContent = w;
+  });
+
+  // 记录当前模式，注入提示文案用
+  let mode = 'auto-fill';
+  document.querySelectorAll('.bar button[data-v]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      mode = btn.dataset.v;
+      cardsA.style.gridTemplateColumns = `repeat(${mode}, minmax(150px, 1fr))`;
+      document.querySelectorAll('.bar button[data-v]').forEach(b => b.classList.toggle('on', b === btn));
+      noteA.textContent = mode === 'auto-fill'
+        ? '当前：auto-fill —— 列数按"放得下几列"最大化，项目不满一行时空轨道保留占位。'
+        : '当前：auto-fit —— 空轨道被折叠为 0，现有项目拉伸铺满整行（注意卡片变宽）。';
+    });
+  });
+
+  // ---------- 第二区：轨道写法切换 + 超长单词注入 ----------
+  const cols = document.getElementById('cols');
+  const longword = document.getElementById('longword');
+  const noteB = document.getElementById('noteB');
+  let track = '1fr 1fr';
+  let injected = false;
+
+  // 超长不可断字符串：模拟 URL / SKU 号，min-content 会被它顶到很大
+  const LONG = 'Pneumonoultramicroscopicsilicovolcanoconiosis-2026-SKU';
+  document.querySelectorAll('.bar button[data-v]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      track = btn.dataset.v;
+      cols.style.gridTemplateColumns = track;   // 直接写入轨道定义
+      document.querySelectorAll('.bar button[data-v]').forEach(b => b.classList.toggle('on', b === btn));
+      noteB.innerHTML = injected
+        ? `当前轨道：<code>${track}</code>。${track === '1fr 1fr'
+            ? '右列被超长单词的 min-content 顶大 → 两列不等宽（fr 的下限生效）。'
+            : '下限被钳制/定值列固定 → 左列不再被挤压，布局恢复可控。'}`
+        : `当前轨道：<code>${track}</code>。右列单词很短，两列看起来等分。`;
+    });
+  });
+  // 注入按钮：替换为超长单词，配合"禁止断行"把 min-content 顶出来
+  document.getElementById('injectBtn').addEventListener('click', e => {
+    injected = !injected;
+    longword.textContent = injected ? LONG : 'short';
+    e.target.classList.toggle('on', injected);
+    e.target.textContent = injected ? '还原短单词' : '注入超长单词';
+    // 同步刷新说明文案（复用轨道按钮的提示逻辑）
+    noteB.innerHTML = injected
+      ? `当前轨道：<code>${track}</code>。${track === '1fr 1fr'
+          ? '右列被超长单词的 min-content 顶大 → 两列不等宽（fr 的下限生效）。'
+          : '下限被钳制/定值列固定 → 左列不再被挤压，布局恢复可控。'}`
+      : `当前轨道：<code>${track}</code>。右列单词很短，两列看起来等分。`;
+  });
+</script>
+</body>
+</html>
