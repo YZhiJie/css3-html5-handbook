@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 04：文本截断综合实战
+  ------------------------------------------------------------
+  【知识点】
+    1. 电商卡片：标题 2 行 + 描述 3 行 + 底部"左店铺名省略 /
+       右按钮固定"的 flex 三栏，全卡高度严格对齐
+    2. table-layout:fixed 多列表格各自省略
+    3. 文件名中段截断（aaa…bbb.js）：Canvas measureText 二分
+       测量，保留头部与扩展名——纯 CSS 尾部省略做不到
+    4. 自定义 tooltip：仅截断项悬浮显示全文，跟随鼠标、
+       视口边界翻转，无 title 的延迟与不可定制问题
+    5. text-wrap:balance 标题平衡换行（不支持的浏览器自动
+       降级为普通换行，纯渐进增强）
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    从上到下依次为：商品卡片网格、订单文件表格、文件名中段
+    截断列表、balance 标题对照（含开关）。把鼠标移到任何出
+    现省略号的文字上，会出现跟随鼠标的自定义气泡全文。
+  【注意事项】
+    中段截断依赖 Canvas 字体与 DOM 完全一致（同一 font 简写
+    字符串）；窗口缩放后所有截断结果会重新测量。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 04 · 文本截断综合实战</title>
+<style>
+  :root {
+    --brand: #4361ee; --ink: #232c3d; --muted: #7c8aa0; --line: #e3e8f1;
+    --bg: #f4f6fb; --card: #fff; --price: #e5484d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.6;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+  section.block {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 14px; padding: 20px; margin-bottom: 20px;
+  }
+  h2 { font-size: 1.08rem; margin-bottom: 4px; }
+  .desc { color: var(--muted); font-size: .82rem; margin-bottom: 16px; }
+
+  /* ============ 商品卡片 ============ */
+  .goods {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 16px;
+  }
+  .g-card {
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    background: #fff; display: flex; flex-direction: column;
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .g-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(35,44,61,.10); }
+  .g-img {
+    aspect-ratio: 4 / 3;                 /* 图位比例锁定，文字区高度才稳定 */
+    background-size: cover; background-position: center;
+  }
+  .g-body { padding: 12px 14px 14px; display: flex; flex-direction: column; flex: 1; }
+  .g-title {
+    font-size: .92rem; font-weight: 600; margin-bottom: 6px;
+    /* 标题固定 2 行：标准 + 前缀双写 */
+    display: -webkit-box; -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+    min-height: calc(1.5em * 2);        /* 标题不足两行时也占位，卡片对齐 */
+  }
+  .g-desc {
+    font-size: .8rem; color: var(--muted); margin-bottom: 10px;
+    /* 描述固定 3 行 */
+    display: -webkit-box; -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden;
+  }
+  .g-foot {
+    margin-top: auto;                    /* 底部钉在卡片下边缘 */
+    display: flex; align-items: center; gap: 10px;
+  }
+  .g-shop {
+    flex: 1; min-width: 0;               /* flex 省略：解除最小宽度下限 */
+    font-size: .76rem; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .g-shop::before {
+    content: "店铺 · "; color: #9aa7bd;
+  }
+  .g-buy {
+    flex: none; border: 0; cursor: pointer;
+    background: var(--brand); color: #fff; font-size: .78rem;
+    padding: 7px 14px; border-radius: 999px;
+  }
+  .g-price { color: var(--price); font-weight: 700; font-size: 1.05rem; margin: 2px 0 8px; }
+  .g-price small { font-size: .72rem; font-weight: 400; }
+
+  /* ============ 表格 ============ */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  table { table-layout: fixed; }        /* 列宽听 colgroup 的，省略才成立 */
+  col.c-file { width: 36%; } col.c-buyer { width: 20%; }
+  col.c-addr { width: 30%; } col.c-amt { width: 14%; }
+  th, td {
+    padding: 10px 12px; text-align: left;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  th { background: #f7f9fd; color: var(--muted); font-weight: 600; }
+  td.amt { color: var(--price); font-weight: 600; }
+
+  /* ============ 中段截断 ============ */
+  .file-list { display: grid; gap: 8px; max-width: 560px; }
+  .file-row {
+    display: flex; align-items: center; gap: 10px;
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 9px 12px; background: #fbfcff; font-size: .85rem;
+  }
+  .file-icon {
+    flex: none; width: 30px; height: 34px;
+  }
+  .file-name {
+    flex: 1; min-width: 0;
+    white-space: nowrap; overflow: hidden;
+    font-family: ui-monospace, Consolas, monospace; font-size: .8rem;
+    /* 中段截断由 JS 写入 textContent；CSS 只负责裁剪兜底 */
+  }
+  .file-size { flex: none; color: var(--muted); font-size: .76rem; }
+  .mw-ctl { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: .82rem; }
+  .mw-ctl input { accent-color: var(--brand); width: 200px; }
+  .mw-ctl output { font-family: ui-monospace, Consolas, monospace; color: var(--brand); }
+
+  /* ============ balance 对照 ============ */
+  .balance-toggle { display: flex; align-items: center; gap: 8px; font-size: .85rem; margin-bottom: 14px; }
+  .balance-toggle input { accent-color: var(--brand); width: 16px; height: 16px; }
+  .balance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .balance-grid { grid-template-columns: 1fr; } }
+  .b-col { border: 1px solid var(--line); border-radius: 10px; padding: 16px; background: #fbfcff; }
+  .b-col h3 { font-size: .82rem; color: var(--muted); margin-bottom: 10px; }
+  .b-headline {
+    font-size: 1.15rem; font-weight: 700; line-height: 1.45;
+    border-left: 3px solid var(--brand); padding-left: 12px; margin-bottom: 14px;
+    text-wrap: wrap;
+  }
+  body.balance-on .b-headline.b { text-wrap: balance; }
+  .b-headline.p { font-size: .95rem; font-weight: 400; border-left-color: #30a46c; }
+  body.balance-on .b-headline.p { text-wrap: pretty; }
+  .support {
+    font-size: .76rem; padding: 3px 10px; border-radius: 999px;
+    background: #eef2f9; color: var(--muted); margin-left: 8px;
+  }
+  .support.yes { background: #e9f9f1; color: #30a46c; }
+
+  /* ============ 自定义 tooltip ============ */
+  #tip {
+    position: fixed; z-index: 99; display: none;
+    max-width: 340px; padding: 9px 12px;
+    background: #232c3d; color: #e8edf7; font-size: .8rem; line-height: 1.55;
+    border-radius: 8px; box-shadow: 0 8px 24px rgba(20,28,44,.28);
+    pointer-events: none;       /* 气泡不吃鼠标事件，避免元素之间闪烁 */
+    white-space: normal; word-break: break-all;
+  }
+  #tip::after {
+    content: ""; position: absolute; top: -5px; left: 24px;
+    border: 5px solid transparent; border-bottom-color: #232c3d; border-top: 0;
+  }
+  #tip.flip::after { top: auto; bottom: -5px; border-bottom: 0; border-top-color: #232c3d; }
+  .tip-target { cursor: help; }
+</style>
+</head>
+<body>
+  <h1>示例 04 · 文本截断综合实战</h1>
+  <p class="sub">卡片、表格、文件列表、标题排版——把本章知识点组装进真实页面。</p>
+
+  <!-- ========== 电商卡片 ========== -->
+  <section class="block">
+    <h2>① 电商商品卡片：标题 2 行 + 描述 3 行 + 底部省略行</h2>
+    <p class="desc">所有卡片文字区行数确定、底部 margin-top:auto 钉底，网格里任意卡片严格对齐；店铺名超长时左侧省略、购买按钮永不收缩。</p>
+    <div class="goods" id="goodsGrid"></div>
+  </section>
+
+  <!-- ========== 订单表格 ========== -->
+  <section class="block">
+    <h2>② 订单表格：table-layout:fixed 多列各自省略</h2>
+    <p class="desc">列宽由 colgroup 决定（36:20:30:14），每列独立省略互不干扰；悬浮查看全文用自定义气泡。</p>
+    <div class="table-wrap">
+      <table>
+        <colgroup><col class="c-file"><col class="c-buyer"><col class="c-addr"><col class="c-amt"></colgroup>
+        <thead><tr><th>商品</th><th>买家</th><th>收货地址</th><th>金额</th></tr></thead>
+        <tbody id="orderBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ========== 文件名中段截断 ========== -->
+  <section class="block">
+    <h2>③ 文件名中段截断：保留头部与扩展名</h2>
+    <p class="desc">纯 CSS 只能尾部省略，会丢掉最重要的扩展名信息；这里用 Canvas measureText 二分测量，输出 <code>aaa…bbb.js</code>。拖动滑杆改变可用宽度。</p>
+    <div class="mw-ctl">
+      可用宽度
+      <input type="range" id="mwRange" min="120" max="520" value="300" step="10">
+      <output id="mwOut">300px</output>
+    </div>
+    <div class="file-list" id="fileList"></div>
+  </section>
+
+  <!-- ========== balance / pretty ========== -->
+  <section class="block">
+    <h2>④ text-wrap 标题平衡与孤行优化
+      <span class="support" id="balSupport">特性检测中</span>
+    </h2>
+    <p class="desc">balance 让两行标题行长尽量均衡（适合 ≤6 行的标题）；pretty 避免段落末行孤字。均为渐进增强，旧浏览器自动退回普通换行。</p>
+    <label class="balance-toggle">
+      <input type="checkbox" id="balToggle" checked> 启用 text-wrap: balance / pretty
+    </label>
+    <div class="balance-grid">
+      <div class="b-col">
+        <h3>普通 wrap（对照）</h3>
+        <div class="b-headline">新一代旗舰降噪耳机发布：续航四十小时并支持空间音频与多设备无缝切换</div>
+        <div class="b-headline p">这是一段用于演示 pretty 效果的正文段落。当最后一行只剩下一个字挂在那里时，排版上称为孤行，pretty 会调整前面各行的断点，让末行至少保留两个以上的字，使段落边缘看起来更稳。</div>
+      </div>
+      <div class="b-col">
+        <h3>balance（标题）/ pretty（正文）</h3>
+        <div class="b-headline b">新一代旗舰降噪耳机发布：续航四十小时并支持空间音频与多设备无缝切换</div>
+        <div class="b-headline b p">这是一段用于演示 pretty 效果的正文段落。当最后一行只剩下一个字挂在那里时，排版上称为孤行，pretty 会调整前面各行的断点，让末行至少保留两个以上的字，使段落边缘看起来更稳。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 自定义 tooltip（全页唯一，复用） -->
+  <div id="tip"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* =======================================================
+   * 工具：内联 SVG 商品图（零网络，data URI 形式供 background 使用）
+   * ===================================================== */
+  function svgImage(a, b, label) {
+    var svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300">' +
+      '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">' +
+      '<stop offset="0" stop-color="' + a + '"/><stop offset="1" stop-color="' + b + '"/>' +
+      '</linearGradient></defs>' +
+      '<rect width="400" height="300" fill="url(#g)"/>' +
+      '<circle cx="320" cy="70" r="90" fill="rgba(255,255,255,.18)"/>' +
+      '<rect x="40" y="170" width="180" height="16" rx="8" fill="rgba(255,255,255,.55)"/>' +
+      '<rect x="40" y="196" width="120" height="12" rx="6" fill="rgba(255,255,255,.35)"/>' +
+      '<text x="40" y="120" font-family="sans-serif" font-size="34" font-weight="700" fill="#fff">' + label + '</text>' +
+      '</svg>';
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
+
+  /* =======================================================
+   * ① 商品数据（故意把标题/店铺名写长，制造截断）
+   * ===================================================== */
+  var goods = [
+    { a: '#4361ee', b: '#3a0ca3', tag: '耳机', price: '899',
+      title: '新一代旗舰主动降噪蓝牙耳机：40 小时超长续航、空间音频、双设备同时连接，首发礼盒版限量开售',
+      desc: '支持自适应降噪与通透模式，佩戴检测自动暂停，充电十分钟听歌四小时；附赠收纳盒与三副不同尺寸硅胶耳塞。',
+      shop: '声学科技官方旗舰店（华东仓）' },
+    { a: '#f72585', b: '#b5179e', tag: '跑鞋', price: '459',
+      title: '轻量缓震跑步鞋男款夏季透气',
+      desc: '中底采用超临界发泡材料，单只重量仅 215 克；鞋面工程网布保证长距离奔跑时的透气与包裹感，适合五公里到半马训练。',
+      shop: '极速运动专营店' },
+    { a: '#4cc9f0', b: '#4895ef', tag: '显示器', price: '1599',
+      title: '27 英寸 4K 办公显示器：Type-C 90W 反向供电、硬件低蓝光、升降旋转支架，发票齐全当日发货',
+      desc: '99% sRGB 色域覆盖，Delta E 小于 2 的出厂校色报告随箱附带；一线连方案让笔记本桌面只剩一根线。',
+      shop: '显示设备品牌直营（支持企业采购）' },
+    { a: '#30a46c', b: '#0f7b48', tag: '咖啡', price: '79',
+      title: '单品手冲咖啡豆 250g 中度烘焙，埃塞俄比亚耶加雪菲水洗豆，花香柑橘调性新鲜烘焙',
+      desc: '浅中度烘焙保留产地风味，建议 1:15 粉水比、92℃ 水温；开封后两周内饮用完毕风味最佳，支持代磨粉。',
+      shop: '山间咖啡' }
+  ];
+
+  var grid = document.getElementById('goodsGrid');
+  goods.forEach(function (g) {
+    var card = document.createElement('article');
+    card.className = 'g-card';
+    card.innerHTML =
+      '<div class="g-img" style="background-image:url(\'' + svgImage(g.a, g.b, g.tag) + '\')"></div>' +
+      '<div class="g-body">' +
+        '<h3 class="g-title tip-target">' + g.title + '</h3>' +
+        '<div class="g-price"><small>¥</small>' + g.price + '</div>' +
+        '<p class="g-desc tip-target">' + g.desc + '</p>' +
+        '<div class="g-foot">' +
+          '<span class="g-shop tip-target">' + g.shop + '</span>' +
+          '<button class="g-buy" type="button">加入购物车</button>' +
+        '</div>' +
+      '</div>';
+    grid.appendChild(card);
+  });
+
+  /* =======================================================
+   * ② 订单表格
+   * ===================================================== */
+  var orders = [
+    ['2026 年度办公用品集中采购清单（第三批）-A4 复印纸与签字笔.xlsx', '王小明（采购部）', '北京市海淀区中关村软件园二期 8 号楼 5 层 501 室', '¥12,480'],
+    ['发票.pdf', '李华', '上海市浦东新区世纪大道 100 号环球金融中心 78 层', '¥326'],
+    ['Q3 季度营销活动主视觉设计终稿（已改第 12 版）.psd', 'Anna Chen', '广州市天河区珠江新城冼村路 1 号保利国际广场南塔', '¥8,000']
+  ];
+  var tbody = document.getElementById('orderBody');
+  orders.forEach(function (o) {
+    var tr = document.createElement('tr');
+    o.forEach(function (cell, i) {
+      var td = document.createElement('td');
+      td.className = 'tip-target' + (i === 3 ? ' amt' : '');
+      td.textContent = cell;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+
+  /* =======================================================
+   * ③ 中段截断（Canvas 二分测量）
+   * ===================================================== */
+  var files = [
+    'annual-report-2026-final-FINAL-v3(1).pdf',
+    'very-long-distribution-bundle.20260923.chunk001.min.js',
+    'Q3-marketing-campaign-keynote-revision-12-approved.key',
+    'product-design-spec.wireframe.high-fidelity.fig',
+    'a.js'
+  ];
+  var fileSizes = ['4.2 MB', '186 KB', '22.8 MB', '9.6 MB', '1 KB'];
+
+  var fileList = document.getElementById('fileList');
+  var rows = files.map(function (name, i) {
+    var row = document.createElement('div');
+    row.className = 'file-row';
+    // 内联 SVG 文件图标
+    row.innerHTML =
+      '<svg class="file-icon" viewBox="0 0 30 34" xmlns="http://www.w3.org/2000/svg">' +
+      '<path d="M2 2h18l8 8v22H2z" fill="#eaf0ff" stroke="#4361ee" stroke-width="1.5"/>' +
+      '<path d="M20 2v8h8" fill="none" stroke="#4361ee" stroke-width="1.5"/>' +
+      '<rect x="7" y="18" width="16" height="2.4" rx="1.2" fill="#4361ee"/>' +
+      '<rect x="7" y="23" width="11" height="2.4" rx="1.2" fill="#9db4f5"/></svg>' +
+      '<span class="file-name tip-target"></span>' +
+      '<span class="file-size">' + fileSizes[i] + '</span>';
+    fileList.appendChild(row);
+    return { name: name, el: row.querySelector('.file-name') };
+  });
+
+  // 共享一个 Canvas 上下文；字体必须与 .file-name 的计算样式一致
+  var measureCanvas = document.createElement('canvas');
+  var mctx = measureCanvas.getContext('2d');
+
+  function middleTruncate(text, maxWidth, font) {
+    mctx.font = font;
+    var measure = function (s) { return mctx.measureText(s).width; };
+    if (measure(text) <= maxWidth) return text;      // 放得下，不截
+    var ell = '…';
+    var lo = 0, hi = text.length;
+    // 二分：head 保留 n 字符，tail 对称保留 n 字符
+    while (lo < hi) {
+      var mid = (lo + hi + 1) >> 1;
+      var candidate = text.slice(0, mid) + ell + text.slice(text.length - mid);
+      if (measure(candidate) <= maxWidth) lo = mid;
+      else hi = mid - 1;
+    }
+    if (lo === 0) {
+      // 极端窄宽：连 1+…+1 都放不下，退化为纯省略号，避免文字溢出
+      return ell;
+    }
+    return text.slice(0, lo) + ell + text.slice(text.length - lo);
+  }
+
+  function renderFiles() {
+    var maxW = document.getElementById('fileList').clientWidth - 96; // 减去图标/大小/间距
+    var font = getComputedStyle(rows[0].el).font;
+    rows.forEach(function (r) {
+      r.el.textContent = middleTruncate(r.name, maxW, font);
+      // 全文始终存到 data 属性，供 tooltip 使用
+      r.el.dataset.full = r.name;
+    });
+  }
+
+  var mwRange = document.getElementById('mwRange');
+  var mwOut = document.getElementById('mwOut');
+  // 滑杆通过限制列表最大宽度来模拟不同容器
+  mwRange.addEventListener('input', function () {
+    mwOut.textContent = mwRange.value + 'px';
+    fileList.style.maxWidth = mwRange.value + 'px';
+    requestAnimationFrame(renderFiles);
+  });
+
+  /* =======================================================
+   * ④ balance 特性检测
+   * =======================================================
+   * CSS.supports 识别带前缀风险小；不支持时仅提示，不阻断使用
+   * （不支持的浏览器本就忽略该声明，无需 JS 兜底）
+   */
+  var balSupported = CSS && CSS.supports && CSS.supports('text-wrap', 'balance');
+  var support = document.getElementById('balSupport');
+  support.textContent = balSupported ? '本浏览器支持 balance' : '本浏览器不支持（自动降级）';
+  support.className = 'support ' + (balSupported ? 'yes' : '');
+
+  var balToggle = document.getElementById('balToggle');
+  balToggle.addEventListener('change', function () {
+    document.body.classList.toggle('balance-on', balToggle.checked);
+  });
+  document.body.classList.add('balance-on');
+
+  /* =======================================================
+   * 通用：自定义 tooltip —— 只在元素真正截断时显示
+   * ===================================================== */
+  var tip = document.getElementById('tip');
+
+  function clipped(el) {
+    // 兼容单行与多行截断
+    return el.scrollWidth - el.clientWidth > 1 || el.scrollHeight - el.clientHeight > 1;
+  }
+
+  function fullText(el) {
+    return el.dataset.full || el.textContent.trim();
+  }
+
+  function showTip(el, x, y) {
+    if (!clipped(el)) return;                 // 没截断：不打扰
+    tip.textContent = fullText(el);
+    tip.style.display = 'block';
+    // 先按鼠标下方定位，再根据视口边界决定翻转到上方
+    var h = tip.offsetHeight, w = tip.offsetWidth;
+    var below = y + 18 + h < window.innerHeight;
+    tip.classList.toggle('flip', !below);
+    var left = Math.min(x + 12, window.innerWidth - w - 12);
+    var top = below ? y + 18 : y - 18 - h;
+    tip.style.left = Math.max(8, left) + 'px';
+    tip.style.top = top + 'px';
+  }
+  function hideTip() { tip.style.display = 'none'; }
+
+  // 事件委托：卡片是动态渲染的，绑在 document 上一份即可
+  document.addEventListener('mouseover', function (e) {
+    var t = e.target.closest('.tip-target');
+    if (t) showTip(t, e.clientX, e.clientY);
+    else hideTip();
+  });
+  document.addEventListener('mousemove', function (e) {
+    if (tip.style.display === 'block') {
+      var t = e.target.closest('.tip-target');
+      if (t) showTip(t, e.clientX, e.clientY);
+    }
+  });
+  document.addEventListener('mouseout', function (e) {
+    if (e.target.closest && e.target.closest('.tip-target')) hideTip();
+  });
+
+  /* 响应式：宽度变化后中段截断结果与截断状态都要更新 */
+  window.addEventListener('resize', renderFiles);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () { requestAnimationFrame(renderFiles); });
+  }
+  requestAnimationFrame(renderFiles);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 01：aspect-ratio 宽高比 + object-fit 五态图墙
+  ------------------------------------------------------------
+  【知识点】
+    1. aspect-ratio 与 width:100% 配合，宽度响应式、高度自动
+       按比例计算；对比 padding-top hack 的实现差异
+    2. aspect-ratio 是"首选约束"：内容超高时盒子会被撑高，
+       需要 overflow:hidden 才是硬锁
+    3. object-fit 五态：fill（拉伸变形）/contain（完整留边）/
+       cover（填满裁切）/none（原始尺寸）/scale-down（小图
+       不放大、大图缩小）
+    4. object-position 控制 cover 裁切时保留画面的哪个部分
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    顶部按钮切换盒子宽高比（16:9 / 4:3 / 1:1），下方五个盒子
+    分别演示 object-fit 五态；另一组按钮切换 object-position，
+    观察 cover 盒子裁切焦点的变化；底部演示"内容撑破比例"。
+  【注意事项】
+    演示图片为 2:1 内联 SVG（800×400），与盒子比例不同才能
+    看出五态差异；所有图片零网络，data URI 内联。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 01 · aspect-ratio 与 object-fit</title>
+<style>
+  :root {
+    --brand: #4361ee; --ink: #232c3d; --muted: #7c8aa0; --line: #e3e8f1;
+    --bg: #f4f6fb; --card: #fff; --bad: #e5484d; --good: #30a46c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.6;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+
+  .toolbar, section.panel {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 16px 18px; margin-bottom: 18px;
+  }
+  .toolbar { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+  .toolbar .group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .toolbar .t { font-size: .8rem; color: var(--muted); }
+  .toolbar button {
+    border: 1px solid var(--line); background: #fbfcff; color: var(--ink);
+    font-size: .82rem; padding: 7px 14px; border-radius: 8px; cursor: pointer;
+  }
+  .toolbar button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .ratio-readout {
+    margin-left: auto; font-family: ui-monospace, Consolas, monospace;
+    font-size: .82rem; color: var(--brand); background: #f1f5ff;
+    padding: 5px 12px; border-radius: 999px;
+  }
+
+  h2 { font-size: 1.05rem; margin-bottom: 4px; }
+  .desc { color: var(--muted); font-size: .82rem; margin-bottom: 14px; }
+
+  /* ---------- 五态图墙 ---------- */
+  .fit-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 16px;
+  }
+  .fit-item h3 { font-size: .88rem; margin-bottom: 2px; }
+  .fit-item .note { font-size: .74rem; color: var(--muted); margin-bottom: 8px; min-height: 2.6em; }
+  .frame {
+    width: 100%;
+    aspect-ratio: var(--ar, 16 / 9);   /* 比例由按钮组控制 */
+    border: 2px dashed #c9d4ea; border-radius: 10px;
+    background: repeating-linear-gradient(45deg, #f7f9fd 0 10px, #eef1f8 10px 20px);
+    overflow: hidden; position: relative;
+    transition: aspect-ratio .25s ease;
+  }
+  .frame img {
+    width: 100%; height: 100%; display: block;
+    object-fit: var(--fit, cover);
+    object-position: var(--pos, 50% 50%);
+    transition: object-position .2s ease;
+  }
+  .fit-fill   { --fit: fill; }
+  .fit-contain{ --fit: contain; }
+  .fit-cover  { --fit: cover; }
+  .fit-none   { --fit: none; }
+  .fit-scale  { --fit: scale-down; }
+  .frame .pill {
+    position: absolute; left: 8px; bottom: 8px;
+    font-size: .68rem; background: rgba(35,44,61,.82); color: #fff;
+    padding: 2px 8px; border-radius: 999px; pointer-events: none;
+  }
+
+  /* ---------- aspect-ratio vs padding hack ---------- */
+  .hack-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .hack-grid { grid-template-columns: 1fr; } }
+  .hack-box { border: 1px solid var(--line); border-radius: 10px; padding: 14px; background: #fbfcff; }
+  .hack-box h3 { font-size: .86rem; margin-bottom: 8px; }
+  .new-way { aspect-ratio: 16 / 9; border-radius: 8px; }
+  .old-way { position: relative; height: 0; padding-top: 56.25%; border-radius: 8px; overflow: hidden; }
+  .old-way .inner {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-size: .78rem; color: var(--muted);
+  }
+  .new-way {
+    background: linear-gradient(135deg, #eef2ff, #dbe7ff);
+    display: grid; place-items: center; font-size: .78rem; color: var(--brand);
+  }
+
+  /* ---------- 内容撑破比例 ---------- */
+  .burst-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .burst-grid { grid-template-columns: 1fr; } }
+  .burst {
+    aspect-ratio: 1 / 1; border: 2px solid var(--bad); border-radius: 10px;
+    padding: 10px; font-size: .78rem; background: #fff7f7;
+  }
+  .burst.fixed { overflow: hidden; border-color: var(--good); background: #f4fbf7; }
+  .burst h3 { font-size: .82rem; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+  <h1>示例 01 · aspect-ratio 宽高比 × object-fit 五态</h1>
+  <p class="sub">一张 2:1 的图，塞进不同比例的盒子——填充策略决定变形、留边还是裁切。</p>
+
+  <div class="toolbar">
+    <div class="group">
+      <span class="t">宽高比：</span>
+      <button data-ar="16 / 9" class="on">16:9</button>
+      <button data-ar="4 / 3">4:3</button>
+      <button data-ar="1 / 1">1:1</button>
+      <button data-ar="3 / 4">3:4</button>
+    </div>
+    <div class="group">
+      <span class="t">object-position：</span>
+      <button data-pos="50% 50%" class="on">中心</button>
+      <button data-pos="0% 50%">左</button>
+      <button data-pos="100% 50%">右</button>
+      <button data-pos="50% 0%">顶</button>
+      <button data-pos="50% 100%">底</button>
+      <button data-pos="0% 0%">左上</button>
+    </div>
+    <span class="ratio-readout" id="arReadout">aspect-ratio: 16 / 9</span>
+  </div>
+
+  <!-- 五态图墙 -->
+  <section class="panel">
+    <h2>① object-fit 五态对照</h2>
+    <p class="desc">原图为 800×400（2:1）：内含九宫格刻度、四角标记与一个焦点圆，方便辨认拉伸/裁切方向。position 按钮对 cover / none 的效果最明显。</p>
+    <div class="fit-grid">
+      <div class="fit-item">
+        <h3>fill（默认）</h3>
+        <p class="note">拉伸填满，圆会变成椭圆、网格变形。视频/图片误用 100% 宽高时就是这个效果。</p>
+        <div class="frame fit-fill"><img id="img1" alt="测试图 fill"><span class="pill">fill</span></div>
+      </div>
+      <div class="fit-item">
+        <h3>contain</h3>
+        <p class="note">保持比例完整显示，短边方向留白（斜纹底）。商品图首选，绝不裁内容。</p>
+        <div class="frame fit-contain"><img id="img2" alt="测试图 contain"><span class="pill">contain</span></div>
+      </div>
+      <div class="fit-item">
+        <h3>cover</h3>
+        <p class="note">保持比例填满，长边裁切。封面/Banner/头像首选；裁切焦点听 object-position。</p>
+        <div class="frame fit-cover"><img id="img3" alt="测试图 cover"><span class="pill">cover</span></div>
+      </div>
+      <div class="fit-item">
+        <h3>none</h3>
+        <p class="note">不缩放，按原图 800×400 居中绘制，盒子小就只看得见中间一块。</p>
+        <div class="frame fit-none"><img id="img4" alt="测试图 none"><span class="pill">none</span></div>
+      </div>
+      <div class="fit-item">
+        <h3>scale-down</h3>
+        <p class="note">等同 none 与 contain 中"更小"的结果：小图不被放大、大图等比缩小。图片预览器常用。</p>
+        <div class="frame fit-scale"><img id="img5" alt="测试图 scale-down"><span class="pill">scale-down</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 新旧写法 -->
+  <section class="panel">
+    <h2>② 新写法 vs padding-top hack</h2>
+    <p class="desc">两者视觉同高（16:9）。新写法里子元素正常文档流；旧写法用零高盒子 + 56.25% padding 撑高，子元素必须绝对定位。</p>
+    <div class="hack-grid">
+      <div class="hack-box">
+        <h3>aspect-ratio（现代）</h3>
+        <div class="new-way">width:100% · aspect-ratio:16/9 · 普通文档流</div>
+      </div>
+      <div class="hack-box">
+        <h3>padding-top hack（兼容）</h3>
+        <div class="old-way">
+          <div style="position:absolute;inset:0;background:linear-gradient(135deg,#eef2ff,#dbe7ff);border-radius:8px"></div>
+          <div class="inner">height:0 · padding-top:56.25% · 子元素 absolute</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 内容撑破 -->
+  <section class="panel">
+    <h2>③ aspect-ratio 会被内容撑破（首选约束 ≠ 强制）</h2>
+    <p class="desc">两个盒子都声明 1:1。左盒只给比例，大量文本直接把正方形撑成长方形；右盒加 overflow:hidden 才真正锁死（内容被裁，业务上需配套截断策略）。</p>
+    <div class="burst-grid">
+      <div class="burst">
+        <h3>只写 aspect-ratio（被撑破）</h3>
+        <p>当内容高度超过比例推算高度时，min-height:auto 让内容优先，比例让步。这是与 padding hack 的硬高度最大的行为差异，实际使用要评估溢出策略。</p>
+      </div>
+      <div class="burst fixed">
+        <h3>aspect-ratio + overflow:hidden（锁死）</h3>
+        <p>超出的文本被裁掉，盒子严格保持正方形。实际项目中文本行应配合第 10 章的 line-clamp，而不是简单裁掉。</p>
+      </div>
+    </div>
+  </section>
+
+<script>
+(function () {
+  'use strict';
+
+  /* 构造一张信息量足够的 800×400 测试图：
+     九宫格刻度便于辨认拉伸，四角字母便于辨认裁切，左上焦点圆
+     用于观察 object-position 的保留区域。 */
+  function buildSvg() {
+    var grid = '';
+    for (var i = 1; i < 8; i++) {
+      var x = i * 100;
+      grid += '<line x1="' + x + '" y1="0" x2="' + x + '" y2="400" stroke="#cdd8f0" stroke-width="1"/>';
+    }
+    for (var j = 1; j < 4; j++) {
+      var y = j * 100;
+      grid += '<line x1="0" y1="' + y + '" x2="800" y2="' + y + '" stroke="#cdd8f0" stroke-width="1"/>';
+    }
+    var svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="400" viewBox="0 0 800 400">' +
+      '<rect width="800" height="400" fill="#fff"/>' + grid +
+      '<circle cx="130" cy="120" r="64" fill="#4361ee" opacity=".85"/>' +
+      '<circle cx="130" cy="120" r="10" fill="#fff"/>' +
+      '<text x="130" y="218" text-anchor="middle" font-family="sans-serif" font-size="22" font-weight="700" fill="#4361ee">焦点</text>' +
+      '<text x="24" y="42" font-family="sans-serif" font-size="34" font-weight="700" fill="#e5484d">TL</text>' +
+      '<text x="724" y="42" font-family="sans-serif" font-size="34" font-weight="700" fill="#f59e0b">TR</text>' +
+      '<text x="24" y="384" font-family="sans-serif" font-size="34" font-weight="700" fill="#30a46c">BL</text>' +
+      '<text x="724" y="384" font-family="sans-serif" font-size="34" font-weight="700" fill="#8b5cf6">BR</text>' +
+      '<rect x="300" y="150" width="220" height="100" rx="12" fill="#eef2ff" stroke="#4361ee" stroke-width="2"/>' +
+      '<text x="410" y="208" text-anchor="middle" font-family="monospace" font-size="26" fill="#232c3d">800 × 400</text>' +
+      '</svg>';
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
+
+  var uri = buildSvg();
+  for (var k = 1; k <= 5; k++) document.getElementById('img' + k).src = uri;
+
+  /* ---------- 按钮组：比例 ---------- */
+  var arButtons = Array.prototype.slice.call(document.querySelectorAll('[data-ar]'));
+  var readout = document.getElementById('arReadout');
+  arButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      arButtons.forEach(function (b) { b.classList.toggle('on', b === btn); });
+      var ar = btn.dataset.ar;
+      document.documentElement.style.setProperty('--ar', ar);
+      // 把 CSS 变量挂到 :root 供所有 .frame 消费
+      readout.textContent = 'aspect-ratio: ' + ar;
+    });
+  });
+
+  /* ---------- 按钮组：position ---------- */
+  var posButtons = Array.prototype.slice.call(document.querySelectorAll('[data-pos]'));
+  posButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      posButtons.forEach(function (b) { b.classList.toggle('on', b === btn); });
+      document.documentElement.style.setProperty('--pos', btn.dataset.pos);
+    });
+  });
+})();
+</script>
+</body>
+</html>

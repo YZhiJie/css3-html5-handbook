@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 04：图片与资源优化教学面板
+  ------------------------------------------------------------
+  【知识点】
+    1. loading="lazy"：原生懒加载；本例用 IntersectionObserver
+       模拟浏览器内部"接近视口才拉取"的判定时机并打印日志
+       （data URI 图片本身离线内联，零网络）
+    2. decoding="async"：后台线程解码，避免卡主线程
+    3. fetchpriority="high|low|auto"：首屏图 high、首屏外 low
+    4. width/height 防 CLS：浏览器据两值推导 aspect-ratio 预占
+       盒子；本例用"1.5s 后图片才到达"的动画直观对比跳动
+    5. 资源提示速查：dns-prefetch / preconnect / preload /
+       prefetch / modulepreload 各自语义与误用代价；
+       rel="noopener noreferrer" 防 reverse tabnabbing
+    6. inputmode / enterkeyhint：移动端虚拟键盘增强（需真机，
+       桌面无虚拟键盘，仅文字说明）；:-webkit-autofill 样式
+    7. hidden 属性的坑：[hidden] 只是 display:none 的 UA 规则，
+       会被作者的 display:flex 等覆盖；修复用 !important 规则
+  【运行方式】
+    纯单文件、零网络零 CDN，双击 file:// 打开即可。
+  【效果说明】
+    从上到下：CLS 对比动效 → 滚动懒加载时机日志（图片排到
+    页面下方，滚动观察）→ 资源提示速查卡 → 移动端键盘测试框
+    （真机点按）→ 自动填充样式 → hidden 踩坑开关。
+  【注意事项】
+    inputmode/enterkeyhint 在桌面浏览器无可见效果，属预期；
+    自动填充需浏览器密码管理器真实触发，另提供"预览样式"按钮。
+    全程页面内 toast/日志反馈，无 alert/prompt。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>示例 04 · 图片与资源优化</title>
+  <style>
+    :root {
+      --ink: #22303f;
+      --muted: #6b7a8c;
+      --line: #dbe3ec;
+      --brand: #0b6bcb;
+      --bg: #f2f5f9;
+      --card: #fff;
+      --ok: #178a50;
+      --danger: #c0392b;
+      --warn: #b9770e;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.65;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: .86rem;
+      margin: 4px 0 14px;
+    }
+
+    section.box {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin: 0 auto 14px;
+      max-width: 920px;
+    }
+
+    h2 {
+      font-size: 1.02rem;
+      margin-bottom: 6px;
+    }
+
+    h3 {
+      font-size: .9rem;
+      margin: 12px 0 6px;
+    }
+
+    p,
+    li,
+    td,
+    th {
+      font-size: .85rem;
+    }
+
+    ul.tips {
+      padding-left: 18px;
+    }
+
+    ul.tips li {
+      margin: 3px 0;
+    }
+
+    code {
+      background: #eef2f7;
+      border-radius: 4px;
+      padding: 0 5px;
+      font-size: .78rem;
+      font-family: "SF Mono", Consolas, monospace;
+    }
+
+    .btn {
+      background: var(--brand);
+      color: #fff;
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: .83rem;
+      cursor: pointer;
+      margin: 4px 6px 4px 0;
+    }
+
+    .btn.ghost {
+      background: #eef2f8;
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+
+    .btn:focus-visible,
+    input:focus-visible,
+    a:focus-visible {
+      outline: 3px solid rgba(11, 107, 203, .35);
+      outline-offset: 1px;
+    }
+
+    input {
+      font-size: .85rem;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      width: 100%;
+      margin: 4px 0 10px;
+    }
+
+    label {
+      font-size: .82rem;
+      font-weight: 600;
+    }
+
+    /* ---------- CLS 对比 ---------- */
+    .cls-grid {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .cls-cell {
+      flex: 1 1 280px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fbfcfe;
+    }
+
+    .cls-cell h4 {
+      font-size: .85rem;
+      margin-bottom: 6px;
+    }
+
+    .img-slot {
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: repeating-linear-gradient(45deg, #f2f5f9 0 12px, #eaf0f6 12px 24px);
+    }
+
+    .img-slot img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    /* 无尺寸组：初始没有预留盒子，"图片到达"时把下面文字顶下去 */
+    #noSizeWrap img {
+      height: auto;
+    }
+
+    .ruler {
+      color: var(--muted);
+      font-size: .74rem;
+      margin-top: 6px;
+    }
+
+    .shift-note {
+      color: var(--danger);
+      font-size: .78rem;
+      min-height: 2.2em;
+    }
+
+    .shift-note.ok {
+      color: var(--ok);
+    }
+
+    /* ---------- 懒加载观察列表 ---------- */
+    .lazy-item {
+      position: relative;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 10px;
+      border: 1px solid var(--line);
+    }
+
+    .lazy-item img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .lazy-tag {
+      position: absolute;
+      left: 8px;
+      top: 8px;
+      font-size: .72rem;
+      background: rgba(16, 24, 38, .78);
+      color: #fff;
+      border-radius: 999px;
+      padding: 2px 10px;
+      font-family: "SF Mono", Consolas, monospace;
+    }
+
+    .lazy-status {
+      position: absolute;
+      right: 8px;
+      bottom: 8px;
+      font-size: .72rem;
+      border-radius: 999px;
+      padding: 2px 10px;
+      background: #fdecea;
+      color: var(--danger);
+    }
+
+    .lazy-status.near {
+      background: #fff4d6;
+      color: var(--warn);
+    }
+
+    .lazy-status.in {
+      background: #e6f4ec;
+      color: var(--ok);
+    }
+
+    #lazyLog {
+      background: #101826;
+      color: #9fe0b5;
+      border-radius: 8px;
+      font-family: "SF Mono", Consolas, monospace;
+      font-size: .72rem;
+      padding: 8px 10px;
+      height: 150px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+
+    /* ---------- 资源提示速查卡 ---------- */
+    .hint-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 10px;
+    }
+
+    .hint-card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #fbfcfe;
+      border-top: 3px solid var(--brand);
+    }
+
+    .hint-card h4 {
+      font-size: .86rem;
+      margin-bottom: 4px;
+    }
+
+    .hint-card .when {
+      color: var(--ok);
+      font-size: .78rem;
+    }
+
+    .hint-card .cost {
+      color: var(--danger);
+      font-size: .78rem;
+    }
+
+    .hint-card pre {
+      background: #101826;
+      color: #c8d6e5;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: .68rem;
+      overflow-x: auto;
+      margin-top: 6px;
+      font-family: "SF Mono", Consolas, monospace;
+      white-space: pre-wrap;
+    }
+
+    /* ---------- 键盘测试网格 ---------- */
+    .kb-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+    }
+
+    .kb-cell {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: #fbfcfe;
+    }
+
+    .kb-cell .kb-meta {
+      font-size: .72rem;
+      color: var(--muted);
+      font-family: "SF Mono", Consolas, monospace;
+    }
+
+    /* ---------- 自动填充样式 ----------
+     自动填充时浏览器强制背景色，普通 background 改不动；
+     用极大内阴影"盖住"输入框底色，-webkit-text-fill-color 染文字 */
+    input.filled,
+    input:-webkit-autofill {
+      -webkit-box-shadow: 0 0 0 1000px #e8f1fd inset !important;
+      -webkit-text-fill-color: #22303f !important;
+      caret-color: #22303f;
+      border-color: #9cc2ef;
+    }
+
+    input:autofill {
+      /* Firefox 标准前缀 */
+      background-color: #e8f1fd;
+    }
+
+    .desk-note {
+      background: #fff4d6;
+      border: 1px solid #f0d590;
+      color: #7a4a06;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: .8rem;
+      margin-bottom: 8px;
+    }
+
+    /* ---------- hidden 踩坑 ---------- */
+    .flex-demo {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fbfcfe;
+    }
+
+    .flex-demo .chip {
+      background: #eef2f8;
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: .8rem;
+    }
+
+    #fixToggle {
+      margin-left: 8px;
+    }
+
+    #toast {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%) translateY(20px);
+      background: #101826;
+      color: #fff;
+      padding: 9px 18px;
+      border-radius: 999px;
+      font-size: .84rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s, transform .2s;
+      max-width: 88vw;
+      z-index: 10;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1 style="max-width:920px;margin:0 auto 4px">示例 04 · 图片与资源优化教学面板</h1>
+  <p class="sub" style="max-width:920px;margin-left:auto;margin-right:auto">
+    懒加载 / 异步解码 / 优先级 / 防 CLS / 五类资源提示 / 移动端键盘 / autofill / hidden 的坑。
+  </p>
+
+  <!-- ============ 1. CLS 对比 ============ -->
+  <section class="box">
+    <h2>① width / height 防 CLS：图片"迟到"时页面跳不跳</h2>
+    <p>点击按钮模拟"弱网下图片 1.5 秒后才到达"：观察下方文字是否被顶动。</p>
+    <div class="cls-grid">
+      <div class="cls-cell">
+        <h4>❌ 无 width/height</h4>
+        <div class="img-slot" id="noSizeSlot" style="min-height:0">
+          <img id="noSizeImg" alt="迟到的图（无尺寸）" style="opacity:0;transition:opacity .3s">
+        </div>
+        <p class="ruler">图片到达前盒子高度 = 0</p>
+        <p class="shift-note" id="noSizeNote">等待模拟…</p>
+        <p>↑ 这段文字在图片到达时会被<strong>猛地顶下去</strong>（CLS）。</p>
+      </div>
+      <div class="cls-cell">
+        <h4>✅ 有 width="600" height="220"</h4>
+        <div class="img-slot">
+          <img id="sizedImg" width="600" height="220" alt="迟到的图（有尺寸）" style="opacity:0;transition:opacity .3s">
+        </div>
+        <p class="ruler">浏览器据宽高比提前预留盒子（配合 height:auto）</p>
+        <p class="shift-note ok" id="sizedNote">等待模拟…</p>
+        <p>↑ 这段文字<strong>纹丝不动</strong>：盒子早已占位，图只是"填进去"。</p>
+      </div>
+    </div>
+    <p style="margin-top:8px">
+      <button class="btn" id="clsBtn" type="button">模拟图片 1.5s 后到达</button>
+    </p>
+  </section>
+
+  <!-- ============ 2. 懒加载时机 ============ -->
+  <section class="box">
+    <h2>② loading="lazy" + fetchpriority + decoding：懒加载时机观察</h2>
+    <p>下图全部是内联 SVG（data URI，零网络），属性按真实项目写法标注。
+      浏览器的原生懒加载内部也是"接近视口时才调度请求"——这里用
+      IntersectionObserver 把这个<strong>时机</strong>可视化：黄签=进入约 200px 预取范围，
+      绿签=真正进入视口。请向下滚动观察日志。</p>
+    <div id="lazyList"></div>
+    <h3>时机日志</h3>
+    <div id="lazyLog" aria-live="polite"></div>
+    <ul class="tips" style="margin-top:8px">
+      <li><code>loading="lazy"</code>：接近视口才加载；<strong>首屏/LCP 图禁用</strong>（会拖慢 LCP）。</li>
+      <li><code>fetchpriority="high"</code> 给 LCP 图；<code>"low"</code> 给首屏外的图；默认 auto。</li>
+      <li><code>decoding="async"</code>：后台线程解码，大图解码不卡交互；属提示，浏览器可忽略。</li>
+    </ul>
+  </section>
+
+  <!-- ============ 3. 资源提示速查卡 ============ -->
+  <section class="box">
+    <h2>③ 资源提示速查卡：&lt;link rel&gt; 五兄弟</h2>
+    <div class="hint-grid">
+      <div class="hint-card">
+        <h4>dns-prefetch</h4>
+        <p>只提前做域名解析（DNS）。</p>
+        <p class="when">场景：第三方域多、廉价预热。</p>
+        <p class="cost">代价：极小，收益也最小。</p>
+        <pre>&lt;link rel="dns-prefetch"
+      href="//cdn.x.com"&gt;</pre>
+      </div>
+      <div class="hint-card">
+        <h4>preconnect</h4>
+        <p>DNS + TCP + TLS 全握手提前完成。</p>
+        <p class="when">场景：3~4 个关键域（字体/API）。</p>
+        <p class="cost">代价：占连接、费电，过量反伤性能。</p>
+        <pre>&lt;link rel="preconnect"
+      href="https://cdn.x.com"
+      crossorigin&gt;</pre>
+      </div>
+      <div class="hint-card">
+        <h4>preload</h4>
+        <p><strong>强制</strong>提前拉当前页必用资源。</p>
+        <p class="when">场景：LCP 图、关键字体/CSS。</p>
+        <p class="cost">代价：没用上 → Console 报警 + 白耗流量。</p>
+        <pre>&lt;link rel="preload"
+      href="/f.woff2" as="font"
+      type="font/woff2"
+      crossorigin&gt;</pre>
+      </div>
+      <div class="hint-card">
+        <h4>prefetch</h4>
+        <p>低优先级拉<strong>下一页</strong>可能用的资源。</p>
+        <p class="when">场景：高概率的下一步导航。</p>
+        <p class="cost">代价：移动端浪费用户套餐流量。</p>
+        <pre>&lt;link rel="prefetch"
+      href="/next-data.json"&gt;</pre>
+      </div>
+      <div class="hint-card">
+        <h4>modulepreload</h4>
+        <p>预取并解析/编译 ES 模块。</p>
+        <p class="when">场景：启动即依赖的模块链。</p>
+        <p class="cost">代价：同 preload，未用即浪费。</p>
+        <pre>&lt;link rel="modulepreload"
+      href="/app.mjs"&gt;</pre>
+      </div>
+      <div class="hint-card" style="border-top-color:var(--danger)">
+        <h4>noopener noreferrer</h4>
+        <p>外链安全：新页面拿不到 window.opener。</p>
+        <p class="when">场景：任何 target="_blank" 的外链。</p>
+        <p class="cost">代价：无；防 reverse tabnabbing。</p>
+        <pre>&lt;a href="https://x.com"
+   target="_blank"
+   rel="noopener
+        noreferrer"&gt;</pre>
+        <p style="margin-top:6px"><a href="about:blank" target="_blank"
+            rel="noopener noreferrer">点此打开空白页测试（about:blank，不访问网络）↗</a></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4. 移动端键盘 ============ -->
+  <section class="box">
+    <h2>④ inputmode / enterkeyhint：移动端键盘增强（表单章补充视角）</h2>
+    <div class="desk-note">🖥️
+      桌面浏览器没有虚拟键盘，以下属性在桌面<strong>无可见效果</strong>——请用手机访问本文件（或真机/远程调试）点按输入框查看键盘变化。注意：它们不改变值类型，输入值仍是字符串。</div>
+    <div class="kb-grid">
+      <div class="kb-cell">
+        <label for="kb1">验证码</label>
+        <input id="kb1" inputmode="numeric" enterkeyhint="next" autocomplete="one-time-code" placeholder="6 位数字">
+        <p class="kb-meta">inputmode="numeric"<br>enterkeyhint="next"</p>
+      </div>
+      <div class="kb-cell">
+        <label for="kb2">金额</label>
+        <input id="kb2" inputmode="decimal" enterkeyhint="done" placeholder="0.00">
+        <p class="kb-meta">inputmode="decimal"<br>enterkeyhint="done"</p>
+      </div>
+      <div class="kb-cell">
+        <label for="kb3">手机号</label>
+        <input id="kb3" inputmode="tel" enterkeyhint="send" autocomplete="tel" placeholder="11 位手机号">
+        <p class="kb-meta">inputmode="tel"<br>enterkeyhint="send"</p>
+      </div>
+      <div class="kb-cell">
+        <label for="kb4">邮箱</label>
+        <input id="kb4" inputmode="email" enterkeyhint="search" autocomplete="email" placeholder="name@x.com">
+        <p class="kb-meta">inputmode="email"<br>enterkeyhint="search"</p>
+      </div>
+      <div class="kb-cell">
+        <label for="kb5">网址</label>
+        <input id="kb5" inputmode="url" enterkeyhint="go" placeholder="https://">
+        <p class="kb-meta">inputmode="url"<br>enterkeyhint="go"</p>
+      </div>
+      <div class="kb-cell">
+        <label for="kb6">搜索（普通键盘 + 搜索键）</label>
+        <input id="kb6" inputmode="search" enterkeyhint="search" placeholder="关键词">
+        <p class="kb-meta">inputmode="search"<br>enterkeyhint="search"</p>
+      </div>
+    </div>
+    <ul class="tips" style="margin-top:8px">
+      <li>取值：<code>none / text / decimal / numeric / tel / search / email / url</code>。</li>
+      <li>与 <code>type="number"</code> 的区别：后者有数值语义（可能吞前导 0、带上下箭头）；验证码/金额优先 inputmode。</li>
+    </ul>
+  </section>
+
+  <!-- ============ 5. autofill 样式 ============ -->
+  <section class="box">
+    <h2>⑤ :-webkit-autofill 自动填充样式</h2>
+    <p>浏览器自动填充时会强加淡黄色背景，普通 <code>background</code> 改不动；标准做法是用
+      <code>-webkit-box-shadow: 0 0 0 1000px 品牌色 inset</code> 内阴影盖住，再用
+      <code>-webkit-text-fill-color</code> 染文字。Firefox 另写 <code>:autofill</code>。
+    </p>
+    <div style="max-width:320px">
+      <label for="afUser">账号（可让浏览器自动填充以观察真实效果）</label>
+      <input id="afUser" autocomplete="username" placeholder="保存密码后刷新，选自动填充">
+      <label for="afPass">密码</label>
+      <input id="afPass" type="password" autocomplete="current-password" placeholder="自动填充后变品牌淡蓝底">
+    </div>
+    <button class="btn ghost" id="afPreview" type="button">预览自动填充外观（加模拟类）</button>
+  </section>
+
+  <!-- ============ 6. hidden 的坑 ============ -->
+  <section class="box" style="margin-bottom:220px">
+    <h2>⑥ hidden 属性被 display 覆盖的坑</h2>
+    <p><code>[hidden]</code> 的 UA 样式本质就是 <code>display:none</code>——一条普通 CSS 规则。
+      若作者样式写了 <code>.flex-demo{display:flex}</code>，优先级相同而作者样式后加载，
+      <code>hidden</code> 就"失效"了。下方第二个 chip 带 hidden，切换观察：
+    </p>
+    <div class="flex-demo">
+      <span class="chip">Chip A</span>
+      <span class="chip" id="badChip" hidden>Chip B（我有 hidden）</span>
+      <span class="chip">Chip C</span>
+    </div>
+    <p style="margin-top:8px">
+      <button class="btn ghost" id="hiddenToggle" type="button">切换 Chip B 的 hidden</button>
+      <label style="font-weight:400;font-size:.82rem"><input type="checkbox" id="fixToggle"
+          style="width:auto;margin:0 4px 0 10px">启用修复规则
+        <code>[hidden]{display:none!important}</code></label>
+    </p>
+    <p class="ruler" id="hiddenStatus"></p>
+  </section>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var toastEl = document.getElementById('toast');
+      var toastTimer = null;
+      function toast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2600);
+      }
+
+      /* ---------- 生成内联 SVG data URI（离线、零网络） ---------- */
+      function svgDataUri(label, bg, fg) {
+        var svg =
+          '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="220">' +
+          '<rect width="600" height="220" fill="' + bg + '"/>' +
+          '<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" ' +
+          'font-family="sans-serif" font-size="30" fill="' + fg + '">' + label + '</text>' +
+          '</svg>';
+        // data URI 需对 # 等字符编码；encodeURIComponent 最稳妥
+        return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      }
+
+      /* ============================================================
+         ① CLS 对比：1.5s 后两张图同时"到达"
+         ============================================================ */
+      var imgArrived = false;
+      document.getElementById('clsBtn').addEventListener('click', function () {
+        if (imgArrived) { toast('已模拟过，刷新页面可重来'); return; }
+        imgArrived = true;
+        document.getElementById('noSizeNote').textContent = '图片加载中…注意右侧文字位置';
+        document.getElementById('sizedNote').textContent = '图片加载中…盒子已预留';
+        setTimeout(function () {
+          // 无尺寸图：到达前高度为 0，到达后整块把后续内容顶下去 → CLS
+          var a = document.getElementById('noSizeImg');
+          a.src = svgDataUri('600×220 无尺寸属性', '#9bb3cc', '#16202b');
+          a.style.opacity = '1';
+          // 有尺寸图：盒子早已按 600:220 占好，图只是在原位淡入
+          var b = document.getElementById('sizedImg');
+          b.src = svgDataUri('600×220 有 width/height', '#9bd6b0', '#10331f');
+          b.style.opacity = '1';
+          document.getElementById('noSizeNote').textContent =
+            '💥 感受到跳动了吗？下方文字被下移——这就是累积布局偏移（CLS）。';
+          document.getElementById('sizedNote').textContent =
+            '✅ 文字没有移动：aspect-ratio 预留盒 + height:auto 是防 CLS 最低成本手段。';
+          toast('图片"到达"：对比左右两侧文字的位移');
+        }, 1500);
+      });
+
+      /* ============================================================
+         ② 懒加载观察列表
+            模拟真实页面：第一张高优先级立即加载，其余懒加载。
+            用两级 IntersectionObserver 还原浏览器的判定时机：
+            rootMargin 300px ≈ 浏览器"接近视口就调度请求"的提前量；
+            threshold 0 ≈ 图片真正进入视口。
+         ============================================================ */
+      var specs = [
+        { label: 'LCP 主图', tag: 'eager · high', lazy: false, pri: 'high', bg: '#0b6bcb', fg: '#fff' },
+        { label: '配图 1', tag: 'lazy · low', lazy: true, pri: 'low', bg: '#7fa8c9', fg: '#10202e' },
+        { label: '配图 2', tag: 'lazy · auto', lazy: true, pri: 'auto', bg: '#a9c7a0', fg: '#17330f' },
+        { label: '配图 3', tag: 'lazy · low', lazy: true, pri: 'low', bg: '#c9b89b', fg: '#33260f' },
+        { label: '配图 4', tag: 'lazy · auto', lazy: true, pri: 'auto', bg: '#9bb3cc', fg: '#16202b' },
+        { label: '配图 5', tag: 'lazy · low', lazy: true, pri: 'low', bg: '#c99ba9', fg: '#330f1a' }
+      ];
+      var lazyLog = document.getElementById('lazyLog');
+      function lazyMsg(msg) {
+        var t = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+        lazyLog.textContent += '[' + t + '] ' + msg + '\n';
+        lazyLog.scrollTop = lazyLog.scrollHeight;
+      }
+
+      var listEl = document.getElementById('lazyList');
+      specs.forEach(function (s, i) {
+        var item = document.createElement('div');
+        item.className = 'lazy-item';
+        item.id = 'lazyItem' + i;
+        var img = document.createElement('img');
+        img.alt = s.label;
+        img.width = 600; img.height = 220;           // 任何时候都写尺寸防 CLS
+        img.decoding = 'async';
+        img.setAttribute('fetchpriority', s.pri);    // content 属性写法：不支持的浏览器直接忽略（渐进增强）
+        if (s.lazy) img.loading = 'lazy';
+        item.appendChild(img);
+        var tag = document.createElement('span');
+        tag.className = 'lazy-tag';
+        tag.textContent = s.tag;
+        item.appendChild(tag);
+        var status = document.createElement('span');
+        status.className = 'lazy-status';
+        status.textContent = '未加载';
+        item.appendChild(status);
+        listEl.appendChild(item);
+
+        if (!s.lazy) {
+          // 首屏图：立即给 src（真实项目就是让浏览器尽早发现它）
+          img.src = svgDataUri(s.label, s.bg, s.fg);
+          status.textContent = '立即加载';
+          status.className = 'lazy-status in';
+          lazyMsg(s.label + '：首屏资源，eager + high，页面解析即加载');
+        }
+      });
+
+      // 两级观察器仅用于"可视化时机"；真实懒加载由 loading=lazy 原生完成
+      if ('IntersectionObserver' in window) {
+        var nearIO = new IntersectionObserver(function (entries) {
+          entries.forEach(function (en) {
+            if (en.isIntersecting) {
+              var item = en.target;
+              var st = item.querySelector('.lazy-status');
+              if (st.textContent === '未加载') {
+                st.textContent = '进入预取范围';
+                st.className = 'lazy-status near';
+                lazyMsg(item.querySelector('img').alt + '：距视口约 300px，浏览器此时调度请求');
+              }
+            }
+          });
+        }, { rootMargin: '300px 0px' });
+
+        var inIO = new IntersectionObserver(function (entries) {
+          entries.forEach(function (en) {
+            var item = en.target;
+            var img = item.querySelector('img');
+            var st = item.querySelector('.lazy-status');
+            if (en.isIntersecting && img.loading === 'lazy' && !img.dataset.loaded) {
+              img.dataset.loaded = '1';
+              var spec = specs[Number(item.id.replace('lazyItem', ''))];
+              img.src = svgDataUri(spec.label, spec.bg, spec.fg); // 此刻才给 src，类比真实请求发出
+              st.textContent = '已进入视口';
+              st.className = 'lazy-status in';
+              lazyMsg(img.alt + '：进入视口，资源就位（若滚得快，浏览器会提前约 200~300px 发起）');
+            }
+          });
+        }, { threshold: 0.05 });
+
+        document.querySelectorAll('.lazy-item').forEach(function (el) {
+          nearIO.observe(el);
+          inIO.observe(el);
+        });
+      } else {
+        lazyMsg('当前环境不支持 IntersectionObserver，时机可视化不可用（原生 loading=lazy 仍有效）');
+      }
+
+      /* ============================================================
+         ⑤ autofill 预览
+         ============================================================ */
+      document.getElementById('afPreview').addEventListener('click', function () {
+        var u = document.getElementById('afUser');
+        var p = document.getElementById('afPass');
+        var on = !u.classList.contains('filled');
+        u.classList.toggle('filled', on);
+        p.classList.toggle('filled', on);
+        if (on && !u.value) { u.value = 'demo@example.com'; p.value = '********'; }
+        toast(on ? '已模拟自动填充外观（真实触发来自浏览器密码管理器）' : '已取消预览');
+      });
+
+      /* ============================================================
+         ⑥ hidden 被覆盖
+         ============================================================ */
+      var badChip = document.getElementById('badChip');
+      var hiddenStatus = document.getElementById('hiddenStatus');
+      var fixStyle = null;
+      function refreshStatus() {
+        // 用计算样式判断"实际是否隐藏"——眼见为实
+        var displayed = getComputedStyle(badChip).display !== 'none';
+        hiddenStatus.textContent = 'Chip B 当前 computed display = ' +
+          getComputedStyle(badChip).display + ' → ' +
+          (displayed ? '❌ hidden 失效：元素仍然可见（被 .flex-demo 的 display:flex 覆盖）'
+            : '✅ 元素已从渲染树移除');
+      }
+      document.getElementById('hiddenToggle').addEventListener('click', function () {
+        badChip.hidden = !badChip.hidden;
+        refreshStatus();
+      });
+      document.getElementById('fixToggle').addEventListener('change', function (e) {
+        if (e.target.checked) {
+          // 全局兜底规则：很多 reset/normalize 样式库会内置这一条
+          fixStyle = document.createElement('style');
+          fixStyle.textContent = '[hidden] { display: none !important; }';
+          document.head.appendChild(fixStyle);
+          toast('已注入修复规则：!important 盖过任何 display 工具类');
+        } else {
+          if (fixStyle) { fixStyle.remove(); fixStyle = null; }
+        }
+        refreshStatus();
+      });
+      refreshStatus();
+    })();
+  </script>
+</body>
+
+</html>

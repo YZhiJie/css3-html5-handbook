@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：scroll-snap 滚动捕捉 + 滚动条 + 平滑锚点
+  ------------------------------------------------------------
+  【知识点】
+    1. scroll-snap-type：mandatory（强制对齐，体验硬）与
+       proximity（靠近才吸，更安全）；scroll-snap-align
+       决定吸附边，scroll-snap-stop:always 限制单次跨越
+    2. scroll-padding 给滚动容器留安全区（配合固定顶栏），
+       scroll-margin 是元素级等价物
+    3. 自定义滚动条：::-webkit-scrollbar 三槽 + Firefox 的
+       scrollbar-width/color；隐藏滚动条但保留滚动
+    4. scroll-behavior:smooth 让锚点跳转平滑；
+       prefers-reduced-motion 用户应自动关闭
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    顶部导航点击可平滑跳转到各分区（标题不会被固定导航挡住）；
+    横向卡片轮播松手自动对齐，可切换 mandatory/proximity 与
+    滚动条三态；纵向盒子内是全屏分屏，滚动有段落吸附感。
+  【注意事项】
+    纵向分屏故意用 proximity：内容高于一屏时 mandatory 可能让
+    最后一段文字永远滚不到。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 03 · scroll-snap / 滚动条 / 平滑锚点</title>
+<style>
+  :root {
+    --brand: #4361ee; --ink: #232c3d; --muted: #7c8aa0; --line: #e3e8f1;
+    --bg: #f4f6fb; --card: #fff; --nav-h: 60px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  /* 锚点/全局吸附统一给固定头让位（本页锚点直接落在页面上） */
+  html { scroll-padding-top: calc(var(--nav-h) + 12px); }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.6;
+  }
+  /* 尊重系统"减少动态效果"：直接跳转不做动画 */
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+
+  /* ---------- 固定导航（锚点导航） ---------- */
+  .nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+    height: var(--nav-h);
+    background: rgba(35,44,61,.92); backdrop-filter: blur(10px);
+    display: flex; align-items: center; gap: 18px; padding: 0 22px;
+  }
+  .nav .logo { color: #fff; font-weight: 700; font-size: .95rem; margin-right: auto; }
+  .nav a {
+    color: #c7d3ea; text-decoration: none; font-size: .82rem;
+    padding: 6px 12px; border-radius: 999px; transition: background .2s;
+  }
+  .nav a:hover { background: rgba(255,255,255,.12); color: #fff; }
+  main { padding-top: var(--nav-h); }
+
+  section.page {
+    padding: 28px 24px 34px;
+  }
+  .page-inner {
+    max-width: 960px; margin: 0 auto;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 14px; padding: 22px;
+  }
+  h1 { font-size: 1.4rem; margin-bottom: 4px; }
+  h2 { font-size: 1.1rem; margin-bottom: 4px; }
+  .sub, .desc { color: var(--muted); font-size: .85rem; margin-bottom: 16px; }
+
+  /* ---------- 控制面板 ---------- */
+  .controls { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+  .ctl { display: flex; align-items: center; gap: 8px; font-size: .82rem; color: var(--muted); }
+  .ctl .seg { display: flex; gap: 4px; }
+  .ctl button {
+    border: 1px solid var(--line); background: #fbfcff; color: var(--ink);
+    font-size: .78rem; padding: 6px 12px; border-radius: 7px; cursor: pointer;
+  }
+  .ctl button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+  /* ---------- 横向轮播 ---------- */
+  .carousel {
+    display: flex; gap: 16px;
+    overflow-x: auto; overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scroll-padding-left: 4px;
+    padding: 4px 4px 14px;
+    -webkit-overflow-scrolling: touch;   /* iOS 惯性滚动 */
+  }
+  .carousel.proximity { scroll-snap-type: x proximity; }
+  .slide {
+    flex: 0 0 78%;                          /* 露出下一张，暗示可横滑 */
+    max-width: 420px;
+    height: 230px; border-radius: 14px;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;               /* 一次手势只过一张 */
+    color: #fff; padding: 22px;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    box-shadow: 0 8px 20px rgba(35,44,61,.18);
+  }
+  .slide h3 { font-size: 1.15rem; margin-bottom: 4px; }
+  .slide p { font-size: .82rem; opacity: .9; }
+  .s1 { background: linear-gradient(135deg, #4361ee, #3a0ca3); }
+  .s2 { background: linear-gradient(135deg, #f72585, #b5179e); }
+  .s3 { background: linear-gradient(135deg, #4cc9f0, #4895ef); }
+  .s4 { background: linear-gradient(135deg, #30a46c, #0f7b48); }
+  .s5 { background: linear-gradient(135deg, #f59e0b, #d97706); }
+  .s6 { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
+
+  /* ---------- 滚动条三态 ---------- */
+  /* 态 1：自定义细滚动条（WebKit） */
+  .bar-custom::-webkit-scrollbar { height: 8px; width: 8px; }
+  .bar-custom::-webkit-scrollbar-track { background: #eef1f8; border-radius: 8px; }
+  .bar-custom::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, #6c8cff, #4361ee); border-radius: 8px;
+  }
+  .bar-custom::-webkit-scrollbar-thumb:hover { background: #3a0ca3; }
+  .bar-custom { scrollbar-width: thin; scrollbar-color: #6c8cff #eef1f8; }
+
+  /* 态 2：隐藏滚动条但保留滚动 */
+  .bar-hidden { scrollbar-width: none; -ms-overflow-style: none; }
+  .bar-hidden::-webkit-scrollbar { display: none; }
+
+  /* 态 3：默认（不显式写任何滚动条样式） */
+
+  .dots { display: flex; gap: 7px; margin-top: 4px; }
+  .dots i {
+    width: 8px; height: 8px; border-radius: 50%; background: #c9d4ea; display: block;
+    transition: background .2s, width .2s;
+  }
+  .dots i.on { background: var(--brand); width: 20px; border-radius: 5px; }
+
+  /* ---------- 纵向全屏分屏 ---------- */
+  .v-snap {
+    height: 520px; overflow-y: auto;
+    scroll-snap-type: y proximity;          /* 故意 proximity：高内容也能滚到底 */
+    border: 1px solid var(--line); border-radius: 14px;
+    scroll-padding-top: 0;
+  }
+  .v-snap.mandatory { scroll-snap-type: y mandatory; }
+  .v-page {
+    height: 100%; scroll-snap-align: start;
+    padding: 30px; color: #fff;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .v-page h3 { font-size: 1.5rem; margin-bottom: 8px; }
+  .v-page p { max-width: 520px; font-size: .9rem; opacity: .92; }
+  .v-page .num {
+    font-size: .76rem; letter-spacing: 2px; opacity: .8; margin-bottom: 10px;
+  }
+  .vp1 { background: #232c3d; }
+  .vp2 { background: #4361ee; }
+  .vp3 { background: #3a0ca3; }
+  .vp4 { background: #b5179e; }
+
+  /* 纵向盒自定义滚动条（与横向轮播同套视觉） */
+  .v-snap::-webkit-scrollbar { width: 8px; }
+  .v-snap::-webkit-scrollbar-track { background: rgba(255,255,255,.12); }
+  .v-snap::-webkit-scrollbar-thumb { background: rgba(255,255,255,.45); border-radius: 8px; }
+  .v-snap { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.45) rgba(255,255,255,.12); }
+
+  .formula {
+    font-family: ui-monospace, Consolas, monospace; font-size: .76rem;
+    background: #232c3d; color: #c7d3ea; border-radius: 8px;
+    padding: 10px 12px; margin-top: 14px; white-space: pre-wrap;
+  }
+  .note-pill {
+    display: inline-block; font-size: .72rem; padding: 2px 9px; border-radius: 999px;
+    background: #f1f5ff; color: var(--brand); margin-bottom: 10px;
+  }
+</style>
+</head>
+<body>
+  <!-- 固定导航：锚点平滑滚动 -->
+  <nav class="nav">
+    <span class="logo">Snap 实验室</span>
+    <a href="#sec-h">横向轮播</a>
+    <a href="#sec-v">纵向分屏</a>
+    <a href="#sec-c">代码要点</a>
+  </nav>
+
+  <main>
+    <!-- 横向 -->
+    <section class="page" id="sec-h">
+      <div class="page-inner">
+        <h1>① 横向 scroll-snap 卡片轮播</h1>
+        <p class="sub">原生滚动实现轮播：触屏惯性、滚轮、键盘全部免费。松手后卡片自动对齐边缘。</p>
+
+        <div class="controls">
+          <div class="ctl">吸附强度
+            <div class="seg" id="snapSeg">
+              <button data-snap="mandatory" class="on">mandatory 强制</button>
+              <button data-snap="proximity">proximity 靠近</button>
+            </div>
+          </div>
+          <div class="ctl">滚动条
+            <div class="seg" id="barSeg">
+              <button data-bar="custom" class="on">自定义</button>
+              <button data-bar="hidden">隐藏可滚</button>
+              <button data-bar="default">浏览器默认</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="carousel bar-custom" id="carousel">
+          <article class="slide s1"><h3>山川计划</h3><p>mandatory 下松手必对齐；scroll-snap-stop:always 让一次手势只跨越一张。</p></article>
+          <article class="slide s2"><h3>湖海专题</h3><p>卡片宽度 78% 并露出下一张边缘，给用户"还能滑"的视觉暗示。</p></article>
+          <article class="slide s3"><h3>星空营地</h3><p>scroll-padding-left 让第一张卡片不贴死容器边缘。</p></article>
+          <article class="slide s4"><h3>城市漫步</h3><p>横向滚动条可自定义为品牌色，也可彻底隐藏只保留指示点。</p></article>
+          <article class="slide s5"><h3>沙漠公路</h3><p>无需任何 JS 同步位置：滚动到哪，指示点由 scroll 事件更新即可。</p></article>
+          <article class="slide s6"><h3>极夜观测</h3><p>内容卡片高度固定，避免 snap 对齐时出现半张卡片悬空。</p></article>
+        </div>
+        <div class="dots" id="dots"></div>
+      </div>
+    </section>
+
+    <!-- 纵向 -->
+    <section class="page" id="sec-v">
+      <div class="page-inner">
+        <h2>② 纵向全屏分屏（局部滚动容器）</h2>
+        <p class="desc">在下方盒子内滚动：每屏一个主题，停顿感来自 snap。可切换 mandatory 感受"强制"的副作用。</p>
+        <div class="controls">
+          <div class="ctl">纵向吸附
+            <div class="seg" id="vSeg">
+              <button data-v="proximity" class="on">proximity（推荐）</button>
+              <button data-v="mandatory">mandatory（强制）</button>
+            </div>
+          </div>
+        </div>
+        <div class="v-snap" id="vSnap">
+          <div class="v-page vp1">
+            <span class="num">SCREEN 01</span>
+            <h3>proximity 为什么是长内容首选</h3>
+            <p>mandatory 要求滚动停止后必须落在 snap 点。若某一屏内容高于容器，超出部分在部分浏览器上难以停留查看；proximity 仅在靠近时吸附，既保留段落感，又不牺牲自由滚动。</p>
+          </div>
+          <div class="v-page vp2">
+            <span class="num">SCREEN 02</span>
+            <h3>吸附边：start / center / end</h3>
+            <p>scroll-snap-align 决定元素的哪条边与容器对齐。全屏分页用 start；居中画廊用 center；时间轴底部对齐的卡片可用 end。</p>
+          </div>
+          <div class="v-page vp3">
+            <span class="num">SCREEN 03</span>
+            <h3>固定头与安全区</h3>
+            <p>本页顶部导航高 60px，html 上声明 scroll-padding-top 后，所有锚点跳转与页面级吸附统一下移，标题不会被遮挡。</p>
+          </div>
+          <div class="v-page vp4">
+            <span class="num">SCREEN 04</span>
+            <h3>减少动态效果</h3>
+            <p>scroll-behavior:smooth 与 snap 动画在 prefers-reduced-motion 下应被收敛，媒体查询把平滑行为退回 auto。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 代码要点 -->
+    <section class="page" id="sec-c">
+      <div class="page-inner">
+        <h2>③ 代码要点速查</h2>
+        <p class="desc">本页实际生效的核心声明：</p>
+        <span class="note-pill">固定头避让 + 平滑锚点</span>
+        <div class="formula">html {
+  scroll-behavior: smooth;        /* 锚点平滑 */
+  scroll-padding-top: 72px;       /* 固定头 60px + 12px 间隙 */
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; } /* 无障碍：尊重系统设置 */
+}</div>
+        <span class="note-pill" style="margin-top:14px">横向轮播</span>
+        <div class="formula">.carousel {
+  display: flex; overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-left: 4px;
+}
+.slide { flex: 0 0 78%; scroll-snap-align: start;
+         scroll-snap-stop: always; }</div>
+        <span class="note-pill" style="margin-top:14px">隐藏滚动条仍可滚动</span>
+        <div class="formula">.bar-hidden { scrollbar-width: none; -ms-overflow-style: none; }
+.bar-hidden::-webkit-scrollbar { display: none; }</div>
+      </div>
+    </section>
+  </main>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- 横向轮播：吸附强度 / 滚动条三态 ---------- */
+  var carousel = document.getElementById('carousel');
+
+  Array.prototype.forEach.call(document.querySelectorAll('#snapSeg button'), function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#snapSeg button').forEach(function (b) {
+        b.classList.toggle('on', b === btn);
+      });
+      carousel.classList.toggle('proximity', btn.dataset.snap === 'proximity');
+    });
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('#barSeg button'), function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#barSeg button').forEach(function (b) {
+        b.classList.toggle('on', b === btn);
+      });
+      carousel.classList.remove('bar-custom', 'bar-hidden');
+      if (btn.dataset.bar === 'custom') carousel.classList.add('bar-custom');
+      if (btn.dataset.bar === 'hidden') carousel.classList.add('bar-hidden');
+      // default：什么类都不加
+    });
+  });
+
+  /* ---------- 指示点：跟随滚动位置高亮 ---------- */
+  var slides = Array.prototype.slice.call(carousel.querySelectorAll('.slide'));
+  var dotsBox = document.getElementById('dots');
+  slides.forEach(function (_, i) {
+    var dot = document.createElement('i');
+    if (i === 0) dot.classList.add('on');
+    dot.addEventListener('click', function () {
+      // scrollIntoView 同样受 scroll-snap 约束，会停在对齐点
+      slides[i].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+    });
+    dotsBox.appendChild(dot);
+  });
+  var dots = Array.prototype.slice.call(dotsBox.children);
+  carousel.addEventListener('scroll', function () {
+    // 找到中点最接近容器中心的卡片
+    var center = carousel.scrollLeft + carousel.clientWidth / 2;
+    var best = 0, bestDist = Infinity;
+    slides.forEach(function (s, i) {
+      var c = s.offsetLeft + s.offsetWidth / 2;
+      var d = Math.abs(c - center);
+      if (d < bestDist) { bestDist = d; best = i; }
+    });
+    dots.forEach(function (d, i) { d.classList.toggle('on', i === best); });
+  }, { passive: true });
+
+  /* ---------- 纵向吸附强度切换 ---------- */
+  var vSnap = document.getElementById('vSnap');
+  Array.prototype.forEach.call(document.querySelectorAll('#vSeg button'), function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#vSeg button').forEach(function (b) {
+        b.classList.toggle('on', b === btn);
+      });
+      vSnap.classList.toggle('mandatory', btn.dataset.v === 'mandatory');
+    });
+  });
+})();
+</script>
+</body>
+</html>

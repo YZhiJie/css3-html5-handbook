@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 01：单行省略多场景实验台
+  ------------------------------------------------------------
+  【知识点】
+    1. 单行省略三件套：white-space:nowrap + overflow:hidden
+       + text-overflow:ellipsis，三者缺一不可
+    2. flex 行方向子项必须 min-width:0 才能被压缩（根因：
+       flex 子项 min-width:auto 的下限等于 min-content）
+    3. grid 子项同样需要 min-width:0，或轨道写 minmax(0,1fr)
+    4. table 需要 table-layout:fixed，列宽不再听内容的
+    5. button 浏览器默认 white-space:nowrap，行为与普通块不同
+    6. scrollWidth > clientWidth 可程序化检测是否真的截断，
+       配合 ResizeObserver 在容器宽度变化后重新检测
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    五种容器并排演示；顶部开关一键切换"修复写法"，可直观
+    对比错误写法与修复写法；每个被截断的文本右上角显示红色
+    "已截断"徽标（由 scrollWidth 检测实时驱动），hover 时
+    仅截断项通过 title 显示全文。拖动窗口宽度观察徽标变化。
+  【注意事项】
+    检测加了 1px 容差，避免子像素缩放误报；title 只在截断时
+    挂载，未截断不打扰用户。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>示例 01 · 单行省略多场景实验台</title>
+  <style>
+    :root {
+      --brand: #4361ee;
+      --ink: #232c3d;
+      --muted: #7c8aa0;
+      --line: #e3e8f1;
+      --bg: #f4f6fb;
+      --card: #fff;
+      --bad: #e5484d;
+      --good: #30a46c;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      padding: 24px;
+      line-height: 1.6;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 4px;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: .9rem;
+      margin-bottom: 18px;
+    }
+
+    /* ---------- 全局控制面板 ---------- */
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 18px;
+      display: flex;
+      gap: 22px;
+      flex-wrap: wrap;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(35, 44, 61, .06);
+    }
+
+    .toolbar label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .88rem;
+      cursor: pointer;
+    }
+
+    .toolbar input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--brand);
+    }
+
+    .toolbar .state {
+      margin-left: auto;
+      font-size: .78rem;
+      font-family: ui-monospace, Consolas, monospace;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    .state.broken {
+      background: #fdecec;
+      color: var(--bad);
+    }
+
+    .state.fixed {
+      background: #e9f9f1;
+      color: var(--good);
+    }
+
+    section.panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+
+    h2 {
+      font-size: 1.05rem;
+      margin-bottom: 4px;
+    }
+
+    .desc {
+      color: var(--muted);
+      font-size: .82rem;
+      margin-bottom: 14px;
+    }
+
+    .code-tag {
+      display: inline-block;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: .72rem;
+      background: #f1f5ff;
+      color: var(--brand);
+      padding: 1px 7px;
+      border-radius: 5px;
+      margin-left: 6px;
+    }
+
+    /* 被检测文本的通用样式：相对定位承载徽标；三件套基础样式 */
+    .txt {
+      position: relative;
+      background: #fbfcff;
+      border: 1px dashed #c9d4ea;
+      border-radius: 8px;
+      padding: 10px 38px 10px 12px;
+      font-size: .9rem;
+      /* 三件套始终在位——本实验对比的是"容器是否给了收缩条件" */
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* 截断徽标：JS 增删 is-clipped 类 */
+    .txt .badge {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      font-size: .66rem;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: #eef2f9;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    .txt.is-clipped .badge {
+      background: #fdecec;
+      color: var(--bad);
+    }
+
+    /* ---------- 场景一：普通块 ---------- */
+    /* 块级元素宽度默认 = 父级内容宽，天然有"确定宽度"，直接生效 */
+    #blockBox {
+      width: 360px;
+      max-width: 100%;
+    }
+
+    /* ---------- 场景二：flex 行（左标题右按钮） ---------- */
+    .flex-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .flex-row .txt {
+      flex: 1;
+      padding-right: 38px;
+    }
+
+    .flex-row button.act {
+      flex: none;
+      /* 按钮永不被压缩，与标题侧形成对照 */
+      border: 0;
+      background: var(--brand);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: .85rem;
+      cursor: pointer;
+    }
+
+    /* 修复开关打开时，由 JS 给 body 加 .fix 类，这里集中定义所有修复 */
+    body.fix .flex-row .txt {
+      min-width: 0;
+    }
+
+    /* ---------- 场景三：grid 两列 ---------- */
+    .grid-row {
+      display: grid;
+      gap: 12px;
+      /* 错误写法：1fr 实际是 minmax(auto,1fr)，下限为 min-content */
+      grid-template-columns: 1fr 1fr;
+    }
+
+    body.fix .grid-row {
+      /* 修复写法一：轨道下限直接给 0；子项也可各自 min-width:0 */
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    /* ---------- 场景四：table ---------- */
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .85rem;
+    }
+
+    /* 默认 auto：浏览器要读完所有单元格内容才能定列宽，长内容撑爆列 */
+    body.fix table {
+      table-layout: fixed;
+    }
+
+    /* 修复：首行/col 定宽即定案 */
+    col.c-name {
+      width: 34%;
+    }
+
+    col.c-link {
+      width: 42%;
+    }
+
+    col.c-time {
+      width: 24%;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      /* td 需要是"裁剪容器"：position 承载徽标 */
+      position: relative;
+      padding-right: 40px;
+    }
+
+    th {
+      background: #f7f9fd;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    /* ---------- 场景五：button 元素 ---------- */
+    .btn-demo {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    button.native {
+      width: 200px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid #c9d4ea;
+      background: #fbfcff;
+      color: var(--ink);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      /* 故意不写 white-space —— button 的 UA 默认就是 nowrap，
+       所以省略"碰巧"能用；显式写出来才不依赖默认值 */
+    }
+
+    body.fix button.native {
+      white-space: nowrap;
+    }
+
+    .btn-demo .note {
+      font-size: .78rem;
+      color: var(--muted);
+      max-width: 260px;
+    }
+
+    /* ---------- 结论面板 ---------- */
+    .summary {
+      background: #eef4ff;
+      border: 1px solid #cdddff;
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: .85rem;
+    }
+
+    .summary b {
+      color: var(--brand);
+    }
+
+    .summary ul {
+      margin: 6px 0 0 18px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>示例 01 · 单行省略多场景实验台</h1>
+  <p class="sub">三件套人人会背，但"为什么在 flex/grid/table 里不生效"才是真正的考点。</p>
+
+  <!-- 全局开关：切换错误写法 / 修复写法 -->
+  <div class="toolbar">
+    <label>
+      <input type="checkbox" id="fixToggle">
+      启用修复写法（min-width:0 / minmax(0,1fr) / table-layout:fixed / 显式 nowrap）
+    </label>
+    <span class="state broken" id="statePill">当前：错误写法</span>
+  </div>
+
+  <!-- 场景一：普通块级元素 -->
+  <section class="panel">
+    <h2>① 普通块级元素<span class="code-tag">width:360px</span></h2>
+    <p class="desc">块级元素宽度由父级/自身 width 决定，是"确定的宽度"，三件套直接生效，不需要任何修复。</p>
+    <div class="txt clamp-target" id="blockBox">这是一段在 360px 宽块级盒子里的长文本：2026 年度产品路线图（内部讨论稿-第三次评审-请以本版为准）.docx</div>
+  </section>
+
+  <!-- 场景二：flex 行 -->
+  <section class="panel">
+    <h2>② flex 行方向子项<span class="code-tag">flex:1 + 固定按钮</span></h2>
+    <p class="desc">错误写法下标题拒绝收缩（min-width:auto=min-content），按钮被挤出容器；开启修复后标题在可用宽度内省略。</p>
+    <div class="flex-row">
+      <span class="txt clamp-target">一份标题特别特别长的需求文档最终版 v17（请各位同事尽快审阅并回填意见）.docx</span>
+      <button class="act">下载</button>
+    </div>
+  </section>
+
+  <!-- 场景三：grid -->
+  <section class="panel">
+    <h2>③ grid 两列布局<span class="code-tag">1fr 1fr</span></h2>
+    <p class="desc">错误写法下 1fr 的下限是 auto（=min-content），长 URL 把两列一起撑宽；修复后轨道可缩到 0，省略生效。</p>
+    <div class="grid-row">
+      <div class="txt clamp-target">短标题</div>
+      <div class="txt clamp-target">
+        https://example.com/api/v2/repositories/2026/very/long/resource/path?token=abcdef0123456789</div>
+    </div>
+  </section>
+
+  <!-- 场景四：table -->
+  <section class="panel">
+    <h2>④ 表格单元格<span class="code-tag">table-layout</span></h2>
+    <p class="desc">auto 布局下列宽由内容决定（长链接独占宽度）；fixed 布局下按 colgroup 34:42:24 分配，各列独立省略。</p>
+    <div class="table-wrap">
+      <table>
+        <colgroup>
+          <col class="c-name">
+          <col class="c-link">
+          <col class="c-time">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>名称</th>
+            <th>链接</th>
+            <th>更新时间</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="clamp-target-cell">2026 年度战略规划（草案-第三轮修订-终稿-真的终稿）.pdf</td>
+            <td class="clamp-target-cell">https://example.com/a/very/long/path/to/resource?x=1&amp;y=2</td>
+            <td class="clamp-target-cell">2026-09-23 14:30</td>
+          </tr>
+          <tr>
+            <td class="clamp-target-cell">季度复盘.pptx</td>
+            <td class="clamp-target-cell">https://e.co/short</td>
+            <td class="clamp-target-cell">2026-09-20 09:12</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 场景五：button -->
+  <section class="panel">
+    <h2>⑤ button 元素<span class="code-tag">UA 默认 nowrap</span></h2>
+    <p class="desc">button 默认 white-space:nowrap，省略"碰巧"能用——但依赖浏览器默认值是脆弱的，修复写法显式声明。</p>
+    <div class="btn-demo">
+      <button class="native clamp-target" type="button">按钮里的超长操作文本：点击查看完整的审批流程历史记录与评论</button>
+      <p class="note">提示：若设计要求按钮文字可换行，需要显式 <code>white-space: normal</code>，因为默认值"拦着"你。</p>
+    </div>
+  </section>
+
+  <div class="summary">
+    <b>实验结论</b>
+    <ul>
+      <li>单行省略 = <b>三件套</b>（nowrap + overflow:hidden + text-overflow:ellipsis）+ <b>确定的宽度</b>。</li>
+      <li>flex 行子项加 <b>min-width:0</b>；grid 子项加 min-width:0 或轨道写 <b>minmax(0,1fr)</b>；table 加 <b>table-layout:fixed</b>。
+      </li>
+      <li>徽标与 title 全部由 <b>scrollWidth/clientWidth 检测</b>驱动：只有真正被截断的元素才标红、才挂 title。</li>
+    </ul>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var fixToggle = document.getElementById('fixToggle');
+      var statePill = document.getElementById('statePill');
+
+      /**
+       * 检测一个元素当前是否发生了截断。
+       * 原理：scrollWidth 是内容的完整可滚动宽度，clientWidth 是可视宽度；
+       *       内容被 overflow:hidden 裁掉时，前者严格大于后者。
+       * 容差 1px：浏览器子像素缩放下两者可能差 0.3~0.8px，并非真截断。
+       */
+      function isClipped(el) {
+        return el.scrollWidth - el.clientWidth > 1;
+      }
+
+      function refresh() {
+        /* --- 普通文本节点（带徽标） --- */
+        document.querySelectorAll('.clamp-target').forEach(function (el) {
+          var clipped = isClipped(el);
+          el.classList.toggle('is-clipped', clipped);
+          // 只有真截断才挂 title：未截断也弹延迟提示会打扰用户
+          if (clipped) {
+            el.setAttribute('title', el.textContent.trim());
+            var badge = el.querySelector('.badge');
+            if (!badge) {
+              badge = document.createElement('span');
+              badge.className = 'badge';
+              el.appendChild(badge);
+            }
+            badge.textContent = '已截断';
+          } else {
+            el.removeAttribute('title');
+            var b = el.querySelector('.badge');
+            if (b) b.textContent = '完整';
+          }
+        });
+
+        /* --- 表格单元格（不放徽标，避免干扰表格布局，仅挂 title） --- */
+        document.querySelectorAll('.clamp-target-cell').forEach(function (td) {
+          if (isClipped(td)) td.setAttribute('title', td.textContent.trim());
+          else td.removeAttribute('title');
+        });
+      }
+
+      // 开关：body 类集中控制全部修复写法
+      fixToggle.addEventListener('change', function () {
+        var on = fixToggle.checked;
+        document.body.classList.toggle('fix', on);
+        statePill.textContent = on ? '当前：修复写法' : '当前：错误写法';
+        statePill.className = 'state ' + (on ? 'fixed' : 'broken');
+        // 类名切换改变布局后，必须等一帧重新测量
+        requestAnimationFrame(refresh);
+      });
+
+      // 窗口宽度变化 → 各容器宽度变化 → 截断状态可能改变（宽了就不截断）
+      // ResizeObserver 比 window.resize 更精确：任意祖先尺寸变化都能捕获
+      if ('ResizeObserver' in window) {
+        var ro = new ResizeObserver(refresh);
+        document.querySelectorAll('section.panel').forEach(function (s) { ro.observe(s); });
+      }
+      window.addEventListener('resize', refresh);
+
+      refresh(); // 字体/布局稳定后先算一次
+      // Web 字体晚到会改变文字宽度，字体加载完成后补算一次
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(refresh);
+    })();
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 01：<dialog> 原生对话框 —— 模态 showModal 与非模态 show
+  ------------------------------------------------------------
+  【知识点】
+    1. showModal()：进入 top layer、自带 ::backdrop 遮罩、
+       ESC 触发 cancel、焦点陷阱（Tab 不出框）、关闭后焦点归还
+    2. form method="dialog"：提交即关框，按钮 value 写入
+       dialog.returnValue，无需自管"确认/取消"状态
+    3. 初始焦点：框内 autofocus 元素 > 首个可聚焦元素
+    4. 点遮罩关闭的社区写法（e.target === dialog）及其误触坑
+    5. show() 非模态：无遮罩、不陷阱焦点、ESC 不关，
+       适合侧栏通知/调色板，可与页面共存操作
+    6. ::backdrop 自定义（半透明 + 模糊）、[open] 进场动画
+  【运行方式】
+    纯单文件、零网络零 CDN，双击 file:// 打开即可。
+  【效果说明】
+    左侧"舞台区"有多个按钮与输入框（用于观察焦点是否被陷阱
+    圈住）；右侧为操作面板与事件日志。打开模态后尝试 Tab、
+    ESC、点遮罩；打开非模态侧栏后可继续操作主页面。
+  【注意事项】
+    全程使用页面内 toast 与日志面板反馈，无 alert/prompt。
+    若浏览器过老不支持 <dialog>，顶部会显示兼容性提示条。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 01 · dialog 原生对话框</title>
+<style>
+  :root {
+    --ink: #22303f; --muted: #6b7a8c; --line: #dbe3ec;
+    --brand: #0b6bcb; --bg: #f2f5f9; --card: #fff;
+    --danger: #c0392b; --ok: #178a50; --warn: #b9770e;
+    --code-bg: #eef2f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.65; padding: 20px;
+  }
+  h1 { font-size: 1.35rem; }
+  .sub { color: var(--muted); font-size: .86rem; margin: 4px 0 14px; }
+  .layout { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .col { flex: 1 1 380px; min-width: 0; }
+  section.box {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px 16px; margin-bottom: 14px;
+  }
+  h2 { font-size: 1rem; margin-bottom: 10px; }
+  p, li { font-size: .85rem; }
+  ul.tips { padding-left: 18px; }
+  ul.tips li { margin: 3px 0; }
+  code {
+    background: var(--code-bg); border-radius: 4px;
+    padding: 0 5px; font-size: .78rem; font-family: "SF Mono", Consolas, monospace;
+  }
+
+  /* ---------- 按钮与输入 ---------- */
+  .btn {
+    background: var(--brand); color: #fff; border: 0; border-radius: 8px;
+    padding: 8px 16px; font-size: .85rem; cursor: pointer; margin: 4px 6px 4px 0;
+  }
+  .btn.ghost { background: #eef2f8; color: var(--ink); border: 1px solid var(--line); }
+  .btn.danger { background: var(--danger); }
+  .btn:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 3px solid rgba(11,107,203,.35); outline-offset: 1px;
+  }
+  input[type=text], select {
+    font-size: .85rem; padding: 7px 10px; border: 1px solid var(--line);
+    border-radius: 8px; width: 100%; margin: 4px 0 10px;
+  }
+  label { font-size: .83rem; font-weight: 600; }
+  .stage-item {
+    border: 1px dashed var(--line); border-radius: 10px;
+    padding: 10px 12px; margin-top: 10px; background: #fbfcfe;
+  }
+
+  /* ---------- 事件日志 ---------- */
+  #log {
+    background: #101826; color: #9fe0b5; border-radius: 8px;
+    font-family: "SF Mono", Consolas, monospace; font-size: .72rem;
+    padding: 8px 10px; height: 170px; overflow: auto; white-space: pre-wrap;
+  }
+
+  /* ---------- toast（替代 alert） ---------- */
+  #toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px);
+    background: #101826; color: #fff; padding: 9px 18px; border-radius: 999px;
+    font-size: .84rem; opacity: 0; pointer-events: none;
+    transition: opacity .2s, transform .2s; z-index: 10; max-width: 86vw;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ============================================================
+     dialog 关键样式
+     ============================================================ */
+  dialog {
+    border: 0; border-radius: 14px; padding: 0; width: min(440px, 92vw);
+    box-shadow: 0 20px 60px rgba(10,20,35,.25);
+  }
+  dialog[open] { animation: dlg-in .2s cubic-bezier(.2,.9,.3,1.2); }
+  @keyframes dlg-in {
+    from { opacity: 0; transform: translateY(16px) scale(.97); }
+    to   { opacity: 1; transform: none; }
+  }
+  /* ::backdrop 只在 showModal() 时存在；show() 非模态没有遮罩 */
+  dialog::backdrop {
+    background: rgba(10, 18, 30, .5);
+    backdrop-filter: blur(3px);            /* 背景毛玻璃 */
+    animation: bd-in .25s ease-out;
+  }
+  @keyframes bd-in { from { opacity: 0; } }
+  .dlg-head { padding: 16px 20px 0; }
+  .dlg-head h3 { font-size: 1.05rem; }
+  .dlg-body { padding: 12px 20px 4px; }
+  .dlg-foot {
+    padding: 12px 20px 18px; display: flex; justify-content: flex-end; gap: 8px;
+  }
+
+  /* 非模态侧栏：锚定在右侧；show() 不会创建 backdrop，也不锁焦点 */
+  #sideDialog {
+    margin: 0; position: fixed; top: 20px; right: 20px;
+    width: min(300px, 86vw); border-radius: 12px;
+  }
+
+  /* 顶部兼容性提示条（仅不支持时出现） */
+  #compat {
+    display: none; background: #fdecea; border: 1px solid #f5c6c0;
+    color: #922; border-radius: 10px; padding: 10px 14px;
+    font-size: .84rem; margin-bottom: 14px;
+  }
+</style>
+</head>
+<body>
+
+<h1>示例 01 · &lt;dialog&gt; 原生对话框</h1>
+<p class="sub">模态 showModal（遮罩 / ESC / 焦点陷阱 / method=dialog 返回值）与非模态 show 侧栏 —— 浏览器原生造好的轮子。</p>
+
+<div id="compat">⚠️ 当前浏览器不支持 <code>&lt;dialog&gt;</code>（建议 Chrome 37+/Edge 79+/Firefox 98+/Safari 15.4+）。页面交互将不可用，请更换现代浏览器体验。</div>
+
+<div class="layout">
+  <!-- ============ 左：舞台区（模态打开时背景元素应不可达） ============ -->
+  <div class="col">
+    <section class="box">
+      <h2>舞台区（背景内容）</h2>
+      <p>打开<strong>模态</strong>后：点不到这些控件、Tab 键无法离开对话框、读屏器也读不到这里；打开<strong>非模态侧栏</strong>后：一切照常可操作。</p>
+      <div class="stage-item">
+        <label for="bgInput">背景输入框（焦点陷阱参照物）</label>
+        <input id="bgInput" type="text" placeholder="模态打开时焦点到不了这里">
+        <button class="btn ghost" type="button">背景按钮 A</button>
+        <button class="btn ghost" type="button">背景按钮 B</button>
+      </div>
+    </section>
+
+    <section class="box">
+      <h2>操作</h2>
+      <button class="btn" id="openModal" type="button">① showModal() 打开模态</button>
+      <button class="btn ghost" id="openSide" type="button">② show() 打开非模态侧栏</button>
+      <p style="margin-top:8px">
+        <strong>建议实测路径：</strong>
+      </p>
+      <ul class="tips">
+        <li>打开模态后狂按 <code>Tab</code> / <code>Shift+Tab</code>：焦点只在框内三要素循环（焦点陷阱）。</li>
+        <li>按 <code>ESC</code>：触发 <code>cancel</code> 后关闭（等于取消）。</li>
+        <li>点击半透明遮罩：关闭并返回 <code>"backdrop"</code>（注意误触说明）。</li>
+        <li>不填原因直接点确认：浏览器内建 required 拦截，框不会关闭。</li>
+        <li>关闭后观察：焦点自动归还到触发按钮。</li>
+      </ul>
+    </section>
+  </div>
+
+  <!-- ============ 右：说明 + 日志 ============ -->
+  <div class="col">
+    <section class="box">
+      <h2>showModal vs show 对照</h2>
+      <ul class="tips">
+        <li><code>showModal()</code>：top layer + <code>::backdrop</code> + ESC + 焦点陷阱 + 背景移出可访问性树。</li>
+        <li><code>show()</code>：普通显示，无遮罩、ESC 不关、焦点自由，可与主页面同时操作。</li>
+        <li><code>method="dialog"</code>：表单提交不发请求，按钮 <code>value</code> 写入 <code>returnValue</code>。</li>
+        <li>遮罩点击关闭是<strong>社区惯例</strong>：在框内按下、框外松手可能误触，破坏性操作慎用。</li>
+      </ul>
+    </section>
+    <section class="box">
+      <h2>事件日志</h2>
+      <div id="log" aria-live="polite"></div>
+    </section>
+  </div>
+</div>
+
+<!-- ============================================================
+     模态对话框：表单 + method=dialog + autofocus 初始焦点
+     ============================================================ -->
+<dialog id="modal" aria-labelledby="modalTitle">
+  <form method="dialog" id="modalForm">
+    <div class="dlg-head">
+      <h3 id="modalTitle">删除订单 #20260923</h3>
+    </div>
+    <div class="dlg-body">
+      <p style="margin-bottom:10px">该操作不可撤销，请选择删除原因：</p>
+      <label for="reason">删除原因（required，初始焦点在此）</label>
+      <select id="reason" name="reason" required autofocus>
+        <option value="">请选择…</option>
+        <option value="dup">重复下单</option>
+        <option value="err">信息填写错误</option>
+        <option value="other">其他</option>
+      </select>
+      <label for="remark">备注（可选，纯文本安全）</label>
+      <input id="remark" name="remark" type="text" placeholder="例如：客户电话要求取消">
+    </div>
+    <div class="dlg-foot">
+      <!-- 两个按钮的 value 即 close 后的 returnValue -->
+      <button class="btn ghost" value="cancel" type="submit">取消（ESC 等价）</button>
+      <button class="btn danger" value="confirm" type="submit">确认删除</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- 非模态侧栏：show() 打开，无遮罩，需要自己提供关闭按钮 -->
+<dialog id="side" aria-labelledby="sideTitle">
+  <div class="dlg-head">
+    <h3 id="sideTitle" style="font-size:.98rem">非模态通知（show）</h3>
+  </div>
+  <div class="dlg-body">
+    <p>我没有遮罩、不拦截焦点、按 ESC 不会关闭我。你可以继续操作主页面的输入框与按钮。</p>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn ghost" id="sideClose" type="button">知道了（close）</button>
+  </div>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------- 特性检测：不支持时页面内提示，不静默失败 ----------
+  const dlg = document.getElementById('modal');
+  if (typeof dlg.showModal !== 'function' || typeof dlg.close !== 'function') {
+    document.getElementById('compat').style.display = 'block';
+    document.getElementById('openModal').disabled = true;
+    document.getElementById('openSide').disabled = true;
+    return;
+  }
+
+  const logEl = document.getElementById('log');
+  const toastEl = document.getElementById('toast');
+  let toastTimer = null;
+
+  // 页面内 toast：替代 alert
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
+  }
+  function log(msg) {
+    const t = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    logEl.textContent += `[${t}] ${msg}\n`;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  const side = document.getElementById('side');
+  const reasonSel = document.getElementById('reason');
+  const remarkInput = document.getElementById('remark');
+
+  // ---------- 打开模态 ----------
+  document.getElementById('openModal').addEventListener('click', () => {
+    log('调用 showModal() —— 进入 top layer，焦点落入 autofocus 的下拉框');
+    dlg.showModal();
+    // 实测初始焦点落在谁身上
+    log('初始焦点元素：<' + (document.activeElement.tagName || 'unknown') +
+        ' id="' + (document.activeElement.id || '') + '">');
+  });
+
+  // ---------- ESC：cancel 先于 close；preventDefault 可阻止关闭 ----------
+  dlg.addEventListener('cancel', (e) => {
+    log('cancel 事件（用户按了 ESC）—— 默认行为：随后关闭');
+    // 这里不 e.preventDefault()，故 ESC 等同取消
+  });
+
+  // ---------- 关闭：读取 method=dialog 的返回值 ----------
+  dlg.addEventListener('close', () => {
+    const v = dlg.returnValue;
+    log(`close 事件 —— returnValue = "${v || ''}"`);
+    log('关闭后焦点归还到：<' + document.activeElement.tagName +
+        ' id="' + document.activeElement.id + '">');
+    if (v === 'confirm') {
+      // 能走到 confirm 说明 required 已通过（否则浏览器拦截提交，框不关）
+      toast('已提交：原因=' + reasonSel.value +
+            (remarkInput.value ? '，备注=' + remarkInput.value : ''));
+      log('业务动作：执行删除（reason=' + reasonSel.value + '）');
+    } else if (v === 'backdrop') {
+      toast('点击遮罩关闭（按取消处理）');
+    } else {
+      toast('已取消');
+    }
+    // 重置表单，避免下次打开带着上次输入
+    document.getElementById('modalForm').reset();
+  });
+
+  // ---------- 点遮罩关闭（社区惯例写法 + 误触防护） ----------
+  // 只判断 e.target === dialog 会有一个坑：
+  // 用户在框内按下鼠标拖选文本、移出框外松手，click 的 target 是 dialog，
+  // 会意外关闭。严谨做法：按下与松手都发生在遮罩上才关。
+  let pressOnBackdrop = false;
+  dlg.addEventListener('pointerdown', (e) => {
+    pressOnBackdrop = (e.target === dlg);
+  });
+  dlg.addEventListener('click', (e) => {
+    if (e.target === dlg && pressOnBackdrop) {
+      log('点击遮罩区域（按下与松手都在遮罩）→ close("backdrop")');
+      dlg.close('backdrop');
+    }
+  });
+
+  // ---------- 非模态 show() 侧栏 ----------
+  document.getElementById('openSide').addEventListener('click', () => {
+    if (!side.open) {
+      side.show(); // 非模态：无 backdrop、ESC 无效、焦点不陷阱
+      log('show() 非模态打开 —— 现在仍可操作主页面，试试背景输入框');
+      toast('非模态侧栏已打开：页面其他部分照常可用');
+    }
+  });
+  document.getElementById('sideClose').addEventListener('click', () => {
+    side.close();
+    log('非模态侧栏 close()');
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 02：Popover API（2024 基线）+ inert 属性
+  ------------------------------------------------------------
+  【知识点】
+    1. Popover 三种触发方式：
+       a) 纯声明式：button[popovertarget] + popovertargetaction
+       b) 手动 JS：showPopover()/hidePopover()/togglePopover()
+          （popover="manual"，不响应 light dismiss，可并存）
+       c) 嵌套菜单：父浮层 manual + 子浮层 auto（声明式挂接）
+    2. :popover-open 状态与进场动画（@starting-style 处理
+       从 display:none 首次出现的过渡）
+    3. light dismiss：点外部 / ESC / 打开另一个 auto 浮层
+    4. toggle 事件（不冒泡，需捕获监听）读 newState
+    5. inert：整棵子树不可点击、不可聚焦（Tab 跳过）、
+       从可访问性树移除；模态打开时锁背景的现代方案
+  【运行方式】
+    纯单文件、零网络零 CDN，双击 file:// 打开即可。
+  【效果说明】
+    上半区演示三种 popover 与动画/关闭行为；下半区是
+    "背景页面"，提供开关直接切换 inert，或打开一个全屏
+    dialog 观察背景被整体失活；右侧日志实时打印浮层开关
+    与焦点轨迹（验证 Tab 是否跳过背景）。
+  【注意事项】
+    Popover 需 Chrome/Edge 114+、Firefox 125+、Safari 17+；
+    不支持时页面顶部显示提示条且禁用相关按钮（不静默失败）。
+    全程页面内 toast/日志反馈，无 alert/prompt。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>示例 02 · Popover API 与 inert</title>
+  <style>
+    :root {
+      --ink: #22303f;
+      --muted: #6b7a8c;
+      --line: #dbe3ec;
+      --brand: #0b6bcb;
+      --bg: #f2f5f9;
+      --card: #fff;
+      --ok: #178a50;
+      --warn: #b9770e;
+      --danger: #c0392b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.65;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: .86rem;
+      margin: 4px 0 14px;
+    }
+
+    .layout {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .col {
+      flex: 1 1 400px;
+      min-width: 0;
+    }
+
+    section.box {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+    }
+
+    h2 {
+      font-size: 1rem;
+      margin-bottom: 8px;
+    }
+
+    p,
+    li {
+      font-size: .85rem;
+    }
+
+    ul.tips {
+      padding-left: 18px;
+    }
+
+    ul.tips li {
+      margin: 3px 0;
+    }
+
+    code {
+      background: #eef2f7;
+      border-radius: 4px;
+      padding: 0 5px;
+      font-size: .78rem;
+      font-family: "SF Mono", Consolas, monospace;
+    }
+
+    .btn {
+      background: var(--brand);
+      color: #fff;
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: .84rem;
+      cursor: pointer;
+      margin: 4px 6px 4px 0;
+    }
+
+    .btn.ghost {
+      background: #eef2f8;
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+
+    .btn.small {
+      padding: 5px 10px;
+      font-size: .8rem;
+    }
+
+    .btn:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
+    .btn:focus-visible,
+    a:focus-visible,
+    input:focus-visible {
+      outline: 3px solid rgba(11, 107, 203, .35);
+      outline-offset: 1px;
+    }
+
+    input {
+      font-size: .85rem;
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      width: 100%;
+      margin: 6px 0;
+    }
+
+    #log {
+      background: #101826;
+      color: #9fe0b5;
+      border-radius: 8px;
+      font-family: "SF Mono", Consolas, monospace;
+      font-size: .72rem;
+      padding: 8px 10px;
+      height: 180px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+
+    #toast {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%) translateY(20px);
+      background: #101826;
+      color: #fff;
+      padding: 9px 18px;
+      border-radius: 999px;
+      font-size: .84rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s, transform .2s;
+      max-width: 86vw;
+      z-index: 10;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ---------- Popover 浮层通用样式 ----------
+     有 popover 属性的元素 UA 默认 display:none；
+     showPopover() 后进入 top layer 并匹配 :popover-open */
+    [popover] {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 12px 34px rgba(10, 20, 35, .16);
+      background: #fff;
+      padding: 10px 14px;
+    }
+
+    /* 进场动画：现代浏览器用 @starting-style 才能对
+     "display:none → 可见"的第一帧做过渡；旧浏览器直接出现（可接受） */
+    .pop-anim:popover-open {
+      animation: pop-in .18s cubic-bezier(.2, .9, .3, 1.2);
+    }
+
+    @keyframes pop-in {
+      from {
+        opacity: 0;
+        transform: translateY(-6px) scale(.97);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    @supports not (position: fixed) {
+      /* 占位：保证老式解析器不出错 */
+    }
+
+    /* 声明式帮助气泡：相对按钮容器定位（top layer 中仍按包含块定位） */
+    .anchor-wrap {
+      position: relative;
+      display: inline-block;
+    }
+
+    #helpPop {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      width: 260px;
+      font-size: .82rem;
+      color: var(--muted);
+    }
+
+    /* 手动菜单 */
+    #menuPop {
+      position: fixed;
+      min-width: 190px;
+      padding: 6px;
+      margin: 0;
+    }
+
+    #menuPop .mitem {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: 0;
+      border-radius: 7px;
+      padding: 7px 10px;
+      font-size: .85rem;
+      cursor: pointer;
+      color: var(--ink);
+    }
+
+    #menuPop .mitem:hover {
+      background: #eef4fb;
+    }
+
+    #subPop {
+      position: absolute;
+      left: calc(100% - 4px);
+      top: -8px;
+      min-width: 130px;
+      padding: 6px;
+      margin: 0;
+    }
+
+    /* ---------- inert 演示区 ---------- */
+    #bgPage {
+      border: 2px dashed var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      transition: opacity .2s, filter .2s;
+    }
+
+    /* inert 生效时给一个视觉提示（inert 本身只负责语义失活，不负责视觉） */
+    #bgPage.is-inert {
+      opacity: .55;
+      filter: grayscale(.4);
+    }
+
+    #inertState {
+      display: inline-block;
+      font-size: .76rem;
+      font-weight: 700;
+      border-radius: 999px;
+      padding: 2px 10px;
+      margin-left: 8px;
+      background: #e6f4ec;
+      color: var(--ok);
+      vertical-align: middle;
+    }
+
+    #inertState.on {
+      background: #fdecea;
+      color: var(--danger);
+    }
+
+    dialog {
+      border: 0;
+      border-radius: 14px;
+      padding: 22px 24px;
+      width: min(420px, 92vw);
+      box-shadow: 0 20px 60px rgba(10, 20, 35, .25);
+    }
+
+    dialog::backdrop {
+      background: rgba(10, 18, 30, .5);
+      backdrop-filter: blur(3px);
+    }
+
+    dialog[open] {
+      animation: pop-in .2s ease-out;
+    }
+
+    #compatPop,
+    #compatInert {
+      display: none;
+      background: #fdf3e2;
+      border: 1px solid #f0d5a3;
+      color: #7a4a06;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: .84rem;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>示例 02 · Popover API 与 inert</h1>
+  <p class="sub">2024 全绿基线的临时浮层能力，配合 inert 实现"模态打开、背景整页失活"。</p>
+
+  <div id="compatPop">⚠️ 当前浏览器不支持 Popover API（需 Chrome/Edge 114+、Firefox 125+、Safari 17+）。浮层相关按钮已禁用，请升级浏览器体验。</div>
+  <div id="compatInert">⚠️ 当前浏览器不支持 <code>inert</code>（需 Chrome/Edge 102+、Firefox 112+、Safari 15.6+）。背景失活演示将不可用。</div>
+
+  <div class="layout">
+    <div class="col">
+      <!-- ============ Popover 三种触发 ============ -->
+      <section class="box">
+        <h2>一、Popover 三种触发方式</h2>
+        <p style="margin-bottom:8px">
+          <span class="anchor-wrap">
+            <button class="btn" id="helpBtn" type="button" popovertarget="helpPop" popovertargetaction="toggle">
+              ① 声明式：操作帮助
+            </button>
+            <!-- 纯 HTML 触发，无一行 JS；auto 浮层支持 light dismiss -->
+            <div id="helpPop" popover="auto" class="pop-anim">
+              我由 <code>popovertarget</code> 直接绑定。<br>
+              点页面任意处或按 <kbd>Esc</kbd> 即可关闭（light dismiss）。
+            </div>
+          </span>
+        </p>
+        <p>
+          <button class="btn ghost" id="menuBtn" type="button">② 手动 JS：更多操作 ▾</button>
+          <button class="btn ghost pop-dependent" id="toastPopBtn" type="button">③ 再开一个 auto 浮层（验证互斥）</button>
+        </p>
+        <ul class="tips">
+          <li>菜单用 <code>popover="manual"</code>：点外部不自动关、ESC 不关，由代码完全控制。</li>
+          <li>菜单内"新建 ▸"挂了一个 <code>auto</code> 子浮层，形成嵌套层级。</li>
+          <li>auto 浮层同时只允许一个：打开"提示浮层"会顶掉帮助气泡（manual 菜单不受影响）。</li>
+        </ul>
+      </section>
+
+      <!-- ============ inert 演示 ============ -->
+      <section class="box">
+        <h2>二、inert 背景失活演示
+          <span id="inertState">inert: 关</span>
+        </h2>
+        <p style="margin-bottom:8px">下方虚线框模拟"页面主内容"。开启 inert 后：链接点不了、输入框点不进、Tab
+          键整个跳过它（看右侧焦点轨迹日志），但它<strong>仍然可见</strong>——这就是与 hidden 的区别。</p>
+        <p>
+          <button class="btn small" id="toggleInert" type="button">直接切换背景 inert</button>
+          <button class="btn small ghost" id="openDialog" type="button">打开全屏确认框（自动 inert 背景）</button>
+        </p>
+        <div id="bgPage">
+          <p><a href="#anchor-link" id="bgLink">背景链接：正常时可点击 / 可 Tab 聚焦</a></p>
+          <label for="bgInput">背景输入框：正常时可输入</label>
+          <input id="bgInput" type="text" placeholder="inert 开启后无法聚焦与输入">
+          <p><button class="btn ghost small" type="button" id="bgBtn">背景按钮</button></p>
+        </div>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="box">
+        <h2>观察指南</h2>
+        <ul class="tips">
+          <li>打开帮助气泡后点别处：看到 <code>toggle → closed</code>（light dismiss）。</li>
+          <li>手动菜单只能用菜单项里的"关闭菜单"或再次点击按钮关闭。</li>
+          <li>开启 inert 后连续按 Tab：日志里焦点只会在虚线框外循环。</li>
+          <li>打开全屏确认框：背景自动 inert；关闭后自动恢复。</li>
+        </ul>
+      </section>
+      <section class="box">
+        <h2>事件 / 焦点日志</h2>
+        <div id="log" aria-live="polite"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- 手动 JS 控制的菜单（manual） + 内嵌 auto 子浮层 -->
+  <div id="menuPop" popover="manual" class="pop-anim">
+    <button class="mitem pop-dependent" type="button" popovertarget="subPop" popovertargetaction="show">
+      新建 <span>▸</span>
+    </button>
+    <button class="mitem" type="button" data-act="rename">重命名</button>
+    <button class="mitem" type="button" data-act="copy">复制链接</button>
+    <button class="mitem" type="button" id="closeMenu">关闭菜单（manual 要代码关）</button>
+
+    <!-- 子浮层：auto，嵌在父浮层内构成层级 -->
+    <div id="subPop" popover="auto" class="pop-anim">
+      <button class="mitem" type="button" data-act="new-folder">📁 文件夹</button>
+      <button class="mitem" type="button" data-act="new-doc">📄 文档</button>
+    </div>
+  </div>
+
+  <!-- 纯演示用第二个 auto 浮层：fixed 定位避免 UA 默认居中样式干扰 -->
+  <div id="toastPop" popover="auto" class="pop-anim"
+    style="position:fixed;top:120px;right:24px;margin:0;max-width:260px;font-size:.83rem">
+    我是另一个 <code>auto</code> 浮层：我打开时，帮助气泡会被自动顶掉（互斥）。点外部关闭我。
+  </div>
+
+  <!-- 全屏确认框：打开期间背景 inert -->
+  <dialog id="blocker" aria-labelledby="blkT">
+    <h3 id="blkT" style="font-size:1.05rem;margin-bottom:8px">请先确认</h3>
+    <p style="font-size:.86rem;margin-bottom:14px">
+      模态期间虚线框内的链接、输入框、按钮全部失活，Tab 也无法进入——这是 <code>inert</code> 一行属性的效果，无需遍历元素逐个禁用。
+    </p>
+    <form method="dialog" style="text-align:right">
+      <button class="btn" value="ok" type="submit">我知道了</button>
+    </form>
+  </dialog>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var logEl = document.getElementById('log');
+      var toastEl = document.getElementById('toast');
+      var toastTimer = null;
+      function log(msg) {
+        var t = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+        logEl.textContent += '[' + t + '] ' + msg + '\n';
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+      function toast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2400);
+      }
+
+      /* ---------- 特性检测：Popover ---------- */
+      var popSupported = typeof HTMLElement !== 'undefined' &&
+        typeof HTMLElement.prototype.showPopover === 'function';
+      if (!popSupported) {
+        document.getElementById('compatPop').style.display = 'block';
+        document.querySelectorAll('.pop-dependent, #helpBtn, #menuBtn, #toastPopBtn, #openDialog')
+          .forEach(function (b) { b.disabled = true; });
+        // 声明式按钮也可能被部分支持但不完整，统一禁用最稳妥
+      }
+
+      /* ---------- 特性检测：inert ---------- */
+      var inertSupported = 'inert' in HTMLElement.prototype;
+      if (!inertSupported) {
+        document.getElementById('compatInert').style.display = 'block';
+        document.getElementById('toggleInert').disabled = true;
+      }
+
+      /* ---------- 全局焦点轨迹：验证 inert 时 Tab 跳过背景 ---------- */
+      document.addEventListener('focusin', function () {
+        var el = document.activeElement;
+        var desc = el.tagName.toLowerCase() +
+          (el.id ? '#' + el.id : '') +
+          (el.textContent && el.tagName === 'A' ? '(' + el.textContent.trim().slice(0, 12) + ')' : '');
+        log('焦点 → ' + desc);
+      });
+
+      /* ---------- toggle 事件不冒泡：捕获阶段统一记录所有浮层/对话框 ---------- */
+      document.addEventListener('toggle', function (e) {
+        if (e.target && (e.target.hasAttribute('popover') || e.target.tagName === 'DIALOG')) {
+          var name = e.target.id || e.target.tagName;
+          log('toggle：#' + name + ' → ' + e.newState);
+        }
+      }, true);
+
+      if (!popSupported) return; // 以下 popover 交互不再绑定
+
+      var menu = document.getElementById('menuPop');
+      var menuBtn = document.getElementById('menuBtn');
+
+      /* ---------- ② 手动 JS：popover="manual" ---------- */
+      menuBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (menu.matches(':popover-open')) {
+          menu.hidePopover();           // manual 必须代码显式关闭
+          return;
+        }
+        // 定位到触发按钮下方（top layer 中 position:fixed 相对视口）
+        var r = menuBtn.getBoundingClientRect();
+        menu.style.top = (r.bottom + 8) + 'px';
+        menu.style.left = r.left + 'px';
+        menu.showPopover();            // 真实项目可 await fetch 数据后再开
+        log('手动调用 showPopover()（manual，不响应点外部/ESC）');
+      });
+      document.getElementById('closeMenu').addEventListener('click', function () {
+        menu.hidePopover();
+      });
+      menu.addEventListener('click', function (e) {
+        var act = e.target.closest('[data-act]');
+        if (act) toast('选中菜单：' + act.dataset.act);
+      });
+
+      /* ---------- ③ 第二个 auto 浮层：演示互斥 ---------- */
+      document.getElementById('toastPopBtn').addEventListener('click', function () {
+        var p = document.getElementById('toastPop');
+        if (p.matches(':popover-open')) { p.hidePopover(); return; }
+        p.showPopover(); // 定位交给 CSS（fixed + top/right + margin:0）
+      });
+
+      /* ---------- inert：手动开关 ---------- */
+      var bgPage = document.getElementById('bgPage');
+      var inertState = document.getElementById('inertState');
+      function setInert(on) {
+        if (!inertSupported) return;
+        bgPage.inert = on;
+        bgPage.classList.toggle('is-inert', on);
+        inertState.textContent = 'inert: ' + (on ? '开（失活）' : '关');
+        inertState.classList.toggle('on', on);
+        log('背景 inert = ' + on + (on ? ' —— 链接/输入/按钮均不可达，Tab 跳过' : ' —— 已恢复'));
+      }
+      document.getElementById('toggleInert').addEventListener('click', function () {
+        setInert(!bgPage.inert);
+      });
+      // 视觉上提示"点不动"
+      bgPage.addEventListener('click', function (e) {
+        if (!bgPage.inert && e.target.closest('a')) log('背景链接被点击（inert 关闭时才可能发生）');
+      });
+
+      /* ---------- dialog 打开期间自动 inert 背景 ---------- */
+      var blocker = document.getElementById('blocker');
+      document.getElementById('openDialog').addEventListener('click', function () {
+        blocker.showModal();
+        setInert(true);
+      });
+      blocker.addEventListener('close', function () {
+        setInert(false); // 关闭后必须恢复，否则背景永久失活——这是唯一的"坑"
+        toast('对话框关闭，背景已恢复可交互');
+      });
+      // 遮罩点击也允许关闭（同样走 close，恢复逻辑不会漏）
+      blocker.addEventListener('click', function (e) {
+        if (e.target === blocker) blocker.close();
+      });
+    })();
+  </script>
+</body>
+
+</html>

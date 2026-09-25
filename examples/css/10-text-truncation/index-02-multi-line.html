@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 02：多行省略 line-clamp 滑块实验台
+  ------------------------------------------------------------
+  【知识点】
+    1. 多行省略"确定性四件套"：
+       display:-webkit-box + -webkit-box-orient:vertical
+       + -webkit-line-clamp:N + overflow:hidden
+    2. 标准属性 line-clamp 与 -webkit- 前缀版双写策略
+    3. 逐个关闭四个属性，观察"缺一个会怎样"
+    4. line-clamp 限制的是行盒数；与 max-height 配合时必须
+       精确等于 line-height × 行数，否则省略号被裁或露白
+    5. scrollHeight > clientHeight 检测多行截断
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    拖滑块把同一段长文限制为 1~5 行；四个勾选框分别移除四件
+    套中的一个属性做对照；另提供 max-height 三种模式（关闭/
+    精确/错误）演示与行高的关系；右侧实时生成可抄写的 CSS。
+  【注意事项】
+    本实验把四件套拆成可开关属性仅为教学；生产代码请始终四
+    个一起写，并双写标准 line-clamp。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 02 · 多行省略 line-clamp 实验台</title>
+<style>
+  :root {
+    --brand: #4361ee; --ink: #232c3d; --muted: #7c8aa0; --line: #e3e8f1;
+    --bg: #f4f6fb; --card: #fff; --bad: #e5484d; --good: #30a46c; --warn: #d97706;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.6;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+
+  .lab {
+    display: grid; grid-template-columns: 300px 1fr; gap: 18px;
+    align-items: start;
+  }
+  @media (max-width: 860px) { .lab { grid-template-columns: 1fr; } }
+
+  /* ---------- 控制面板 ---------- */
+  .controls, .stage-box, .panel {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px;
+  }
+  .controls { position: sticky; top: 18px; }
+  .ctl { margin-bottom: 16px; }
+  .ctl > label { display: block; font-size: .82rem; color: var(--muted); margin-bottom: 6px; }
+  .ctl input[type="range"] { width: 100%; accent-color: var(--brand); }
+  .ctl .row-line { display: flex; justify-content: space-between; font-size: .82rem; }
+  .ctl output { color: var(--brand); font-family: ui-monospace, Consolas, monospace; font-weight: 700; }
+  .checks { display: grid; gap: 8px; }
+  .checks label {
+    display: flex; gap: 8px; align-items: flex-start; font-size: .82rem;
+    background: #f7f9fd; border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px; cursor: pointer;
+  }
+  .checks input { accent-color: var(--brand); margin-top: 3px; }
+  .checks code { font-size: .74rem; color: var(--brand); }
+  .checks .miss {
+    display: block; font-size: .72rem; color: var(--bad); margin-top: 2px;
+  }
+  .seg { display: flex; gap: 6px; }
+  .seg button {
+    flex: 1; border: 1px solid var(--line); background: #fbfcff; color: var(--ink);
+    font-size: .76rem; padding: 7px 4px; border-radius: 7px; cursor: pointer;
+  }
+  .seg button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+  /* ---------- 舞台 ---------- */
+  .stage-box { min-height: 320px; }
+  .stage-head {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+  }
+  .stage-head h2 { font-size: 1.02rem; }
+  .flag {
+    font-size: .72rem; padding: 3px 10px; border-radius: 999px;
+    background: #eef2f9; color: var(--muted);
+  }
+  .flag.ok { background: #e9f9f1; color: var(--good); }
+  .flag.bad { background: #fdecec; color: var(--bad); }
+
+  #demo {
+    position: relative;
+    background: #fbfcff; border: 1px dashed #c9d4ea; border-radius: 10px;
+    padding: 14px 16px; font-size: 15px; line-height: 28px; /* 行高取整，便于讲解 */
+    color: var(--ink);
+  }
+  /* 四件套默认全开；关闭某个勾选时 JS 在元素上挂 data-off 属性，
+     这里用属性选择器精确移除对应声明，模拟"缺了它" */
+  #demo[data-off~="box"]      { display: block; }
+  #demo[data-off~="orient"]   { -webkit-box-orient: horizontal; }
+  #demo[data-off~="clamp"]    { -webkit-line-clamp: unset; line-clamp: unset; }
+  #demo[data-off~="overflow"] { overflow: visible; }
+
+  /* max-height 三种模式：精确 / 错误（少算一行的 40%） */
+  #demo[data-mh="exact"] { max-height: calc(28px * var(--lines, 2)); }
+  #demo[data-mh="wrong"] { max-height: calc(28px * var(--lines, 2) - 12px); }
+
+  .ruler { margin-top: 10px; font-size: .74rem; color: var(--muted); }
+  .ruler b { color: var(--warn); }
+
+  pre.code {
+    margin-top: 16px; background: #232c3d; color: #c7d3ea;
+    font-size: .76rem; line-height: 1.7; padding: 14px 16px;
+    border-radius: 10px; overflow-x: auto; white-space: pre-wrap;
+  }
+  pre.code .c { color: #7b8aa8; }
+
+  /* ---------- 下方：2 行 / 3 行并排实例 ---------- */
+  .grid-demo {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 18px;
+  }
+  @media (max-width: 860px) { .grid-demo { grid-template-columns: 1fr; } }
+  .mini {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 16px;
+  }
+  .mini h3 { font-size: .9rem; margin-bottom: 8px; }
+  .mini p {
+    display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden;
+    font-size: .85rem; line-height: 1.6; color: #4a5569;
+  }
+  .mini .c2 { -webkit-line-clamp: 2; line-clamp: 2; }
+  .mini .c3 { -webkit-line-clamp: 3; line-clamp: 3; }
+  .mini .c5 { -webkit-line-clamp: 5; line-clamp: 5; }
+  .mini .tag { font-size: .7rem; color: var(--muted); margin-top: 8px; font-family: ui-monospace, Consolas, monospace; }
+</style>
+</head>
+<body>
+  <h1>示例 02 · 多行省略 line-clamp 实验台</h1>
+  <p class="sub">同一个段落，拖动行数、逐个拆掉四件套，亲眼确认每个属性的不可替代性。</p>
+
+  <div class="lab">
+    <!-- 左侧控制面板 -->
+    <div class="controls">
+      <div class="ctl">
+        <label>最多显示行数</label>
+        <input type="range" id="lineRange" min="1" max="5" value="2" step="1">
+        <div class="row-line"><span>1 行（等价单行效果）</span><output id="lineOut">2</output></div>
+      </div>
+
+      <div class="ctl">
+        <label>四件套开关（取消勾选 = 故意缺失该属性）</label>
+        <div class="checks">
+          <label><input type="checkbox" checked data-key="box">
+            <span><code>display:-webkit-box</code><span class="miss" data-miss="box"></span></span>
+          </label>
+          <label><input type="checkbox" checked data-key="orient">
+            <span><code>-webkit-box-orient:vertical</code><span class="miss" data-miss="orient"></span></span>
+          </label>
+          <label><input type="checkbox" checked data-key="clamp">
+            <span><code>-webkit-line-clamp / line-clamp</code><span class="miss" data-miss="orient"></span></span>
+          </label>
+          <label><input type="checkbox" checked data-key="overflow">
+            <span><code>overflow:hidden</code><span class="miss" data-miss="overflow"></span></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="ctl">
+        <label>max-height 模式（与固定行高的关系）</label>
+        <div class="seg" id="mhSeg">
+          <button data-mh="none" class="on">不设置</button>
+          <button data-mh="exact">精确 行高×N</button>
+          <button data-mh="wrong">少 12px（错误）</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧舞台 -->
+    <div class="stage-box">
+      <div class="stage-head">
+        <h2>实时舞台</h2>
+        <span class="flag ok" id="flag">截断正常</span>
+      </div>
+      <div id="demo">多行省略常用于商品卡片的标题与摘要：当后端返回的文本长度不可控时，把标题固定为两行、摘要固定为三行，可以让整个卡片网格的底部对齐，避免有的卡片因为标题太长而把价格区域挤到屏幕外。需要特别注意的是，line-clamp 限制的是行盒（line box）的数量，而不是像素高度，因此行高变化、字体异步加载、浏览器缩放都可能让手写的 max-height 与真实行数错位，生产环境优先只依赖 line-clamp，让高度由行高自然撑起。这是继续补充的文本，用来保证在五行以内也能触发截断：好的截断策略应当对读屏器保持完整内容，视觉上的省略不应删除真实文本。</div>
+      <p class="ruler">行高 28px × <b id="rulerLines">2</b> 行 = <b id="rulerPx">56</b>px（精确 max-height 的计算依据）</p>
+      <pre class="code" id="codeOut"></pre>
+    </div>
+  </div>
+
+  <!-- 2/3/5 行并排实例：真实卡片用法 -->
+  <div class="grid-demo">
+    <div class="mini">
+      <h3>标题 · 2 行</h3>
+      <p class="c2">新一代轻薄笔记本电脑发布：性能提升 40%，续航延长至 22 小时，全系搭载高分辨率屏幕并支持快充，首发价引发热议。</p>
+      <div class="tag">-webkit-line-clamp: 2</div>
+    </div>
+    <div class="mini">
+      <h3>描述 · 3 行</h3>
+      <p class="c3">商品描述区域通常比标题多一行预算，用于承载促销、规格与配送信息。三行是信息密度与整齐度的常见平衡点，再多用户也不会读完，再少则浪费纵向空间。</p>
+      <div class="tag">-webkit-line-clamp: 3</div>
+    </div>
+    <div class="mini">
+      <h3>长摘要 · 5 行</h3>
+      <p class="c5">评论摘要、文章预览等场景会放宽到五行左右，给内容更多曝光机会，同时仍然防止个别超长文本把列表节奏打乱。无论几行，写法都完全相同，只改一个数字——这正是 line-clamp 相对"max-height 硬裁"方案的可维护性优势：调行数不需要重新测量任何像素。</p>
+      <div class="tag">-webkit-line-clamp: 5</div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+
+  var range = document.getElementById('lineRange');
+  var lineOut = document.getElementById('lineOut');
+  var demo = document.getElementById('demo');
+  var codeOut = document.getElementById('codeOut');
+  var flag = document.getElementById('flag');
+  var rulerLines = document.getElementById('rulerLines');
+  var rulerPx = document.getElementById('rulerPx');
+  var checks = Array.prototype.slice.call(document.querySelectorAll('.checks input'));
+  var segBtns = Array.prototype.slice.call(document.querySelectorAll('#mhSeg button'));
+
+  var missText = {
+    box: '缺它：旧内核完全不截断，布局退回普通块',
+    orient: '缺它：行被横向排列，效果全乱',
+    clamp: '缺它：不限制行数，无省略号',
+    overflow: '缺它：内容不裁剪，省略号失去意义'
+  };
+
+  var currentMh = 'none';
+
+  function render() {
+    var n = +range.value;
+    lineOut.textContent = n;
+    rulerLines.textContent = n;
+    rulerPx.textContent = n * 28;
+
+    // 收集被故意关闭的属性
+    var off = checks.filter(function (c) { return !c.checked; })
+                    .map(function (c) { return c.dataset.key; });
+    if (off.length) demo.setAttribute('data-off', off.join(' '));
+    else demo.removeAttribute('data-off');
+
+    // 无论怎么拆，clamp 值都由滑块驱动
+    demo.style.setProperty('--lines', n);
+    if (off.indexOf('clamp') === -1) {
+      demo.style.webkitLineClamp = String(n);
+      demo.style.lineClamp = String(n);
+    } else {
+      demo.style.webkitLineClamp = '';
+      demo.style.lineClamp = '';
+    }
+    // box / orient / overflow 的"缺失态"由 CSS 属性选择器处理，
+    // 这里负责恢复内联默认（防止上一次缺失态残留）
+    demo.style.display = '';
+    demo.style.webkitBoxOrient = '';
+    demo.style.overflow = '';
+    if (off.indexOf('box') === -1) demo.style.display = '-webkit-box';
+    if (off.indexOf('orient') === -1) demo.style.webkitBoxOrient = 'vertical';
+    if (off.indexOf('overflow') === -1) demo.style.overflow = 'hidden';
+
+    demo.setAttribute('data-mh', currentMh);
+    demo.style.maxHeight = ''; // 属性选择器接管
+    if (currentMh === 'exact') demo.style.maxHeight = (n * 28) + 'px';
+    if (currentMh === 'wrong') demo.style.maxHeight = (n * 28 - 12) + 'px';
+
+    // 缺属性提示文字
+    document.querySelectorAll('[data-miss]').forEach(function (s) {
+      s.textContent = '';
+    });
+    checks.forEach(function (c) {
+      var slot = document.querySelector('[data-miss="' + c.dataset.key + '"]');
+      if (!c.checked && slot) slot.textContent = '✘ ' + missText[c.dataset.key];
+    });
+
+    // 截断状态徽标（多行用 scrollHeight 对比）
+    requestAnimationFrame(function () {
+      var clipped = demo.scrollHeight - demo.clientHeight > 1;
+      var allOn = off.length === 0;
+      if (allOn && clipped) {
+        flag.textContent = '截断正常（' + n + ' 行）';
+        flag.className = 'flag ok';
+      } else if (allOn && !clipped) {
+        flag.textContent = '文本不足 ' + n + ' 行（无需截断）';
+        flag.className = 'flag';
+      } else {
+        flag.textContent = '四件套不完整，截断已失效';
+        flag.className = 'flag bad';
+      }
+    });
+
+    // 生成可抄写的 CSS
+    var lines = [];
+    lines.push('.clamp-' + n + ' {');
+    if (off.indexOf('box') === -1) lines.push('  display: -webkit-box;');
+    if (off.indexOf('orient') === -1) lines.push('  -webkit-box-orient: vertical;');
+    if (off.indexOf('clamp') === -1) {
+      lines.push('  -webkit-line-clamp: ' + n + ';');
+      lines.push('  line-clamp: ' + n + ';            ' + '/* 标准属性，面向未来 */');
+    }
+    if (off.indexOf('overflow') === -1) lines.push('  overflow: hidden;');
+    if (currentMh === 'exact') lines.push('  max-height: ' + (n * 28) + 'px;       /* 行高 28px × ' + n + ' 行 */');
+    if (currentMh === 'wrong') lines.push('  max-height: ' + (n * 28 - 12) + 'px;       /* ✘ 与行数错位：省略号会被裁 */');
+    lines.push('}');
+    codeOut.innerHTML = lines.map(function (l) {
+      return l.replace(/\/\*.*\*\//, function (m) { return '<span class="c">' + m + '</span>'; });
+    }).join('\n');
+  }
+
+  range.addEventListener('input', render);
+  checks.forEach(function (c) { c.addEventListener('change', render); });
+  segBtns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      currentMh = b.dataset.mh;
+      segBtns.forEach(function (x) { x.classList.toggle('on', x === b); });
+      render();
+    });
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

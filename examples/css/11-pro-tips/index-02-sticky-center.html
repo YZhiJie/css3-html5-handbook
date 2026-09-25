@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 02：position:sticky 粘性定位 + 水平垂直居中四方案
+  ------------------------------------------------------------
+  【知识点】
+    1. sticky = relative 与 fixed 的混合体：不脱离文档流，
+       到达阈值后"粘"在滚动容器内，父包含块滚完即离场
+    2. 最大的坑：祖先链上的 overflow:hidden 会成为 sticky 的
+       吸附参考系，视觉上等同失效；overflow:clip 不创建滚动
+       容器，是更安全的裁剪方案
+    3. 表格冻结窗格：thead 的 th 吸顶 + 首列吸左同时使用，
+       需要 border-collapse:separate、不透明背景与 z-index
+    4. 四种水平垂直居中方案的选型差异：flex / grid place-items
+       / absolute+transform / absolute+inset+margin:auto
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    ① 两个等高滚动盒对照：左盒 sticky 正常，右盒祖先带
+       overflow:hidden（可一键修复）；② 一个 12 行数据表同时
+       冻结表头与首列；③ 四个 160px 高盒子分别用四种方案居中
+       同一个尺寸标签。
+  【注意事项】
+    滚动盒内的 sticky 标题背景必须不透明，否则正文会透上来。
+  ============================================================
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>示例 02 · sticky 粘性定位与居中四方案</title>
+<style>
+  :root {
+    --brand: #4361ee; --ink: #232c3d; --muted: #7c8aa0; --line: #e3e8f1;
+    --bg: #f4f6fb; --card: #fff; --bad: #e5484d; --good: #30a46c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 24px; line-height: 1.6;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+
+  section.panel {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 4px; }
+  .desc { color: var(--muted); font-size: .82rem; margin-bottom: 14px; }
+  .mini-tag {
+    display: inline-block; font-family: ui-monospace, Consolas, monospace;
+    font-size: .7rem; padding: 2px 8px; border-radius: 999px; margin-left: 8px;
+  }
+  .mini-tag.ok { background: #e9f9f1; color: var(--good); }
+  .mini-tag.no { background: #fdecec; color: var(--bad); }
+
+  /* ============ ① sticky 对照滚动盒 ============ */
+  .sticky-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .sticky-grid { grid-template-columns: 1fr; } }
+  .scroll-box {
+    height: 280px; overflow-y: auto;
+    border: 1px solid var(--line); border-radius: 10px; background: #fbfcff;
+  }
+  .scroll-box h3.box-title {
+    /* 滚动盒自身的吸顶标题：证明 sticky 相对最近滚动祖先工作 */
+    position: sticky; top: 0; z-index: 3;
+    background: #232c3d; color: #fff; font-size: .82rem;
+    padding: 9px 14px; display: flex; justify-content: space-between; align-items: center;
+  }
+  .scroll-box h3.box-title .s { font-size: .68rem; opacity: .8; font-weight: 400; }
+  .block-sec { border-bottom: 1px solid var(--line); }
+  .block-sec > h4 {
+    position: sticky; top: 34px; z-index: 2;     /* 给总标题留 34px */
+    background: #eef2ff; color: var(--brand);
+    font-size: .8rem; padding: 7px 14px;
+  }
+  .block-sec p { padding: 10px 14px; font-size: .8rem; color: #4a5569; }
+
+  /* 右盒的"坑层"：默认 overflow:hidden —— sticky 相对它吸附，
+     而它本身在滚动，标题就跟着内容滚走了 */
+  .trap { overflow: hidden; }
+  .trap.fixed { overflow: visible; }
+  .fix-bar { margin-top: 10px; display: flex; align-items: center; gap: 10px; }
+  .fix-bar button {
+    border: 1px solid var(--line); background: #fbfcff; cursor: pointer;
+    font-size: .8rem; padding: 7px 14px; border-radius: 8px;
+  }
+  .fix-bar button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .fix-bar .hint { font-size: .76rem; color: var(--muted); }
+
+  /* ============ ② 冻结窗格表格 ============ */
+  .table-scroll {
+    max-height: 340px; overflow: auto;
+    border: 1px solid var(--line); border-radius: 10px;
+  }
+  table.freeze {
+    border-collapse: separate; border-spacing: 0;
+    font-size: .8rem; width: 760px;                 /* 故意超宽，制造横向滚动 */
+  }
+  table.freeze th, table.freeze td {
+    padding: 9px 14px; border-bottom: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    white-space: nowrap; background: #fff;          /* 单元格默认白底不透明 */
+  }
+  table.freeze thead th {
+    position: sticky; top: 0; z-index: 2;
+    background: #f7f9fd; color: var(--muted); font-weight: 600;
+  }
+  /* 首列：z-index 1，压过横向滚动的普通单元格 */
+  table.freeze th:first-child, table.freeze td:first-child {
+    position: sticky; left: 0; z-index: 1;
+    background: #fbfcff; font-weight: 600;
+  }
+  /* 左上角交叉格：两个方向都粘，z-index 必须最高 */
+  table.freeze thead th:first-child { z-index: 4; background: #eef2ff; }
+  table.freeze td.pos { color: var(--good); }
+  table.freeze td.neg { color: var(--bad); }
+
+  /* ============ ③ 居中四方案 ============ */
+  .center-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+  }
+  @media (max-width: 900px) { .center-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 520px) { .center-grid { grid-template-columns: 1fr; } }
+  .stage {
+    height: 170px; border: 1px dashed #c9d4ea; border-radius: 10px;
+    background:
+      linear-gradient(#eef1f8 1px, transparent 1px),
+      linear-gradient(90deg, #eef1f8 1px, transparent 1px), #fbfcff;
+    background-size: 24px 24px; position: relative;
+  }
+  .chip {
+    width: 110px; height: 56px; border-radius: 10px;
+    background: var(--brand); color: #fff;
+    display: grid; place-items: center; font-size: .76rem; text-align: center;
+    box-shadow: 0 6px 14px rgba(67,97,238,.35);
+  }
+  .c-flex { display: flex; align-items: center; justify-content: center; }
+  .c-grid { display: grid; place-items: center; }
+  .c-abs { position: relative; }
+  .c-abs .chip { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+  .c-margin { position: relative; }
+  /* 定宽高时四向 0 + margin:auto：两方向 auto 均分剩余空间 */
+  .c-margin .chip { position: absolute; inset: 0; margin: auto; }
+  .stage-name {
+    font-size: .78rem; color: var(--muted); text-align: center;
+    margin-top: 8px; font-family: ui-monospace, Consolas, monospace;
+  }
+  .stage-name b { color: var(--ink); display: block; font-family: inherit; font-size: .82rem; }
+</style>
+</head>
+<body>
+  <h1>示例 02 · sticky 粘性定位与居中四方案</h1>
+  <p class="sub">sticky 失效九成是祖先 overflow；冻结窗格是 sticky 最经典的生产用法。</p>
+
+  <!-- ① sticky 对照 -->
+  <section class="panel">
+    <h2>① sticky 对照：正常祖先 <span class="mini-tag ok">top:0 吸顶</span> vs overflow 祖先 <span class="mini-tag no" id="trapTag">跟随滚走</span></h2>
+    <p class="desc">两个盒子都在内部滚动；右盒的章节多包了一层 overflow:hidden（可切换为 visible/clip 修复）。向下滚动右盒，观察小标题无法停留。</p>
+    <div class="sticky-grid">
+      <div>
+        <div class="scroll-box" id="boxA">
+          <h3 class="box-title">左：正常 <span class="s">无 overflow 祖先</span></h3>
+          <!-- 内容由 JS 生成，两边结构一致 -->
+        </div>
+      </div>
+      <div>
+        <div class="scroll-box" id="boxB">
+          <h3 class="box-title">右：overflow 祖先 <span class="s">吸附参考系错位</span></h3>
+        </div>
+        <div class="fix-bar">
+          <button id="fixBtn" type="button">修复：overflow: visible</button>
+          <span class="hint" id="fixHint">当前 .trap { overflow: hidden } —— sticky 失效</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ② 冻结窗格 -->
+  <section class="panel">
+    <h2>② 表格冻结窗格：thead 吸顶 + 首列吸左</h2>
+    <p class="desc">在表格区域内上下/左右滚动：表头、首列、左上角交叉格分别由 z-index 2/1/4 管理层叠。注意 border-collapse 必须是 separate。</p>
+    <div class="table-scroll">
+      <table class="freeze">
+        <thead>
+          <tr>
+            <th>城市</th><th>Q1 销售额</th><th>Q2 销售额</th><th>Q3 销售额</th><th>Q4 销售额</th>
+            <th>全年合计</th><th>同比</th><th>负责人</th><th>备注</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ③ 居中四方案 -->
+  <section class="panel">
+    <h2>③ 水平垂直居中四方案对照</h2>
+    <p class="desc">同一个标签在四种盒子里都居中。文档流内选 flex/grid；脱离文档流选 transform；定宽定高浮层可用 margin:auto。</p>
+    <div class="center-grid">
+      <div>
+        <div class="stage c-flex"><div class="chip">未知尺寸<br>也能居中</div></div>
+        <p class="stage-name"><b>① Flex</b>display:flex + align/justify</p>
+      </div>
+      <div>
+        <div class="stage c-grid"><div class="chip">代码最短</div></div>
+        <p class="stage-name"><b>② Grid</b>display:grid; place-items:center</p>
+      </div>
+      <div>
+        <div class="stage c-abs"><div class="chip">浮层常用</div></div>
+        <p class="stage-name"><b>③ Absolute</b>50% + translate(-50%)</p>
+      </div>
+      <div>
+        <div class="stage c-margin"><div class="chip">110×56 定宽</div></div>
+        <p class="stage-name"><b>④ Margin</b>inset:0 + margin:auto</p>
+      </div>
+    </div>
+  </section>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- ① 构造滚动盒内容：左盒普通章节，右盒多一层 .trap ---------- */
+  var sections = [
+    ['第一章 · 概述', 'sticky 元素在跨越阈值前表现为 relative，正常占据文档位置；到达 top 阈值后切换为固定表现，但它不会离开父包含块。'],
+    ['第二章 · 阈值', 'top/right/bottom/left 给出相对滚动容器视口的吸附距离；不写阈值，sticky 与 relative 没有区别。'],
+    ['第三章 · 轨道', '吸附轨道 = 父包含块在滚动容器内的可见区间。父块滚完，sticky 元素被它"带走"——这是吸顶元素自然离场的原因。'],
+    ['第四章 · overflow 坑', '祖先一旦有 overflow:hidden，它就成为新的吸附参考系；它自己随外层滚动时，内部 sticky 标题看起来完全失效。'],
+    ['第五章 · 修复', '去掉不必要的 hidden；确需裁剪用 overflow:clip（不建立滚动容器）；或把滚动职责明确交给该祖先。'],
+    ['第六章 · z-index', '吸顶后元素与后续内容层叠，建议显式 z-index；表格交叉格还要为两个方向分别规划层级。']
+  ];
+
+  var boxA = document.getElementById('boxA');
+  var boxB = document.getElementById('boxB');
+
+  sections.forEach(function (s) {
+    // 左：直接章节
+    var a = document.createElement('div');
+    a.className = 'block-sec';
+    a.innerHTML = '<h4>' + s[0] + '</h4><p>' + s[1] + '</p><p>' + s[1] + '</p>';
+    boxA.appendChild(a);
+
+    // 右：章节外套 .trap 层（JS 切换 fixed 类）
+    var trap = document.createElement('div');
+    trap.className = 'trap';
+    var b = document.createElement('div');
+    b.className = 'block-sec';
+    b.innerHTML = '<h4>' + s[0] + '</h4><p>' + s[1] + '</p><p>' + s[1] + '</p>';
+    trap.appendChild(b);
+    boxB.appendChild(trap);
+  });
+
+  var fixBtn = document.getElementById('fixBtn');
+  var fixHint = document.getElementById('fixHint');
+  var trapTag = document.getElementById('trapTag');
+  var fixed = false;
+  fixBtn.addEventListener('click', function () {
+    fixed = !fixed;
+    document.querySelectorAll('.trap').forEach(function (t) {
+      t.classList.toggle('fixed', fixed);
+      // 真正切换 overflow 属性：visible 时 sticky 参考系回到外层滚动盒
+      t.style.overflow = fixed ? 'visible' : 'hidden';
+    });
+    fixBtn.classList.toggle('on', fixed);
+    fixBtn.textContent = fixed ? '已修复（再点恢复坑）' : '修复：overflow: visible';
+    fixHint.textContent = fixed
+      ? 'overflow:visible（或 clip）—— sticky 恢复吸顶'
+      : '当前 .trap { overflow: hidden } —— sticky 失效';
+    trapTag.textContent = fixed ? '恢复吸顶' : '跟随滚走';
+    trapTag.className = 'mini-tag ' + (fixed ? 'ok' : 'no');
+  });
+
+  /* ---------- ② 生成 12 行数据 ---------- */
+  var cities = ['北京', '上海', '广州', '深圳', '杭州', '成都', '武汉', '西安', '南京', '重庆', '苏州', '长沙'];
+  var owners = ['王芳', '李伟', '张敏', '刘洋', '陈静'];
+  var tbody = document.getElementById('tbody');
+  function money() { return (Math.random() * 400 + 80).toFixed(1) + ' 万'; }
+  cities.forEach(function (city, i) {
+    var vals = [money(), money(), money(), money()];
+    var total = vals.reduce(function (s, v) { return s + parseFloat(v); }, 0).toFixed(1) + ' 万';
+    var up = i % 3 !== 0;
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + city + '</td>' +
+      '<td>' + vals[0] + '</td><td>' + vals[1] + '</td><td>' + vals[2] + '</td><td>' + vals[3] + '</td>' +
+      '<td>' + total + '</td>' +
+      '<td class="' + (up ? 'pos' : 'neg') + '">' + (up ? '▲ ' : '▼ ') + (Math.random() * 30 + 2).toFixed(1) + '%</td>' +
+      '<td>' + owners[i % owners.length] + '</td>' +
+      '<td>' + (i % 2 ? '重点市场' : '常规区域，按季度复盘') + '</td>';
+    tbody.appendChild(tr);
+  });
+})();
+</script>
+</body>
+</html>

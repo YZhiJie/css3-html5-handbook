@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 03：<template> + cloneNode 安全渲染、data-* 事件委托
+           与高频语义小标签补遗（mark/small/abbr/kbd/samp）
+  ------------------------------------------------------------
+  【知识点】
+    1. <template> 内容是惰性 DocumentFragment（不渲染、脚本
+       不执行、图片不加载）；cloneNode(true) 深拷贝后挂载才激活
+    2. 安全：textContent/createTextNode 填充用户数据 → 文本永远
+       是文本，从根上杜绝 XSS；对比 innerHTML 拼接（img onerror
+       会真实执行）——本演示用受控 payload 触发页面内 toast
+    3. data-* + dataset + closest() 事件委托：一个监听器管
+       整个动态列表（完成/删除/读取 id），增删行无需重绑
+    4. DocumentFragment 批量挂载只触发一次布局
+    5. 搜索高亮 <mark>（语境标记）、<small> 附属细则、
+       <abbr title> 缩写、<kbd> 用户按键、<samp> 系统输出
+    6. <slot> 思路：模板占位 → 使用方投影内容（Web Components）
+  【运行方式】
+    纯单文件、零网络零 CDN，双击 file:// 打开即可。
+  【效果说明】
+    上半区是待办列表：新增（默认安全路径）、搜索关键词高亮、
+    勾选完成、删除；"注入恶意内容"按钮分别走安全路径与
+    innerHTML 路径，直观对比 XSS；下半区是语义小标签展示卡。
+  【注意事项】
+    恶意 payload 只调用本页内置演示钩子（toast + 日志），
+    不做任何真实破坏；全程无 alert/prompt。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>示例 03 · template 渲染与 XSS 对比</title>
+  <style>
+    :root {
+      --ink: #22303f;
+      --muted: #6b7a8c;
+      --line: #dbe3ec;
+      --brand: #0b6bcb;
+      --bg: #f2f5f9;
+      --card: #fff;
+      --ok: #178a50;
+      --danger: #c0392b;
+      --warn: #b9770e;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.65;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: .86rem;
+      margin: 4px 0 14px;
+    }
+
+    .layout {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .col {
+      flex: 1 1 400px;
+      min-width: 0;
+    }
+
+    section.box {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+    }
+
+    h2 {
+      font-size: 1rem;
+      margin-bottom: 8px;
+    }
+
+    h3.sub2 {
+      font-size: .9rem;
+      margin: 12px 0 6px;
+    }
+
+    p,
+    li,
+    td,
+    th {
+      font-size: .85rem;
+    }
+
+    code {
+      background: #eef2f7;
+      border-radius: 4px;
+      padding: 0 5px;
+      font-size: .78rem;
+      font-family: "SF Mono", Consolas, monospace;
+    }
+
+    .btn {
+      background: var(--brand);
+      color: #fff;
+      border: 0;
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: .83rem;
+      cursor: pointer;
+      margin: 4px 6px 4px 0;
+    }
+
+    .btn.ghost {
+      background: #eef2f8;
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+
+    .btn.danger {
+      background: var(--danger);
+    }
+
+    .btn.warn {
+      background: var(--warn);
+    }
+
+    .btn:focus-visible,
+    input:focus-visible {
+      outline: 3px solid rgba(11, 107, 203, .35);
+      outline-offset: 1px;
+    }
+
+    input[type=text] {
+      font-size: .85rem;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      width: 100%;
+    }
+
+    .row-flex {
+      display: flex;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .row-flex input {
+      flex: 1;
+    }
+
+    /* ---------- 待办列表 ---------- */
+    #todoList {
+      list-style: none;
+    }
+
+    .todo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      background: #fbfcfe;
+    }
+
+    .todo.done .t {
+      text-decoration: line-through;
+      color: var(--muted);
+    }
+
+    .todo .t {
+      flex: 1;
+      word-break: break-all;
+      font-size: .88rem;
+    }
+
+    .todo .meta {
+      font-size: .72rem;
+      color: var(--muted);
+    }
+
+    .todo button {
+      font-size: .76rem;
+      padding: 4px 10px;
+    }
+
+    /* <mark> 搜索高亮：浏览器默认黄底，这里微调与品牌协调 */
+    mark {
+      background: #ffe58a;
+      border-radius: 3px;
+      padding: 0 2px;
+    }
+
+    .empty {
+      color: var(--muted);
+      font-size: .82rem;
+      padding: 8px 2px;
+    }
+
+    /* ---------- XSS 对比区 ---------- */
+    .xss-grid {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .xss-cell {
+      flex: 1 1 220px;
+      border-radius: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      background: #fbfcfe;
+    }
+
+    .xss-cell.safe {
+      border-left: 4px solid var(--ok);
+    }
+
+    .xss-cell.bad {
+      border-left: 4px solid var(--danger);
+    }
+
+    .xss-cell h4 {
+      font-size: .84rem;
+      margin-bottom: 6px;
+    }
+
+    .out {
+      margin-top: 6px;
+      min-height: 42px;
+      border-radius: 8px;
+      background: #fff;
+      border: 1px dashed var(--line);
+      padding: 6px 10px;
+      font-size: .8rem;
+      word-break: break-all;
+    }
+
+    .out .boom {
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    #log {
+      background: #101826;
+      color: #9fe0b5;
+      border-radius: 8px;
+      font-family: "SF Mono", Consolas, monospace;
+      font-size: .72rem;
+      padding: 8px 10px;
+      height: 150px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+
+    #toast {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%) translateY(20px);
+      background: #101826;
+      color: #fff;
+      padding: 9px 18px;
+      border-radius: 999px;
+      font-size: .84rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s, transform .2s;
+      max-width: 88vw;
+      z-index: 10;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ---------- 语义标签展示卡 ---------- */
+    .tag-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+    }
+
+    .tag-table th,
+    .tag-table td {
+      border: 1px solid var(--line);
+      padding: 6px 8px;
+      text-align: left;
+    }
+
+    .tag-table th {
+      background: #f4f7fb;
+      font-size: .8rem;
+    }
+
+    .demo-card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: #fbfcfe;
+      margin-top: 8px;
+    }
+
+    .demo-card kbd {
+      background: #fff;
+      border: 1px solid #b8c4d2;
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      padding: 1px 7px;
+      font-size: .78rem;
+      font-family: "SF Mono", Consolas, monospace;
+    }
+
+    .demo-card samp {
+      background: #101826;
+      color: #8fd49a;
+      border-radius: 5px;
+      padding: 1px 7px;
+      font-size: .78rem;
+      font-family: "SF Mono", Consolas, monospace;
+    }
+
+    .demo-card abbr {
+      text-decoration: underline dotted var(--muted);
+      cursor: help;
+    }
+
+    .demo-card small {
+      color: var(--muted);
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>示例 03 · &lt;template&gt; 安全渲染、dataset 委托与语义小标签</h1>
+  <p class="sub">结构与数据分离：惰性模板克隆 + 文本节点赋值防 XSS，data-* 做事件 ID 载体。</p>
+
+  <div class="layout">
+    <div class="col">
+      <!-- ============ 待办列表（template 安全渲染） ============ -->
+      <section class="box">
+        <h2>待办列表（template + cloneNode）</h2>
+        <div class="row-flex">
+          <input id="newTodo" type="text" maxlength="80" placeholder="输入待办内容，回车添加（任意字符都安全）">
+          <button class="btn" id="addBtn" type="button">添加</button>
+        </div>
+        <div class="row-flex">
+          <input id="search" type="text" placeholder="搜索关键词 → 命中处用 <mark> 高亮">
+        </div>
+        <ul id="todoList"></ul>
+        <p class="meta" style="font-size:.76rem;color:var(--muted)">
+          提示：试试输入 <code>&lt;b&gt;加粗&lt;/b&gt;</code> —— 安全路径下它只会原样显示为文本。
+        </p>
+      </section>
+
+      <!-- ============ XSS 对比 ============ -->
+      <section class="box">
+        <h2>XSS 风险对比：textContent vs innerHTML</h2>
+        <p style="margin-bottom:8px">
+          下面的 payload 是历史上最经典的存储型 XSS：
+          <code>&lt;img src=x onerror=...&gt;</code>。<code>&lt;script&gt;</code> 经 innerHTML
+          注入不会执行，但<strong>内联事件属性会执行</strong>——本演示的 payload 只调本页演示钩子。
+        </p>
+        <div class="xss-grid">
+          <div class="xss-cell safe">
+            <h4>✅ template + textContent</h4>
+            <p>数据以文本节点存在，不可能被解析成标签。</p>
+            <button class="btn" id="safeXss" type="button">安全方式注入</button>
+            <div class="out" id="safeOut">（等待注入）</div>
+          </div>
+          <div class="xss-cell bad">
+            <h4>❌ innerHTML 字符串拼接</h4>
+            <p>拼接进 HTML 解析器，<code>onerror</code> 立即执行。</p>
+            <button class="btn danger" id="badXss" type="button">危险方式注入</button>
+            <div class="out" id="badOut">（等待注入）</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="col">
+      <!-- ============ 语义小标签 ============ -->
+      <section class="box">
+        <h2>高频易混语义小标签补遗</h2>
+        <div class="demo-card">
+          <p>搜索"<mark>发票</mark>"共 3 条结果 —— <mark> 表示<strong>当前语境</strong>下的标记。</p>
+          <p style="margin-top:6px">
+            快捷键：<kbd>Ctrl</kbd> + <kbd>F</kbd> 在页内查找；
+            提交后服务端返回 <samp>201 Created</samp>。
+            更多说明见 <abbr title="Frequently Asked Questions，常见问题解答">FAQ</abbr>。
+          </p>
+          <p style="margin-top:6px">
+            <small>本演示数据仅存于内存，刷新即清空（&lt;small&gt;：附属细则，不是单纯"小字"）。</small>
+          </p>
+        </div>
+        <table class="tag-table">
+          <tr>
+            <th>标签</th>
+            <th>语义</th>
+            <th>不要混用</th>
+          </tr>
+          <tr>
+            <td><code>mark</code></td>
+            <td>语境相关的高亮（搜索/批注）</td>
+            <td>永久强调用 strong</td>
+          </tr>
+          <tr>
+            <td><code>small</code></td>
+            <td>附属细则：版权、免责、脚注</td>
+            <td>只为了变小用 CSS</td>
+          </tr>
+          <tr>
+            <td><code>abbr</code></td>
+            <td>缩写，title 给全称</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td><code>kbd</code></td>
+            <td>用户输入（按键/命令）</td>
+            <td>程序输出用 samp</td>
+          </tr>
+          <tr>
+            <td><code>samp</code></td>
+            <td>系统/程序输出</td>
+            <td>代码本身用 code</td>
+          </tr>
+        </table>
+        <h3 class="sub2">slot 思路简述</h3>
+        <p><code>&lt;slot&gt;</code> 是 Shadow DOM 的内容投影槽：组件模板里写
+          <code>&lt;slot name="title"&gt;</code> 占位，使用方传
+          <code>&lt;span slot="title"&gt;</code> 即投射到槽内。template 解决"结构复用"，
+          slot 解决"占位填充"，二者在自定义元素中配合。
+        </p>
+      </section>
+
+      <section class="box">
+        <h2>操作日志</h2>
+        <div id="log" aria-live="polite"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============================================================
+     待办项模板：惰性存在，不渲染、不参与文档；
+     JS 通过 cloneNode(true) 复制后填充数据再插入
+     ============================================================ -->
+  <template id="todoTpl">
+    <li class="todo">
+      <input type="checkbox" class="check" data-action="toggle" aria-label="完成状态">
+      <span class="t"></span>
+      <span class="meta"></span>
+      <button type="button" class="btn ghost" data-action="delete">删除</button>
+    </li>
+  </template>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var tpl = document.getElementById('todoTpl');
+      var list = document.getElementById('todoList');
+      var logEl = document.getElementById('log');
+      var toastEl = document.getElementById('toast');
+      var toastTimer = null;
+
+      // 数据层与 DOM 分离：data-id 只是两者之间的映射钥匙
+      var todos = [];
+      var seq = 0;
+
+      function log(msg) {
+        var t = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+        logEl.textContent += '[' + t + '] ' + msg + '\n';
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+      function toast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2600);
+      }
+
+      /* 安全高亮：把文本按关键词切成 [文本, mark, 文本…]。
+         所有片段都以文本节点进入 DOM，mark 元素是我们自建的、
+         其中内容依然是 textContent —— 全程没有字符串拼 HTML。 */
+      function appendHighlighted(container, text, keyword) {
+        if (!keyword) { container.textContent = text; return; }
+        container.textContent = '';
+        var idx = text.toLowerCase().indexOf(keyword.toLowerCase());
+        if (idx < 0) { container.textContent = text; return; }
+        container.appendChild(document.createTextNode(text.slice(0, idx)));
+        var m = document.createElement('mark');
+        m.textContent = text.slice(idx, idx + keyword.length); // 命中词也是文本节点
+        container.appendChild(m);
+        container.appendChild(document.createTextNode(text.slice(idx + keyword.length)));
+      }
+
+      /* 渲染整表：DocumentFragment 批量挂载，只触发一次布局 */
+      function render() {
+        var keyword = document.getElementById('search').value.trim();
+        var frag = document.createDocumentFragment();
+        todos.forEach(function (item) {
+          var node = tpl.content.cloneNode(true);
+          var li = node.querySelector('.todo');
+          // dataset 是字符串存储：id 写进 data-id，事件委托时再读
+          li.dataset.id = String(item.id);
+          if (item.done) li.classList.add('done');
+          node.querySelector('.check').checked = item.done;
+          appendHighlighted(node.querySelector('.t'), item.title, keyword);
+          node.querySelector('.meta').textContent = '#' + item.id;
+          frag.appendChild(node);
+        });
+        list.replaceChildren(frag); // 旧节点整体替换；事件委托绑在父级，不受影响
+        var empty = list.querySelector('.empty');
+        if (!todos.length && !empty) {
+          var li = document.createElement('li');
+          li.className = 'empty';
+          li.textContent = '暂无待办，添加一条试试（数据只存在内存）';
+          list.appendChild(li);
+        }
+      }
+
+      function addTodo(title) {
+        title = title.trim();
+        if (!title) { toast('内容不能为空'); return; }
+        var item = { id: ++seq, title: title, done: false };
+        todos.push(item);
+        log('新增 #' + item.id + '（长度 ' + title.length + '，内容作为纯文本存储）');
+        render();
+      }
+
+      /* ---------- 事件委托：整个列表只绑一个监听器 ----------
+         closest 向上找带 data-action 的元素，dataset 告知动作与 id，
+         动态增删行完全不需要重新绑定/解绑。 */
+      list.addEventListener('click', function (e) {
+        var actor = e.target.closest('[data-action]');
+        if (!actor || !list.contains(actor)) return;
+        var li = actor.closest('.todo');
+        var id = Number(li.dataset.id); // 注意：dataset 读出来永远是字符串
+        var item = todos.find(function (x) { return x.id === id; });
+        if (!item) return;
+        if (actor.dataset.action === 'delete') {
+          todos = todos.filter(function (x) { return x.id !== id; });
+          log('删除 #' + id + '（委托读取 data-id，无需为每行绑事件）');
+          render();
+        }
+      });
+      // checkbox 的 change 也走委托
+      list.addEventListener('change', function (e) {
+        if (e.target.dataset.action !== 'toggle') return;
+        var li = e.target.closest('.todo');
+        var item = todos.find(function (x) { return x.id === Number(li.dataset.id); });
+        if (item) {
+          item.done = e.target.checked;
+          log('#' + item.id + ' 完成状态 → ' + item.done);
+          render();
+        }
+      });
+
+      document.getElementById('addBtn').addEventListener('click', function () {
+        var input = document.getElementById('newTodo');
+        addTodo(input.value);
+        input.value = '';
+        input.focus();
+      });
+      document.getElementById('newTodo').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') document.getElementById('addBtn').click();
+      });
+      document.getElementById('search').addEventListener('input', render);
+
+      /* ============================================================
+         XSS 对比实验
+         ============================================================ */
+      // 受控演示钩子：真实攻击里这里可能是偷 cookie、伪造请求……
+      window.__xssDemoFired = function () {
+        var out = document.getElementById('badOut');
+        out.appendChild(document.createElement('br'));
+        var s = document.createElement('span');
+        s.className = 'boom';
+        s.textContent = '💥 onerror 执行了！脚本已在页面上下文运行（这就是 XSS）';
+        out.appendChild(s);
+        log('XSS：注入的 onerror 内联处理器被执行（真实场景将导致账号被盗等后果）');
+        toast('危险路径：恶意脚本已执行，看日志');
+      };
+
+      var PAYLOAD = '<img src="x" alt="坏图" onerror="window.__xssDemoFired && window.__xssDemoFired()">';
+
+      document.getElementById('safeXss').addEventListener('click', function () {
+        // 安全路径等价于 template 克隆后的填充动作：textContent 赋值。
+        // 页面上只会看到这串"文字"，浏览器不做任何 HTML 解析。
+        var out = document.getElementById('safeOut');
+        out.textContent = ''; // 先清空，允许重复点击演示
+        out.appendChild(document.createTextNode(PAYLOAD));
+        log('安全注入：payload 作为文本节点显示，浏览器不解析、不执行');
+        toast('安全路径：payload 原样显示为文本');
+      });
+
+      document.getElementById('badXss').addEventListener('click', function () {
+        // 危险路径：innerHTML 拼接 —— 浏览器解析 <img>，src 加载失败 → onerror 执行
+        var out = document.getElementById('badOut');
+        out.textContent = '';
+        out.appendChild(document.createTextNode('已拼接 HTML，观察结果 → '));
+        var holder = document.createElement('span');
+        holder.innerHTML = PAYLOAD; // ❌ 反面教材：切勿对不可信数据这样做
+        out.appendChild(holder);
+        log('危险注入：innerHTML 拼接完成，等待 onerror…');
+      });
+
+      // 初始数据
+      ['阅读 dialog 章节', '整理资源提示速查卡', '真机验证 inputmode 键盘'].forEach(addTodo);
+    })();
+  </script>
+</body>
+
+</html>

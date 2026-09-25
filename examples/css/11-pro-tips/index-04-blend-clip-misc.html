@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  示例 04：混合模式 · 滤镜 · clip-path · 交互杂项合集
+  ------------------------------------------------------------
+  【知识点】
+    1. background-clip:text 镂空字；mix-blend-mode 与下层做
+       颜色混合（difference 可在任意底色上保持高对比）
+    2. background-blend-mode 多背景层互混；backdrop-filter
+       玻璃拟态；filter 链式滤镜墙
+    3. clip-path 基本形状与同点数 polygon 悬停动画
+    4. pointer-events:none 让装饰层点击穿透
+    5. :focus-visible 键盘焦点、user-select 选中控制、
+       accent-color/color-scheme 表单换肤、inset 简写
+    6. 外边距折叠：相邻垂直 margin 取大值而非相加，及规避
+  【运行方式】
+    双击本文件即可在浏览器中打开，无需任何服务器与网络。
+  【效果说明】
+    ① 镂空字 + 滤镜墙 + 玻璃卡；② 四张异形卡片 hover 动画；
+    ③ 装饰光斑层穿透开关（点击下方按钮看事件面板）；
+    ④ 明暗/主题色表单（用 Tab 键观察 focus-visible）；
+    ⑤ 外边距折叠对照与三种规避。
+  【注意事项】
+    blend 必须存在"下层内容"才可见；filter/backdrop-filter
+    在低端机上成本较高，生产环境请准备降级。
+  ============================================================
+-->
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>示例 04 · blend / clip / 交互杂项</title>
+  <style>
+    :root {
+      --brand: #4361ee;
+      --ink: #232c3d;
+      --muted: #7c8aa0;
+      --line: #e3e8f1;
+      --bg: #f4f6fb;
+      --card: #fff;
+      --good: #30a46c;
+      --bad: #e5484d;
+      color-scheme: light;
+      /* 原生控件的配色方案 */
+    }
+
+    :root[data-theme="dark"] {
+      --brand: #8aa2ff;
+      --ink: #e8edf7;
+      --muted: #98a4bd;
+      --line: #333d52;
+      --bg: #171c28;
+      --card: #222a3a;
+      color-scheme: dark;
+      /* 滚动条/表单/弹层一起变暗 */
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      padding: 24px;
+      line-height: 1.6;
+      transition: background .25s, color .25s;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 4px;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: .9rem;
+      margin-bottom: 18px;
+    }
+
+    section.panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    h2 {
+      font-size: 1.08rem;
+      margin-bottom: 4px;
+    }
+
+    .desc {
+      color: var(--muted);
+      font-size: .82rem;
+      margin-bottom: 14px;
+    }
+
+    code.k {
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: .76rem;
+      background: #f1f5ff;
+      color: var(--brand);
+      padding: 1px 6px;
+      border-radius: 5px;
+    }
+
+    .topbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .topbar button {
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--ink);
+      font-size: .82rem;
+      padding: 8px 16px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+
+    .topbar button.on {
+      background: var(--brand);
+      border-color: var(--brand);
+      color: #fff;
+    }
+
+    /* ============ ① 镂空字与混合 ============ */
+    .hero {
+      position: relative;
+      height: 200px;
+      border-radius: 14px;
+      overflow: hidden;
+      /* 流动的彩色底图：供镂空字取色、供 difference 文字反色 */
+      background:
+        linear-gradient(100deg, #4361ee 0%, #f72585 30%, #f59e0b 55%, #30a46c 80%, #8b5cf6 100%);
+      background-size: 220% 220%;
+      animation: flow 8s ease-in-out infinite alternate;
+      display: grid;
+      place-items: center;
+    }
+
+    @keyframes flow {
+      from {
+        background-position: 0 0;
+      }
+
+      to {
+        background-position: 100% 100%;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hero {
+        animation: none;
+      }
+    }
+
+    .knockout {
+      font-size: clamp(1.6rem, 5vw, 2.6rem);
+      font-weight: 800;
+      letter-spacing: 4px;
+      background: inherit;
+      /* 继承不到背景图，故另写一遍 */
+      background-image:
+        linear-gradient(100deg, #4361ee 0%, #f72585 30%, #f59e0b 55%, #30a46c 80%, #8b5cf6 100%);
+      background-size: 220% 220%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: flow 8s ease-in-out infinite alternate;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .knockout {
+        animation: none;
+      }
+    }
+
+    .mix-diff {
+      position: absolute;
+      right: 18px;
+      bottom: 14px;
+      color: #fff;
+      font-size: .9rem;
+      font-weight: 700;
+      mix-blend-mode: difference;
+      /* 任意底色上都强对比 */
+    }
+
+    /* 滤镜墙 */
+    .filter-wall {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .f-item {
+      text-align: center;
+      font-size: .74rem;
+      color: var(--muted);
+    }
+
+    .f-item .imgbox {
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 6px;
+      border: 1px solid var(--line);
+    }
+
+    .f-item .imgbox img {
+      width: 100%;
+      display: block;
+    }
+
+    .f-none img {
+      filter: none;
+    }
+
+    .f-blur img {
+      filter: blur(2px);
+    }
+
+    .f-gray img {
+      filter: grayscale(1);
+    }
+
+    .f-sepia img {
+      filter: sepia(.7);
+    }
+
+    .f-bright img {
+      filter: brightness(1.35);
+    }
+
+    .f-contrast img {
+      filter: contrast(1.6);
+    }
+
+    .f-sat img {
+      filter: saturate(2);
+    }
+
+    .f-hue img {
+      filter: hue-rotate(120deg);
+    }
+
+    .f-chain img {
+      filter: contrast(1.15) saturate(1.4) drop-shadow(0 4px 6px rgba(67, 97, 238, .35));
+    }
+
+    /* 玻璃卡：backdrop-filter 模糊"身后"的内容 */
+    .glass-stage {
+      position: relative;
+      height: 150px;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-top: 16px;
+      background:
+        repeating-linear-gradient(45deg, #4361ee 0 18px, #f72585 18px 36px, #f59e0b 36px 54px, #30a46c 54px 72px);
+    }
+
+    .glass-card {
+      position: absolute;
+      inset: 24px auto 24px 24px;
+      width: 260px;
+      max-width: 70%;
+      border-radius: 12px;
+      padding: 16px;
+      background: rgba(255, 255, 255, .28);
+      backdrop-filter: blur(12px) saturate(1.4);
+      -webkit-backdrop-filter: blur(12px) saturate(1.4);
+      border: 1px solid rgba(255, 255, 255, .5);
+      color: #fff;
+      font-size: .82rem;
+    }
+
+    .glass-card b {
+      font-size: .92rem;
+    }
+
+    /* ============ ② clip-path ============ */
+    .clip-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+    }
+
+    .clip-card {
+      height: 130px;
+      border-radius: 0;
+      /* clip 接管形状 */
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: .88rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: clip-path .35s ease, transform .35s ease;
+    }
+
+    .cc1 {
+      background: linear-gradient(135deg, #4361ee, #3a0ca3);
+      clip-path: polygon(0 0, 100% 0, 100% 85%, 85% 100%, 0 100%);
+    }
+
+    .cc1:hover {
+      clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+    }
+
+    .cc2 {
+      background: linear-gradient(135deg, #f72585, #b5179e);
+      clip-path: circle(42% at 50% 50%);
+    }
+
+    .cc2:hover {
+      clip-path: circle(50% at 50% 50%);
+      transform: rotate(4deg);
+    }
+
+    .cc3 {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+    }
+
+    .cc3:hover {
+      clip-path: polygon(50% 6%, 94% 29%, 94% 71%, 50% 94%, 6% 71%, 6% 29%);
+    }
+
+    .cc4 {
+      background: linear-gradient(135deg, #30a46c, #0f7b48);
+      clip-path: inset(0 0 0 0 round 0);
+    }
+
+    .cc4:hover {
+      clip-path: inset(10px 10px 10px 10px round 18px);
+    }
+
+    /* ============ ③ pointer-events ============ */
+    .pe-stage {
+      position: relative;
+      height: 150px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      background: #fbfcff;
+    }
+
+    .pe-stage button.real {
+      border: 0;
+      background: var(--brand);
+      color: #fff;
+      cursor: pointer;
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-size: .85rem;
+    }
+
+    .pe-overlay {
+      position: absolute;
+      inset: 0;
+      /* inset:0 = 四方向全 0 */
+      background:
+        radial-gradient(circle at 20% 30%, rgba(247, 37, 133, .35), transparent 40%),
+        radial-gradient(circle at 80% 60%, rgba(67, 97, 238, .35), transparent 45%);
+      pointer-events: auto;
+      /* 默认值：挡住下层点击 */
+    }
+
+    .pe-overlay.pass {
+      pointer-events: none;
+    }
+
+    /* 穿透：点击直达按钮 */
+    .pe-log {
+      margin-top: 10px;
+      font-size: .8rem;
+      min-height: 38px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 8px 12px;
+      background: #fbfcff;
+      color: var(--muted);
+    }
+
+    .pe-log b {
+      color: var(--good);
+    }
+
+    .pe-log b.blocked {
+      color: var(--bad);
+    }
+
+    .switch-line {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .switch-line button {
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--ink);
+      font-size: .78rem;
+      padding: 6px 12px;
+      border-radius: 7px;
+      cursor: pointer;
+    }
+
+    .switch-line button.on {
+      background: var(--brand);
+      border-color: var(--brand);
+      color: #fff;
+    }
+
+    /* ============ ④ 表单换肤 ============ */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    @media (max-width: 720px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    form.skin {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+    }
+
+    form.skin {
+      accent-color: var(--accent, #4361ee);
+    }
+
+    .field {
+      display: block;
+      margin-bottom: 12px;
+      font-size: .85rem;
+    }
+
+    .field span {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .field input[type="text"],
+    .field select,
+    .field textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 8px;
+      font: inherit;
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--ink);
+    }
+
+    /* 焦点环：鼠标点击不出现，Tab 键聚焦才出现（用键盘试） */
+    .field input:focus-visible,
+    .field select:focus-visible,
+    .field textarea:focus-visible {
+      outline: 3px solid var(--accent, #4361ee);
+      outline-offset: 1px;
+    }
+
+    .swatches {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .swatches button {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .swatches button.on {
+      border-color: var(--ink);
+    }
+
+    .checks-line {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: .82rem;
+    }
+
+    .range-line input {
+      width: 100%;
+    }
+
+    .select-demo {
+      font-size: .8rem;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .no-select {
+      margin-top: 14px;
+      font-size: .78rem;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #fbfcff;
+      border: 1px solid var(--line);
+      user-select: none;
+    }
+
+    .select-all {
+      user-select: all;
+    }
+
+    /* ============ ⑤ 外边距折叠 ============ */
+    .mc-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    @media (max-width: 760px) {
+      .mc-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .mc-box {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+    }
+
+    .mc-box h3 {
+      font-size: .84rem;
+      margin-bottom: 10px;
+    }
+
+    .mc-parent {
+      background: #fbfcff;
+      border: 1px dashed #c9d4ea;
+      border-radius: 8px;
+    }
+
+    .mc-child {
+      background: #dbe7ff;
+      border-radius: 6px;
+      padding: 10px;
+      font-size: .78rem;
+    }
+
+    .mc-raw .mc-child:first-child {
+      margin-bottom: 40px;
+    }
+
+    .mc-raw .mc-child:last-child {
+      margin-top: 24px;
+    }
+
+    .mc-fix1 {
+      display: flow-root;
+    }
+
+    /* 无副作用 BFC：父子/兄弟分隔 */
+    .mc-fix1 .mc-child {
+      margin: 0 0 12px;
+    }
+
+    .mc-flex {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* gap 根治 */
+    .mc-flex .mc-child {
+      margin: 0;
+    }
+
+    .mc-readout {
+      margin-top: 8px;
+      font-size: .72rem;
+      color: var(--muted);
+      font-family: ui-monospace, Consolas, monospace;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>示例 04 · 混合模式 / clip-path / 交互杂项</h1>
+  <p class="sub">视觉特效与高频小属性集中演练，每个区块都可直接交互。</p>
+
+  <div class="topbar">
+    <button id="themeBtn" type="button">切换暗色（color-scheme）</button>
+    <span class="sub" style="margin:0">提示：多按 Tab 键在表单间移动，观察 focus-visible 焦点环</span>
+  </div>
+
+  <!-- ① blend & filter -->
+  <section class="panel">
+    <h2>① 镂空字、混合模式与滤镜墙</h2>
+    <p class="desc">标题使用 <code class="k">background-clip:text</code> 显示流动底色；右下角白字使用 <code
+        class="k">mix-blend-mode:difference</code> 实时反色。下方同一张内联 SVG 图经过九种滤镜。</p>
+    <div class="hero">
+      <div class="knockout">视觉特效实验室</div>
+      <span class="mix-diff">difference · 任意底色高对比</span>
+    </div>
+
+    <div class="filter-wall" id="filterWall">
+      <!-- 由 JS 渲染 9 个滤镜格，共用一张内联 SVG -->
+    </div>
+
+    <div class="glass-stage">
+      <div class="glass-card">
+        <b>backdrop-filter 玻璃拟态</b><br>
+        模糊与饱和作用在"元素身后"的彩色条纹上；半透明背景负责着色。低端机建议 @supports 降级纯色。
+      </div>
+    </div>
+  </section>
+
+  <!-- ② clip-path -->
+  <section class="panel">
+    <h2>② clip-path 异形卡片悬停动画</h2>
+    <p class="desc">折角、圆形、六边形、inset 圆角四种形状；hover 动画在同点数形状之间插值，所以平滑而非瞬切。裁剪区外不接收点击、不绘制阴影。</p>
+    <div class="clip-grid">
+      <div class="clip-card cc1">折角 → 矩形</div>
+      <div class="clip-card cc2">圆形放大</div>
+      <div class="clip-card cc3">六边形内缩</div>
+      <div class="clip-card cc4">inset 圆角</div>
+    </div>
+  </section>
+
+  <!-- ③ pointer-events -->
+  <section class="panel">
+    <h2>③ pointer-events:none 点击穿透</h2>
+    <p class="desc">彩色光斑是盖在按钮上的装饰层。auto（默认）会挡住按钮点击；none 时事件穿透到下层按钮。点击验证。</p>
+    <div class="switch-line">
+      <button data-pe="auto" class="on">装饰层 pointer-events:auto（挡住）</button>
+      <button data-pe="none">pointer-events:none（穿透）</button>
+    </div>
+    <div class="pe-stage" id="peStage">
+      <button class="real" type="button" data-name="主按钮 A">主按钮 A</button>
+      <button class="real" type="button" data-name="主按钮 B">主按钮 B</button>
+      <div class="pe-overlay" id="peOverlay"></div>
+    </div>
+    <div class="pe-log" id="peLog">事件面板：尚未点击。</div>
+  </section>
+
+  <!-- ④ 表单 -->
+  <section class="panel">
+    <h2>④ 表单换肤：accent-color + color-scheme + focus-visible</h2>
+    <p class="desc">换主题色，复选框/单选/range/进度条全部跟随；暗色模式下原生下拉、日历等控件也由 color-scheme 统一翻色。</p>
+    <div class="form-grid">
+      <form class="skin" onsubmit="return false">
+        <div class="swatches" id="swatches">
+          <button type="button" data-c="#4361ee" class="on" style="background:#4361ee"></button>
+          <button type="button" data-c="#e5484d" style="background:#e5484d"></button>
+          <button type="button" data-c="#30a46c" style="background:#30a46c"></button>
+          <button type="button" data-c="#d97706" style="background:#d97706"></button>
+          <button type="button" data-c="#8b5cf6" style="background:#8b5cf6"></button>
+        </div>
+        <label class="field"><span>用户名（点击与 Tab 聚焦对比焦点环）</span>
+          <input type="text" placeholder="点一下：无环；按 Tab：有环"></label>
+        <div class="checks-line">
+          <label><input type="checkbox" checked> 订阅产品更新（accent-color）</label>
+          <label><input type="checkbox"> 接收营销短信</label>
+          <label><input type="radio" name="r" checked> 个人版</label>
+          <label><input type="radio" name="r"> 企业版</label>
+        </div>
+        <label class="field range-line" style="margin-top:12px"><span>音量（range 跟随主题色）</span>
+          <input type="range" min="0" max="100" value="60"></label>
+        <label class="field"><span>原生下拉（暗色下观察控件配色）</span>
+          <select>
+            <option>简体中文</option>
+            <option>English</option>
+            <option>日本語</option>
+          </select></label>
+      </form>
+      <div>
+        <p class="select-demo" style="margin-bottom:8px">
+          <code class="k">:focus-visible</code> 由浏览器按输入设备启发式判断：鼠标按下不显示焦点环，键盘 Tab 必须显示。
+          永远不要用 <code class="k">:focus{outline:none}</code> 裸删焦点而不提供替代。
+        </p>
+        <div class="no-select">
+          <b>user-select:none</b><br>
+          这段文字无法被选中——适合按钮角标、装饰编号，避免连点误选；但不要用在正文上。
+        </div>
+        <div class="no-select select-all" style="user-select:all; margin-top:10px">
+          <b>user-select:all</b><br>点击即整段选中：适合订单号、优惠码等需要一键复制的短文本（例如 NODE-2026-0923）。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ⑤ 外边距折叠 -->
+  <section class="panel">
+    <h2>⑤ 外边距折叠：取大值，不是相加</h2>
+    <p class="desc">左盒两块分别有 40px 下边距与 24px 上边距，相邻后间距是 max(40,24)=40px；中间用 flow-root 分隔；右侧 flex+gap 从源头消灭折叠。</p>
+    <div class="mc-grid">
+      <div class="mc-box">
+        <h3>原始：折叠发生</h3>
+        <div class="mc-parent mc-raw">
+          <div class="mc-child">上块 margin-bottom:40px</div>
+          <div class="mc-child">下块 margin-top:24px</div>
+        </div>
+        <p class="mc-readout" id="mcRaw">测量中…</p>
+      </div>
+      <div class="mc-box">
+        <h3>规避一：flow-root（BFC）</h3>
+        <div class="mc-parent mc-fix1">
+          <div class="mc-child">统一 margin-bottom:12px</div>
+          <div class="mc-child">父级 display:flow-root</div>
+        </div>
+        <p class="mc-readout" id="mcFix1">测量中…</p>
+      </div>
+      <div class="mc-box">
+        <h3>规避二：flex + gap（推荐）</h3>
+        <div class="mc-parent mc-flex">
+          <div class="mc-child">margin:0</div>
+          <div class="mc-child">容器 gap:12px</div>
+        </div>
+        <p class="mc-readout" id="mcFix2">测量中…</p>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      'use strict';
+
+      /* ---------- 内联 SVG 滤镜测试图（零网络） ---------- */
+      var svg =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="260" height="160" viewBox="0 0 260 160">' +
+        '<rect width="260" height="160" fill="#eef2ff"/>' +
+        '<circle cx="80" cy="70" r="46" fill="#4361ee"/>' +
+        '<rect x="130" y="36" width="90" height="70" rx="10" fill="#f72585"/>' +
+        '<polygon points="60,140 100,100 140,140" fill="#f59e0b"/>' +
+        '<text x="130" y="150" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#232c3d">FILTER</text>' +
+        '</svg>';
+      var uri = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+
+      var filters = [
+        ['f-none', 'none 原图'], ['f-blur', 'blur(2px)'], ['f-gray', 'grayscale(1)'],
+        ['f-sepia', 'sepia(.7)'], ['f-bright', 'brightness(1.35)'], ['f-contrast', 'contrast(1.6)'],
+        ['f-sat', 'saturate(2)'], ['f-hue', 'hue-rotate(120deg)'], ['f-chain', '链式+drop-shadow']
+      ];
+      var wall = document.getElementById('filterWall');
+      filters.forEach(function (f) {
+        var item = document.createElement('div');
+        item.className = 'f-item ' + f[0];
+        item.innerHTML = '<div class="imgbox"><img alt="' + f[1] + '"></div>' + f[1];
+        item.querySelector('img').src = uri;
+        wall.appendChild(item);
+      });
+
+      /* ---------- 明暗主题 ---------- */
+      var themeBtn = document.getElementById('themeBtn');
+      themeBtn.addEventListener('click', function () {
+        var dark = document.documentElement.dataset.theme === 'dark';
+        document.documentElement.dataset.theme = dark ? '' : 'dark';
+        themeBtn.textContent = dark ? '切换暗色（color-scheme）' : '切回亮色';
+      });
+
+      /* ---------- 主题色 ---------- */
+      document.querySelectorAll('#swatches button').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('#swatches button').forEach(function (b) {
+            b.classList.toggle('on', b === btn);
+          });
+          document.documentElement.style.setProperty('--accent', btn.dataset.c);
+        });
+      });
+
+      /* ---------- pointer-events 穿透 ---------- */
+      var overlay = document.getElementById('peOverlay');
+      var log = document.getElementById('peLog');
+      document.querySelectorAll('[data-pe]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var pass = btn.dataset.pe === 'none';
+          overlay.classList.toggle('pass', pass);
+          document.querySelectorAll('[data-pe]').forEach(function (b) {
+            b.classList.toggle('on', b === btn);
+          });
+        });
+      });
+      // 事件绑定在真实按钮上：被遮挡层挡住时根本不会触发
+      document.querySelectorAll('.pe-stage .real').forEach(function (b) {
+        b.addEventListener('click', function () {
+          log.innerHTML = '<b>收到点击：</b>' + b.dataset.name +
+            ' —— 说明装饰层当前为 pointer-events:none，事件已穿透。';
+        });
+      });
+      // 点击遮罩本身：证明 auto 时它在吞事件
+      overlay.addEventListener('click', function () {
+        if (!overlay.classList.contains('pass')) {
+          log.innerHTML = '<b class="blocked">点击被装饰层吞掉：</b>' +
+            '事件目标是光斑层，按钮收不到。切到 none 后再试。';
+        }
+      });
+
+      /* ---------- 外边距折叠实测：读真实布局数值 ---------- */
+      function measure(id, wrapSel) {
+        var box = document.querySelector('.' + wrapSel);
+        var kids = box.querySelectorAll('.mc-child');
+        var gap = kids[1].getBoundingClientRect().top -
+          kids[0].getBoundingClientRect().bottom;
+        document.getElementById(id).textContent =
+          '实际间距：' + Math.round(gap) + 'px（盒高 ' + Math.round(box.getBoundingClientRect().height) + 'px）';
+      }
+      measure('mcRaw', 'mc-raw');
+      measure('mcFix1', 'mc-fix1');
+      measure('mcFix2', 'mc-flex');
+      window.addEventListener('resize', function () {
+        measure('mcRaw', 'mc-raw'); measure('mcFix1', 'mc-fix1'); measure('mcFix2', 'mc-flex');
+      });
+    })();
+  </script>
+</body>
+
+</html>
