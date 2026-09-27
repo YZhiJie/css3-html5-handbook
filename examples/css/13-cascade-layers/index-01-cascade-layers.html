@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>层叠层 Cascade Layers · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 1100px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+
+  /* ===== 示例1：基础层顺序 ===== */
+  @layer reset-demo, base-demo, components-demo, utilities-demo;
+
+  @layer reset-demo {
+    .btn-v1 {
+      margin: 0; padding: 0; border: none; background: none;
+      font: inherit; cursor: pointer; color: inherit;
+    }
+  }
+  @layer base-demo {
+    .btn-v1 { padding: 10px 20px; border-radius: 8px; font-weight: 600; }
+  }
+  @layer components-demo {
+    .btn-v1 {
+      background: #334155; color: #e2e8f0;
+      transition: background 0.2s;
+    }
+    .btn-v1:hover { background: #475569; }
+  }
+  @layer utilities-demo {
+    .btn-primary { background: #3b82f6 !important; color: #fff !important; }
+    .btn-danger { background: #ef4444 !important; color: #fff !important; }
+  }
+
+  /* 未分层规则：优先级高于所有分层规则 */
+  .btn-v1 { border: 2px solid transparent; }
+  .btn-v1:focus-visible { outline: 2px solid #22d3ee; outline-offset: 2px; }
+
+  .btn-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+
+  /* ===== 示例2：层覆盖演示（层顺序 > 特异性） ===== */
+  @layer low, high;
+
+  @layer low {
+    #specificity-test .btn-v2 {
+      background: #ef4444; padding: 12px 24px; border-radius: 8px;
+      color: #fff; border: none; font-weight: 600;
+    }
+  }
+  @layer high {
+    .btn-v2 {
+      background: #22d3ee; color: #0b1220;
+    }
+  }
+  /* 未分层 */
+  .btn-v2 { padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+
+  .specificity-note {
+    background: #1e293b; padding: 12px; border-radius: 8px;
+    font-size: 13px; border-left: 3px solid #f472b6; margin-top: 8px;
+  }
+
+  /* ===== 示例3：嵌套层 ===== */
+  @layer framework {
+    @layer reset {
+      .card-v3 { margin: 0; }
+    }
+    @layer components {
+      .card-v3 {
+        background: #1e293b; border-radius: 10px; padding: 20px;
+        border: 2px solid #334155;
+      }
+    }
+  }
+  @layer my-overrides {
+    .card-v3 { border-color: #a78bfa; }
+  }
+
+  /* ===== 示例4：!important 在层中的逆序行为 ===== */
+  @layer base-imp, utilities-imp;
+
+  @layer base-imp {
+    .text-imp { color: #f87171 !important; }
+  }
+  @layer utilities-imp {
+    .text-imp { color: #4ade80 !important; }
+  }
+
+  .imp-demo {
+    font-size: 18px; font-weight: 700; padding: 16px;
+    background: #1e293b; border-radius: 8px; text-align: center;
+  }
+
+  /* ===== 示例5：层可视化面板 ===== */
+  .layer-stack {
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .layer-bar {
+    padding: 8px 14px; border-radius: 6px; font-size: 13px;
+    font-weight: 600; display: flex; justify-content: space-between;
+    align-items: center;
+  }
+  .layer-bar .prio { font-size: 11px; opacity: 0.7; }
+</style>
+</head>
+<body>
+
+<h1>层叠层 Cascade Layers</h1>
+<p class="sub">@layer 显式定义样式优先级层级，终结 !important 战争与特异性军备竞赛。</p>
+
+<!-- 示例1 -->
+<section>
+  <h2>示例 1 · 五层架构：reset → base → components → utilities</h2>
+  <div class="demo-box">
+    <div class="btn-row">
+      <button class="btn-v1">默认按钮</button>
+      <button class="btn-v1 btn-primary">主要按钮</button>
+      <button class="btn-v1 btn-danger">危险按钮</button>
+    </div>
+    <div class="specificity-note">
+      所有按钮共享同一 DOM 结构。<code>btn-primary</code> 和 <code>btn-danger</code> 在 <code>utilities</code> 层中用了 <code>!important</code>，能覆盖 <code>components</code> 层的背景色——因为层顺序在特异性之前决胜。
+    </div>
+  </div>
+</section>
+
+<!-- 示例2 -->
+<section>
+  <h2>示例 2 · 层顺序 > 特异性（ID 选择器输给普通类）</h2>
+  <div class="demo-box">
+    <div id="specificity-test">
+      <button class="btn-v2">我应该是什么颜色？</button>
+    </div>
+    <div class="specificity-note">
+      <code>low</code> 层中用了 <code>#specificity-test .btn-v2</code>（ID + 类，特异性 (1,1,0)），<code>high</code> 层中只用 <code>.btn-v2</code>（特异性 (0,1,0)）。但 <code>high</code> 层声明顺序更晚，所以按钮是 <strong>青色</strong> 而非红色。层顺序比特异性更强。
+    </div>
+  </div>
+</section>
+
+<!-- 示例3 -->
+<section>
+  <h2>示例 3 · 嵌套层：framework.reset / framework.components / my-overrides</h2>
+  <div class="demo-box">
+    <div class="card-v3">
+      <strong>嵌套层卡片</strong><br>
+      <span style="color:#94a3b8; font-size:13px;">framework.components 提供基础样式，my-overrides 层覆盖边框颜色为紫色。</span>
+    </div>
+  </div>
+  <div class="specificity-note">
+    嵌套层语法：<code>@layer framework { @layer reset { ... } @layer components { ... } }</code>。外层声明顺序决定大方向，内层子层独立排序。
+  </div>
+</section>
+
+<!-- 示例4 -->
+<section>
+  <h2>示例 4 · !important 在层中的逆序行为</h2>
+  <div class="demo-box">
+    <div class="imp-demo text-imp">这段文字是什么颜色？</div>
+    <div class="specificity-note">
+      <code>base-imp</code> 层：红色 <code>!important</code>；<code>utilities-imp</code> 层：绿色 <code>!important</code>。按层逆序规则，<code>base-imp !important</code> > <code>utilities-imp !important</code>，所以文字是 <strong style="color:#f87171">红色</strong>。<br>
+      这防止了工具层用 <code>!important</code> 彻底封死下层覆盖——滥用 <code>!important</code> 时，层叠层不会给你免死金牌。
+    </div>
+  </div>
+</section>
+
+<!-- 示例5 -->
+<section>
+  <h2>示例 5 · 层优先级可视化</h2>
+  <div class="demo-box">
+    <div class="layer-stack">
+      <div class="layer-bar" style="background:#1e293b; border-left:3px solid #64748b;">
+        <span>@layer reset</span><span class="prio">优先级最低（分层中）</span>
+      </div>
+      <div class="layer-bar" style="background:#1e293b; border-left:3px solid #22d3ee;">
+        <span>@layer base</span><span class="prio">↑</span>
+      </div>
+      <div class="layer-bar" style="background:#1e293b; border-left:3px solid #a78bfa;">
+        <span>@layer components</span><span class="prio">↑</span>
+      </div>
+      <div class="layer-bar" style="background:#1e293b; border-left:3px solid #f472b6;">
+        <span>@layer utilities</span><span class="prio">↑</span>
+      </div>
+      <div class="layer-bar" style="background:#131c2e; border-left:3px solid #fbbf24; border: 1px dashed #fbbf24;">
+        <span>未分层规则（普通样式）</span><span class="prio">优先级最高</span>
+      </div>
+    </div>
+    <div class="specificity-note">
+      记住：<strong>未分层 > 分层（按声明顺序后者优先）> 特异性 > 出现顺序</strong>。<code>!important</code> 在分层中按层逆序生效。
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

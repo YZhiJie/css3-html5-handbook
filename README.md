@@ -16,17 +16,17 @@ css3-html5-handbook/
 ├── cheatsheet.md           # 高频语法速查表
 ├── design-system.md        # Spark 设计系统（Web 界面用：色彩/字体/组件/动效 token）
 ├── docs/                   # 深度文档（每主题一篇）
-│   ├── css/                # CSS3 九大主题
-│   └── html/               # HTML5 九大主题
+│   ├── css/                # CSS3 十三大主题
+│   └── html/               # HTML5 十大主题
 ├── examples/               # 可运行示例（与文档一一对应）
 │   ├── css/
 │   └── html/
-└── comics/                 # 漫画剧场（「霓虹墨」风格，全 21 话）
+└── comics/                 # 漫画剧场（「霓虹墨」风格，全 23 话）
     ├── style-guide.md      # 漫画美术风格规范
     ├── manifest.json       # 话数清单（校验器依据）
     ├── check-comics.mjs    # SVG 良构 / MD 行数 / 链接一致性校验
     ├── samples/            # 三张风格定妆稿（SVG，不参与编号）
-    ├── css/                # CSS 篇 EP.01–11（SVG + 讲解 MD）
+    ├── css/                # CSS 篇 EP.01–11、EP.22–23（SVG + 讲解 MD）
     └── html/               # HTML 篇 EP.12–21（SVG + 讲解 MD）
 ```
 
@@ -45,6 +45,10 @@ css3-html5-handbook/
 | 07 | 阴影效果 | [docs/css/07-shadows.md](docs/css/07-shadows.md) | [examples/css/07-shadows/](examples/css/07-shadows/) |
 | 08 | 渐变背景 | [docs/css/08-gradients.md](docs/css/08-gradients.md) | [examples/css/08-gradients/](examples/css/08-gradients/) |
 | 09 | 变换 Transform | [docs/css/09-transform.md](docs/css/09-transform.md) | [examples/css/09-transform/](examples/css/09-transform/) |
+| 10 | 文本截断 | [docs/css/10-text-truncation.md](docs/css/10-text-truncation.md) | [examples/css/10-text-truncation/](examples/css/10-text-truncation/) |
+| 11 | CSS 进阶技巧 | [docs/css/11-pro-tips.md](docs/css/11-pro-tips.md) | [examples/css/11-pro-tips/](examples/css/11-pro-tips/) |
+| 12 | 容器查询 | [docs/css/12-container-queries.md](docs/css/12-container-queries.md) | [examples/css/12-container-queries/](examples/css/12-container-queries/) |
+| 13 | 层叠层 | [docs/css/13-cascade-layers.md](docs/css/13-cascade-layers.md) | [examples/css/13-cascade-layers/](examples/css/13-cascade-layers/) |
 
 ### HTML5 篇
 
@@ -94,6 +98,8 @@ css3-html5-handbook/
 | EP.19 | 拖放 API | [SVG](comics/html/EP.19-drag-drop.svg) | [讲解](comics/html/EP.19-drag-drop.md) |
 | EP.20 | 多媒体元素 | [SVG](comics/html/EP.20-multimedia.svg) | [讲解](comics/html/EP.20-multimedia.md) |
 | EP.21 | HTML 进阶技巧（完结篇） | [SVG](comics/html/EP.21-pro-tips.svg) | [讲解](comics/html/EP.21-pro-tips.md) |
+| EP.22 | 容器查询 | [SVG](comics/css/EP.22-container-queries.svg) | [讲解](comics/css/EP.22-container-queries.md) |
+| EP.23 | 层叠层 | [SVG](comics/css/EP.23-cascade-layers.svg) | [讲解](comics/css/EP.23-cascade-layers.md) |
 
 ## 如何使用
 
@@ -114,6 +120,7 @@ css3-html5-handbook/
 
 | 版本 | 日期 | 说明 |
 | --- | --- | --- |
+| v1.3.0 | 2026-09-27 | CSS 篇扩展：新增容器查询（12）与层叠层（13）两章，配套漫画 EP.22–23，全 23 话 |
 | v1.2.0 | 2026-09-27 | 「霓虹墨」漫画剧场全 21 话量产完成：CSS 篇 EP.01–11 + HTML 篇 EP.12–21，每话含 SVG 原画与讲解 MD，附话数清单与质量校验器 |
 | v1.1.0 | 2026-09-27 | 新增「霓虹墨」漫画风格规范 + 三张定妆稿（样板页/角色表/配色构图）与 Spark Web 设计系统，漫画剧场量产启动 |
 | v1.0.0 | 2026-09-23 | 全部 18 个主题完成：CSS3 九大主题 + HTML5 九大主题，18 篇深度文档 + 61 个可运行示例 + 速查表 |

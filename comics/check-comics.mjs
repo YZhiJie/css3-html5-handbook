@@ -38,7 +38,7 @@ try {
 
 if (manifest) {
   const eps = manifest.episodes ?? [];
-  if (eps.length !== 21) fail(`manifest 应有 21 话，实际 ${eps.length} 话`);
+  if (eps.length !== 23) fail(`manifest 应有 23 话，实际 ${eps.length} 话`);
 
   const seen = new Set();
   eps.forEach((item, i) => {

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSS3 × HTML5 漫画剧场 · 霓虹墨 Neon Ink</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #131c2e;
+      --line: #334155;
+      --cyan: #22d3ee;
+      --violet: #a78bfa;
+      --pink: #f472b6;
+      --amber: #fbbf24;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      padding: 40px 24px 80px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    header h1 {
+      font-size: 34px;
+      background: linear-gradient(90deg, var(--cyan), var(--violet), var(--pink));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin-bottom: 8px;
+    }
+
+    header p {
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .arc-label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      max-width: 1120px;
+      margin: 40px auto 20px;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .arc-label::before,
+    .arc-label::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--line);
+    }
+
+    .arc-css {
+      color: var(--cyan);
+    }
+
+    .arc-html {
+      color: var(--amber);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 20px;
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 2px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      transition: transform .18s ease, border-color .18s ease;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: var(--cyan);
+    }
+
+    .card.html:hover {
+      border-color: var(--amber);
+    }
+
+    .thumb {
+      width: 100%;
+      aspect-ratio: 10 / 7;
+      display: block;
+      background: #0f172a;
+      object-fit: cover;
+    }
+
+    .meta {
+      padding: 14px 16px 16px;
+    }
+
+    .meta .ep {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      color: var(--cyan);
+      margin-bottom: 4px;
+    }
+
+    .card.html .meta .ep {
+      color: var(--amber);
+    }
+
+    .meta .title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .meta .links {
+      display: flex;
+      gap: 14px;
+      font-size: 13px;
+    }
+
+    .meta .links a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    .meta .links a:hover {
+      color: var(--cyan);
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 64px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>CSS3 × HTML5 漫画剧场</h1>
+    <p>霓虹墨 Neon Ink · 全 21 话 · 像素酱 × 标签君 × 码叔</p>
+  </header>
+
+  <div class="arc-label arc-css">CSS 篇 · EP.01 – 11</div>
+  <div class="grid" id="grid-css"></div>
+
+  <div class="arc-label arc-html">HTML 篇 · EP.12 – 21</div>
+  <div class="grid" id="grid-html"></div>
+
+  <footer>每话 = SVG 原画 + 讲解 MD ｜ 点击卡片看原画，讲解含剧情 / 划重点 / 自测 / 动手实验</footer>
+
+  <script>
+    const EPISODES = [
+      { ep: "EP.01", comic: "css/EP.01-selectors", title: "选择器" },
+      { ep: "EP.02", comic: "css/EP.02-animation-transition", title: "动画与过渡" },
+      { ep: "EP.03", comic: "css/EP.03-flexbox", title: "Flexbox" },
+      { ep: "EP.04", comic: "css/EP.04-grid", title: "Grid" },
+      { ep: "EP.05", comic: "css/EP.05-responsive", title: "响应式" },
+      { ep: "EP.06", comic: "css/EP.06-variables-calc", title: "变量与 calc" },
+      { ep: "EP.07", comic: "css/EP.07-shadows", title: "阴影" },
+      { ep: "EP.08", comic: "css/EP.08-gradients", title: "渐变" },
+      { ep: "EP.09", comic: "css/EP.09-transform", title: "Transform" },
+      { ep: "EP.10", comic: "css/EP.10-text-truncation", title: "文本截断" },
+      { ep: "EP.11", comic: "css/EP.11-pro-tips", title: "CSS 进阶技巧" },
+      { ep: "EP.12", comic: "html/EP.12-semantic", title: "语义化标签" },
+      { ep: "EP.13", comic: "html/EP.13-forms", title: "表单" },
+      { ep: "EP.14", comic: "html/EP.14-canvas", title: "Canvas" },
+      { ep: "EP.15", comic: "html/EP.15-svg", title: "SVG" },
+      { ep: "EP.16", comic: "html/EP.16-web-storage", title: "Web Storage" },
+      { ep: "EP.17", comic: "html/EP.17-web-workers", title: "Web Workers" },
+      { ep: "EP.18", comic: "html/EP.18-geolocation", title: "Geolocation" },
+      { ep: "EP.19", comic: "html/EP.19-drag-drop", title: "拖放" },
+      { ep: "EP.20", comic: "html/EP.20-multimedia", title: "多媒体" },
+      { ep: "EP.21", comic: "html/EP.21-pro-tips", title: "HTML 进阶技巧（完结）" },
+      { ep: "EP.22", comic: "css/EP.22-container-queries", title: "容器查询" },
+      { ep: "EP.23", comic: "css/EP.23-cascade-layers", title: "层叠层" }
+    ];
+
+    function render(gridId, list, arc) {
+      const grid = document.getElementById(gridId);
+      for (const e of list) {
+        const svg = `${e.comic}.svg`;
+        const md = `${e.comic}.md`;
+        const card = document.createElement("a");
+        card.className = `card ${arc}`;
+        card.href = svg;
+        card.target = "_blank";
+        card.innerHTML = `
+      <img class="thumb" src="${svg}" alt="${e.ep} ${e.title}" loading="lazy">
+      <div class="meta">
+        <div class="ep">${e.ep}</div>
+        <div class="title">${e.title}</div>
+        <div class="links">
+          <a href="${svg}" target="_blank">原画 SVG</a>
+          <a href="${md}" target="_blank">讲解 MD</a>
+        </div>
+      </div>`;
+        grid.appendChild(card);
+      }
+    }
+
+    render("grid-css", EPISODES.slice(0, 11), "css");
+    render("grid-html", EPISODES.slice(11), "html");
+  </script>
+</body>
+
+</html>
