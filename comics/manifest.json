@@ -1,0 +1,29 @@
+{
+  "series": "CSS3 × HTML5 漫画剧场",
+  "style": "霓虹墨 Neon Ink",
+  "version": "1.0.0",
+  "note": "samples/ 目录仅作定妆参考，不参与话数编号与校验",
+  "episodes": [
+    { "ep": "EP.01", "comic": "css/EP.01-selectors", "doc": "docs/css/01-selectors.md", "example": "examples/css/01-selectors", "title": "选择器" },
+    { "ep": "EP.02", "comic": "css/EP.02-animation-transition", "doc": "docs/css/02-animation-transition.md", "example": "examples/css/02-animation-transition", "title": "动画与过渡" },
+    { "ep": "EP.03", "comic": "css/EP.03-flexbox", "doc": "docs/css/03-flexbox.md", "example": "examples/css/03-flexbox", "title": "Flexbox" },
+    { "ep": "EP.04", "comic": "css/EP.04-grid", "doc": "docs/css/04-grid.md", "example": "examples/css/04-grid", "title": "Grid" },
+    { "ep": "EP.05", "comic": "css/EP.05-responsive", "doc": "docs/css/05-responsive.md", "example": "examples/css/05-responsive", "title": "响应式" },
+    { "ep": "EP.06", "comic": "css/EP.06-variables-calc", "doc": "docs/css/06-variables-calc.md", "example": "examples/css/06-variables-calc", "title": "变量与 calc" },
+    { "ep": "EP.07", "comic": "css/EP.07-shadows", "doc": "docs/css/07-shadows.md", "example": "examples/css/07-shadows", "title": "阴影" },
+    { "ep": "EP.08", "comic": "css/EP.08-gradients", "doc": "docs/css/08-gradients.md", "example": "examples/css/08-gradients", "title": "渐变" },
+    { "ep": "EP.09", "comic": "css/EP.09-transform", "doc": "docs/css/09-transform.md", "example": "examples/css/09-transform", "title": "Transform" },
+    { "ep": "EP.10", "comic": "css/EP.10-text-truncation", "doc": "docs/css/10-text-truncation.md", "example": "examples/css/10-text-truncation", "title": "文本截断" },
+    { "ep": "EP.11", "comic": "css/EP.11-pro-tips", "doc": "docs/css/11-pro-tips.md", "example": "examples/css/11-pro-tips", "title": "CSS 进阶技巧" },
+    { "ep": "EP.12", "comic": "html/EP.12-semantic", "doc": "docs/html/01-semantic.md", "example": "examples/html/01-semantic", "title": "语义化标签" },
+    { "ep": "EP.13", "comic": "html/EP.13-forms", "doc": "docs/html/02-forms.md", "example": "examples/html/02-forms", "title": "表单" },
+    { "ep": "EP.14", "comic": "html/EP.14-canvas", "doc": "docs/html/03-canvas.md", "example": "examples/html/03-canvas", "title": "Canvas" },
+    { "ep": "EP.15", "comic": "html/EP.15-svg", "doc": "docs/html/04-svg.md", "example": "examples/html/04-svg", "title": "SVG" },
+    { "ep": "EP.16", "comic": "html/EP.16-web-storage", "doc": "docs/html/05-web-storage.md", "example": "examples/html/05-web-storage", "title": "Web Storage" },
+    { "ep": "EP.17", "comic": "html/EP.17-web-workers", "doc": "docs/html/06-web-workers.md", "example": "examples/html/06-web-workers", "title": "Web Workers" },
+    { "ep": "EP.18", "comic": "html/EP.18-geolocation", "doc": "docs/html/07-geolocation.md", "example": "examples/html/07-geolocation", "title": "Geolocation" },
+    { "ep": "EP.19", "comic": "html/EP.19-drag-drop", "doc": "docs/html/08-drag-drop.md", "example": "examples/html/08-drag-drop", "title": "拖放" },
+    { "ep": "EP.20", "comic": "html/EP.20-multimedia", "doc": "docs/html/09-multimedia.md", "example": "examples/html/09-multimedia", "title": "多媒体" },
+    { "ep": "EP.21", "comic": "html/EP.21-pro-tips", "doc": "docs/html/10-pro-tips.md", "example": "examples/html/10-pro-tips", "title": "HTML 进阶技巧" }
+  ]
+}
