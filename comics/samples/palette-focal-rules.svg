@@ -1,0 +1,118 @@
+<!-- 配色与构图法则定妆 ·「霓虹墨 Neon Ink」— 规范见 ../style-guide.md §2/§5/§6 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 664">
+  <defs>
+    <style>
+      .t{font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;}
+      .m{font-family:'SFMono-Regular',Menlo,Consolas,monospace;}
+      .h1{font-size:22px;font-weight:bold;fill:#f8fafc;}
+      .cap{font-size:13px;fill:#94a3b8;}
+      .sec{font-size:15px;font-weight:bold;fill:#22d3ee;}
+      .sec2{font-size:15px;font-weight:bold;fill:#fbbf24;}
+      .ct{font-size:14px;font-weight:bold;fill:#f8fafc;}
+      .sn{font-size:12.5px;fill:#cbd5e1;}
+      .sh{font-size:11.5px;fill:#64748b;}
+      .nt{font-size:13px;fill:#cbd5e1;}
+      .lb{font-size:11.5px;fill:#94a3b8;}
+      .ft{font-size:12px;fill:#64748b;}
+    </style>
+  </defs>
+  <rect x="0" y="0" width="1200" height="664" fill="#0b1220"/>
+  <text class="t h1" x="40" y="44">配色与构图法则 · 霓虹墨</text>
+  <text class="t cap" x="1160" y="44" text-anchor="end">深墨底打光，霓虹只给主角</text>
+  <line x1="0" y1="72" x2="1200" y2="72" stroke="#1e293b" stroke-width="2"/>
+
+  <!-- ===== 01 配色系统 ===== -->
+  <text class="t sec" x="40" y="108">01 · 配色系统</text>
+  <rect x="40" y="128" width="140" height="56" rx="10" fill="#0b1220" stroke="#334155" stroke-width="2"/>
+  <text class="t sn" x="42" y="204">墨底 Ink</text>
+  <text class="m sh" x="42" y="220">#0B1220</text>
+  <rect x="220" y="128" width="140" height="56" rx="10" fill="#131c2e" stroke="#334155" stroke-width="2"/>
+  <text class="t sn" x="222" y="204">面板 Panel</text>
+  <text class="m sh" x="222" y="220">#131C2E</text>
+  <rect x="400" y="128" width="140" height="56" rx="10" fill="#22d3ee"/>
+  <text class="t sn" x="402" y="204">电光青 Cyan</text>
+  <text class="m sh" x="402" y="220">#22D3EE</text>
+  <rect x="580" y="128" width="140" height="56" rx="10" fill="#a78bfa"/>
+  <text class="t sn" x="582" y="204">幻紫 Violet</text>
+  <text class="m sh" x="582" y="220">#A78BFA</text>
+  <rect x="40" y="228" width="140" height="56" rx="10" fill="#f472b6"/>
+  <text class="t sn" x="42" y="304">品红 Magenta</text>
+  <text class="m sh" x="42" y="320">#F472B6</text>
+  <rect x="220" y="228" width="140" height="56" rx="10" fill="#fbbf24"/>
+  <text class="t sn" x="222" y="304">琥珀 Amber</text>
+  <text class="m sh" x="222" y="320">#FBBF24</text>
+  <rect x="400" y="228" width="140" height="56" rx="10" fill="#f87171"/>
+  <text class="t sn" x="402" y="304">语义红 Error</text>
+  <text class="m sh" x="402" y="320">#F87171</text>
+  <rect x="580" y="228" width="140" height="56" rx="10" fill="#4ade80"/>
+  <text class="t sn" x="582" y="304">语义绿 Success</text>
+  <text class="m sh" x="582" y="320">#4ADE80</text>
+
+  <text class="t sec" x="800" y="108">60 / 30 / 10 配比</text>
+  <rect x="800" y="128" width="360" height="40" rx="8" fill="none" stroke="#334155" stroke-width="1.5"/>
+  <rect x="802" y="130" width="212" height="36" fill="#1e293b"/>
+  <rect x="1016" y="130" width="106" height="36" fill="#334155"/>
+  <rect x="1124" y="130" width="34" height="36" fill="#22d3ee"/>
+  <text class="t lb" x="802" y="192">60% 中性底</text>
+  <text class="t lb" x="1018" y="192">30% 结构</text>
+  <text class="t lb" x="1160" y="192" text-anchor="end" fill="#22d3ee">10% 霓虹</text>
+  <circle cx="806" cy="220" r="3" fill="#22d3ee"/>
+  <text class="t nt" x="818" y="224">霓虹只落当格主角</text>
+  <circle cx="806" cy="242" r="3" fill="#22d3ee"/>
+  <text class="t nt" x="818" y="246">重要 = 更亮，唯一权重语言</text>
+  <circle cx="806" cy="264" r="3" fill="#22d3ee"/>
+  <text class="t nt" x="818" y="268">同屏高亮霓虹 ≤3 色相</text>
+  <text class="t nt" x="800" y="300" fill="#94a3b8">篇章主色：</text>
+  <rect x="800" y="314" width="84" height="26" rx="13" fill="#22d3ee"/>
+  <text class="t" x="842" y="331" text-anchor="middle" font-size="12" font-weight="bold" fill="#0b1220">CSS 篇</text>
+  <text class="m sh" x="896" y="331" fill="#94a3b8">主 #22D3EE · 辅 #A78BFA</text>
+  <rect x="800" y="348" width="84" height="26" rx="13" fill="#fbbf24"/>
+  <text class="t" x="842" y="365" text-anchor="middle" font-size="12" font-weight="bold" fill="#0b1220">HTML 篇</text>
+  <text class="m sh" x="896" y="365" fill="#94a3b8">主 #FBBF24 · 辅 #FB923C</text>
+
+  <!-- ===== 02 构图三法则 ===== -->
+  <text class="t sec2" x="40" y="396">02 · 构图三法则</text>
+
+  <rect x="40" y="412" width="356" height="204" rx="12" fill="#131c2e" stroke="#334155" stroke-width="3"/>
+  <text class="t ct" x="56" y="440">法则一 · 一格一焦点</text>
+  <rect x="64" y="470" width="90" height="64" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <rect x="76" y="486" width="66" height="8" rx="3" fill="#334155"/>
+  <rect x="76" y="502" width="50" height="8" rx="3" fill="#334155"/>
+  <rect x="170" y="470" width="90" height="64" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <rect x="182" y="486" width="66" height="8" rx="3" fill="#334155"/>
+  <rect x="182" y="502" width="44" height="8" rx="3" fill="#334155"/>
+  <rect x="296" y="462" width="100" height="84" rx="12" fill="none" stroke="#22d3ee" stroke-width="1.5" opacity="0.35"/>
+  <rect x="304" y="470" width="84" height="68" rx="10" fill="#1e293b" stroke="#22d3ee" stroke-width="3"/>
+  <rect x="316" y="488" width="60" height="12" rx="4" fill="#22d3ee" opacity="0.9"/>
+  <rect x="316" y="510" width="56" height="8" rx="3" fill="#334155"/>
+  <rect x="316" y="524" width="44" height="8" rx="3" fill="#334155"/>
+  <path d="M 396 452 l 3 8 8 3 -8 3 -3 8 -3 -8 -8 -3 8 -3 Z" fill="#fbbf24"/>
+  <text class="t ft" x="56" y="600" fill="#94a3b8">双描边光晕锁定唯一焦点，其余元素降暗</text>
+
+  <rect x="420" y="412" width="356" height="204" rx="12" fill="#131c2e" stroke="#334155" stroke-width="3"/>
+  <text class="t ct" x="436" y="440">法则二 · 1→2→3 视线动线</text>
+  <circle cx="460" cy="480" r="13" fill="#22d3ee"/>
+  <text class="m" x="460" y="485" text-anchor="middle" font-size="14" font-weight="bold" fill="#0b1220">1</text>
+  <circle cx="590" cy="520" r="13" fill="#a78bfa"/>
+  <text class="m" x="590" y="525" text-anchor="middle" font-size="14" font-weight="bold" fill="#0b1220">2</text>
+  <circle cx="724" cy="560" r="13" fill="#fbbf24"/>
+  <text class="m" x="724" y="565" text-anchor="middle" font-size="14" font-weight="bold" fill="#0b1220">3</text>
+  <line x1="478" y1="488" x2="568" y2="512" stroke="#22d3ee" stroke-width="2.5" stroke-linecap="round"/>
+  <polygon points="576,515 561,514 567,503" fill="#22d3ee"/>
+  <line x1="608" y1="528" x2="704" y2="552" stroke="#f472b6" stroke-width="2.5" stroke-linecap="round"/>
+  <polygon points="712,555 697,554 703,543" fill="#f472b6"/>
+  <text class="t ft" x="436" y="600" fill="#94a3b8">编号圆片 + 箭头引导 Z 字动线，终点用琥珀</text>
+
+  <rect x="800" y="412" width="356" height="204" rx="12" fill="#131c2e" stroke="#334155" stroke-width="3"/>
+  <text class="t ct" x="816" y="440">法则三 · 明暗节奏</text>
+  <rect x="824" y="456" width="308" height="104" rx="8" fill="#0b1220" stroke="#1e293b" stroke-width="2"/>
+  <rect x="840" y="472" width="44" height="24" rx="4" fill="#22d3ee" opacity="0.9"/>
+  <circle cx="920" cy="484" r="5" fill="#a78bfa"/>
+  <path d="M 980 464 l 2.5 7 7 2.5 -7 2.5 -2.5 7 -2.5 -7 -7 -2.5 7 -2.5 Z" fill="#fbbf24"/>
+  <rect x="840" y="510" width="240" height="8" rx="3" fill="#334155" opacity="0.6"/>
+  <text class="t ft" x="840" y="545">深底 ≥60% · 霓虹 ≤10%</text>
+  <rect x="824" y="576" width="308" height="24" rx="6" fill="#fbbf24"/>
+  <text class="t" x="838" y="592" font-size="11" font-weight="bold" fill="#451a03">知识条 · 全系列琥珀恒定锚点</text>
+
+  <text class="t ft" x="40" y="650">霓虹墨 Neon Ink · 配色与构图定妆 — 规范全文见 comics/style-guide.md §2 / §5 / §6</text>
+</svg>

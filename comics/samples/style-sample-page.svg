@@ -1,0 +1,218 @@
+<!-- 风格样板页 EP.00 ·「霓虹墨 Neon Ink」— 三格定式与组件巡礼，规范见 ../style-guide.md -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 840">
+  <defs>
+    <style>
+      .t{font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;}
+      .m{font-family:'SFMono-Regular',Menlo,Consolas,monospace;}
+      .st{font-size:15px;fill:#94a3b8;}
+      .bt{font-size:30px;font-weight:bold;fill:#f8fafc;}
+      .pt{font-size:19px;font-weight:bold;fill:#f8fafc;}
+      .an{font-size:12.5px;fill:#94a3b8;}
+      .cd{font-size:11.5px;fill:#cbd5e1;}
+      .kt{font-size:20px;font-weight:bold;fill:#451a03;}
+      .kb{font-size:15px;fill:#451a03;}
+      .ft{font-size:12.5px;fill:#64748b;}
+    </style>
+    <pattern id="ht" width="14" height="14" patternUnits="userSpaceOnUse">
+      <circle cx="3" cy="3" r="1.8" fill="#f8fafc" opacity="0.05"/>
+    </pattern>
+
+    <!-- ===== 角色：像素酱 Pixel（脚底为原点，v2 定稿） ===== -->
+    <g id="pixelv2">
+      <ellipse cx="0" cy="0" rx="46" ry="9" fill="#020617" opacity="0.5"/>
+      <rect x="-24" y="-8" width="18" height="9" rx="4" fill="#f8fafc" stroke="#0b1220" stroke-width="2.5"/>
+      <rect x="6" y="-8" width="18" height="9" rx="4" fill="#f8fafc" stroke="#0b1220" stroke-width="2.5"/>
+      <rect x="-18" y="-30" width="11" height="24" fill="#f8d8bf" stroke="#0b1220" stroke-width="2"/>
+      <rect x="7" y="-30" width="11" height="24" fill="#f8d8bf" stroke="#0b1220" stroke-width="2"/>
+      <path d="M 30 -128 Q 58 -120 54 -92 Q 51 -74 38 -70 Q 48 -86 42 -100 Q 38 -114 26 -120 Z" fill="#22d3ee" stroke="#0b1220" stroke-width="3"/>
+      <circle cx="29" cy="-124" r="5" fill="#fbbf24" stroke="#0b1220" stroke-width="2"/>
+      <path d="M -32 -84 L 32 -84 L 26 -26 L -26 -26 Z" fill="#f472b6" stroke="#0b1220" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M -26 -34 L 26 -34" stroke="#db2777" stroke-width="2"/>
+      <path d="M -6 -80 L -9 -64" stroke="#f8fafc" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M 6 -80 L 9 -64" stroke="#f8fafc" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="-9" cy="-62" r="2" fill="#f8fafc"/>
+      <circle cx="9" cy="-62" r="2" fill="#f8fafc"/>
+      <rect x="-14" y="-60" width="28" height="14" rx="4" fill="#22d3ee" stroke="#0b1220" stroke-width="2"/>
+      <text class="m" x="0" y="-50" text-anchor="middle" font-size="9" font-weight="bold" fill="#0b1220">CSS</text>
+      <rect x="-46" y="-72" width="14" height="36" rx="7" fill="#f472b6" stroke="#0b1220" stroke-width="2.5"/>
+      <rect x="30" y="-106" width="14" height="34" rx="7" fill="#f472b6" stroke="#0b1220" stroke-width="2.5" transform="rotate(-55 37 -89)"/>
+      <circle cx="0" cy="-106" r="31" fill="#ffdfc8" stroke="#0b1220" stroke-width="3"/>
+      <path d="M -33 -104 Q -35 -142 0 -142 Q 35 -142 33 -104 L 33 -96 Q 17 -110 0 -110 Q -17 -110 -33 -96 Z" fill="#22d3ee" stroke="#0b1220" stroke-width="3"/>
+      <path d="M -33 -114 L -39 -76 Q -33 -68 -26 -78 Z" fill="#22d3ee" stroke="#0b1220" stroke-width="2"/>
+      <path d="M 33 -114 L 39 -76 Q 33 -68 26 -78 Z" fill="#22d3ee" stroke="#0b1220" stroke-width="2"/>
+      <path d="M 8 -140 Q 20 -124 17 -108 L 24 -111 Q 27 -128 19 -138 Z" fill="#a78bfa" stroke="#0b1220" stroke-width="2"/>
+      <path d="M -19 -130 Q -25 -123 -19 -116" stroke="#fbbf24" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <ellipse cx="-12" cy="-108" rx="4.5" ry="6" fill="#0b1220"/>
+      <ellipse cx="12" cy="-108" rx="4.5" ry="6" fill="#0b1220"/>
+      <circle cx="-13.5" cy="-110.5" r="1.8" fill="#ffffff"/>
+      <circle cx="10.5" cy="-110.5" r="1.8" fill="#ffffff"/>
+      <path d="M -18 -118 Q -12 -121 -6 -119" stroke="#0b1220" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <path d="M 18 -118 Q 12 -121 6 -119" stroke="#0b1220" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <circle cx="-20" cy="-100" r="4" fill="#fb7185" opacity="0.55"/>
+      <circle cx="20" cy="-100" r="4" fill="#fb7185" opacity="0.55"/>
+      <path d="M -9 -94 Q 0 -83 9 -94" stroke="#0b1220" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </g>
+
+    <!-- ===== 角色：标签君 Taggy（脚底为原点，v2 定稿） ===== -->
+    <g id="taggyv2">
+      <ellipse cx="0" cy="0" rx="42" ry="8" fill="#020617" opacity="0.5"/>
+      <rect x="-26" y="-8" width="20" height="10" rx="5" fill="#f8fafc" stroke="#0b1220" stroke-width="2.5"/>
+      <rect x="6" y="-8" width="20" height="10" rx="5" fill="#f8fafc" stroke="#0b1220" stroke-width="2.5"/>
+      <rect x="-21" y="-24" width="13" height="18" fill="#c2410c" stroke="#0b1220" stroke-width="2"/>
+      <rect x="8" y="-24" width="13" height="18" fill="#c2410c" stroke="#0b1220" stroke-width="2"/>
+      <rect x="-34" y="-78" width="68" height="60" rx="14" fill="#fb923c" stroke="#0b1220" stroke-width="3"/>
+      <polygon points="-13,-70 13,-70 10,-48 0,-44 -10,-48" fill="#0b1220" stroke="#0b1220" stroke-width="2"/>
+      <text class="m" x="0" y="-52" text-anchor="middle" font-size="11" font-weight="bold" fill="#fbbf24">5</text>
+      <rect x="-34" y="-26" width="68" height="8" fill="#c2410c" stroke="#0b1220" stroke-width="2"/>
+      <rect x="-6" y="-27" width="12" height="10" rx="2" fill="#fbbf24" stroke="#0b1220" stroke-width="2"/>
+      <rect x="-48" y="-68" width="14" height="34" rx="7" fill="#fb923c" stroke="#0b1220" stroke-width="2.5"/>
+      <circle cx="-41" cy="-66" r="5" fill="#fdba74" stroke="#0b1220" stroke-width="2"/>
+      <rect x="32" y="-71" width="34" height="13" rx="6.5" fill="#fb923c" stroke="#0b1220" stroke-width="2.5" transform="rotate(-20 32 -65)"/>
+      <circle cx="38" cy="-64" r="5" fill="#fdba74" stroke="#0b1220" stroke-width="2"/>
+      <rect x="-30" y="-128" width="60" height="46" rx="13" fill="#fdba74" stroke="#0b1220" stroke-width="3"/>
+      <rect x="-36" y="-112" width="8" height="18" rx="3" fill="#fb923c" stroke="#0b1220" stroke-width="2"/>
+      <rect x="28" y="-112" width="8" height="18" rx="3" fill="#fb923c" stroke="#0b1220" stroke-width="2"/>
+      <rect x="-23" y="-118" width="46" height="22" rx="8" fill="#0b1220"/>
+      <text class="m" x="-10" y="-102" text-anchor="middle" font-size="16" font-weight="bold" fill="#22d3ee">&lt;</text>
+      <text class="m" x="10" y="-102" text-anchor="middle" font-size="16" font-weight="bold" fill="#22d3ee">&gt;</text>
+      <circle cx="-6" cy="-90" r="1.5" fill="#0b1220"/>
+      <circle cx="0" cy="-90" r="1.5" fill="#0b1220"/>
+      <circle cx="6" cy="-90" r="1.5" fill="#0b1220"/>
+      <line x1="0" y1="-128" x2="0" y2="-142" stroke="#0b1220" stroke-width="3"/>
+      <circle cx="0" cy="-147" r="9" fill="none" stroke="#fbbf24" stroke-width="1.5" opacity="0.4"/>
+      <circle cx="0" cy="-147" r="5.5" fill="#fbbf24" stroke="#0b1220" stroke-width="2"/>
+    </g>
+
+    <!-- ===== 角色：码叔 Prof. Moo（脚底为原点，v2 定稿） ===== -->
+    <g id="moov2">
+      <ellipse cx="0" cy="68" rx="48" ry="7" fill="#020617" opacity="0.5"/>
+      <line x1="-9" y1="60" x2="-9" y2="66" stroke="#78350f" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="9" y1="60" x2="9" y2="66" stroke="#78350f" stroke-width="3.5" stroke-linecap="round"/>
+      <ellipse cx="0" cy="12" rx="30" ry="22" fill="#b45309" stroke="#78350f" stroke-width="3"/>
+      <ellipse cx="0" cy="16" rx="17" ry="13" fill="#fde68a"/>
+      <path d="M -30 18 L 30 18 L 38 52 Q 0 60 -38 52 Z" fill="#1e293b" stroke="#0b1220" stroke-width="2.5"/>
+      <line x1="0" y1="22" x2="0" y2="54" stroke="#334155" stroke-width="2"/>
+      <path d="M -30 2 Q -46 12 -37 28 Q -30 20 -28 6 Z" fill="#92400e" stroke="#78350f" stroke-width="2.5"/>
+      <path d="M 30 -4 Q 44 -14 40 -28 Q 30 -22 26 -8 Z" fill="#92400e" stroke="#78350f" stroke-width="2.5"/>
+      <line x1="40" y1="-28" x2="56" y2="-56" stroke="#b45309" stroke-width="3.5" stroke-linecap="round"/>
+      <circle cx="56" cy="-56" r="3.5" fill="#fbbf24" stroke="#78350f" stroke-width="1.5"/>
+      <polygon points="-9,10 0,6 0,14" fill="#f472b6" stroke="#0b1220" stroke-width="1.5"/>
+      <polygon points="9,10 0,6 0,14" fill="#f472b6" stroke="#0b1220" stroke-width="1.5"/>
+      <circle cx="0" cy="10" r="2.5" fill="#db2777"/>
+      <circle cx="0" cy="-26" r="33" fill="#f59e0b" stroke="#78350f" stroke-width="3"/>
+      <polygon points="-27,-50 0,-62 27,-50 0,-42" fill="#1e293b" stroke="#0b1220" stroke-width="2"/>
+      <circle cx="0" cy="-62" r="2.5" fill="#fbbf24"/>
+      <path d="M 27 -50 L 33 -34" stroke="#fbbf24" stroke-width="2"/>
+      <circle cx="33" cy="-31" r="3" fill="#fbbf24"/>
+      <circle cx="-12" cy="-30" r="12.5" fill="#fffbeb" stroke="#78350f" stroke-width="2"/>
+      <circle cx="12" cy="-30" r="12.5" fill="#fffbeb" stroke="#78350f" stroke-width="2"/>
+      <line x1="-1" y1="-30" x2="1" y2="-30" stroke="#78350f" stroke-width="2"/>
+      <line x1="-24.5" y1="-30" x2="-30" y2="-32" stroke="#78350f" stroke-width="2"/>
+      <line x1="24.5" y1="-30" x2="30" y2="-32" stroke="#78350f" stroke-width="2"/>
+      <circle cx="-12" cy="-30" r="4.5" fill="#0b1220"/>
+      <circle cx="12" cy="-30" r="4.5" fill="#0b1220"/>
+      <circle cx="-13.5" cy="-32" r="1.5" fill="#ffffff"/>
+      <circle cx="10.5" cy="-32" r="1.5" fill="#ffffff"/>
+      <polygon points="0,-14 -6,-22 6,-22" fill="#f97316" stroke="#78350f" stroke-width="2"/>
+    </g>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="840" fill="#0b1220"/>
+
+  <!-- ===== 顶部横幅 ===== -->
+  <rect x="40" y="6" width="120" height="6" rx="3" fill="#22d3ee"/>
+  <rect x="40" y="16" width="120" height="6" rx="3" fill="#f472b6"/>
+  <text class="t st" x="40" y="40">前端漫画实验室 · CSS3 × HTML5 漫画剧场</text>
+  <text class="t bt" x="40" y="80">样板页 · 三格定式与组件巡礼</text>
+  <rect x="1020" y="26" width="140" height="44" rx="22" fill="#22d3ee"/>
+  <text class="m" x="1090" y="54" text-anchor="middle" font-size="19" font-weight="bold" fill="#0b1220">EP.00</text>
+  <line x1="0" y1="96" x2="1200" y2="96" stroke="#1e293b" stroke-width="2"/>
+
+  <!-- ===== 格1 · 痛点现场 ===== -->
+  <rect x="40" y="120" width="556" height="250" rx="16" fill="#131c2e" stroke="#334155" stroke-width="3"/>
+  <rect x="40" y="120" width="556" height="250" rx="16" fill="url(#ht)"/>
+  <circle cx="66" cy="146" r="14" fill="#22d3ee"/>
+  <text class="m" x="66" y="151" text-anchor="middle" font-size="15" font-weight="bold" fill="#0b1220">1</text>
+  <text class="t pt" x="92" y="152">痛点现场</text>
+  <circle cx="560" cy="146" r="12" fill="#f87171"/>
+  <text class="t" x="560" y="151" text-anchor="middle" font-size="15" font-weight="bold" fill="#0b1220">?</text>
+  <rect x="64" y="176" width="250" height="140" rx="10" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <circle cx="82" cy="192" r="4" fill="#f87171"/>
+  <circle cx="98" cy="192" r="4" fill="#fbbf24"/>
+  <circle cx="114" cy="192" r="4" fill="#4ade80"/>
+  <text class="m cd" x="78" y="216">.card {</text>
+  <text class="m cd" x="90" y="234">width: 100px;</text>
+  <text class="m" x="90" y="252"><tspan fill="#f87171">colr</tspan><tspan fill="#64748b">: blue;</tspan></text>
+  <path d="M 90 256 q 4 3 8 0 t 8 0 t 8 0 t 8 0" stroke="#f87171" stroke-width="1.5" fill="none"/>
+  <text class="m cd" x="78" y="270">}</text>
+  <text class="t an" x="64" y="344">错一个字母，整条样式静默失效</text>
+  <use href="#pixelv2" transform="translate(430,352) scale(0.62)"/>
+  <path d="M 452 252 q 6 9 0 14 q -6 -5 0 -14" fill="#7dd3fc" stroke="#0b1220" stroke-width="1"/>
+  <text class="t" x="468" y="272" font-size="20" font-weight="bold" fill="#f87171">?</text>
+
+  <!-- ===== 格2 · 机制登场 ===== -->
+  <rect x="616" y="120" width="544" height="250" rx="16" fill="#131c2e" stroke="#334155" stroke-width="3"/>
+  <rect x="616" y="120" width="544" height="250" rx="16" fill="url(#ht)"/>
+  <circle cx="642" cy="146" r="14" fill="#a78bfa"/>
+  <text class="m" x="642" y="151" text-anchor="middle" font-size="15" font-weight="bold" fill="#0b1220">2</text>
+  <text class="t pt" x="668" y="152">机制登场 · 标签先搭台</text>
+  <rect x="648" y="180" width="220" height="34" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+  <text class="m" x="664" y="202" font-size="13" fill="#a78bfa">&lt;section class="card"&gt;</text>
+  <rect x="672" y="226" width="172" height="34" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+  <text class="m" x="688" y="248" font-size="13" fill="#a78bfa">&lt;h2&gt;标题&lt;/h2&gt;</text>
+  <rect x="696" y="272" width="148" height="34" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+  <text class="m" x="712" y="294" font-size="13" fill="#a78bfa">&lt;/section&gt;</text>
+  <line x1="880" y1="247" x2="1000" y2="247" stroke="#22d3ee" stroke-width="3" stroke-linecap="round"/>
+  <polygon points="1008,247 993,240 993,254" fill="#22d3ee"/>
+  <rect x="1016" y="192" width="120" height="112" rx="10" fill="#1e293b" stroke="#22d3ee" stroke-width="2.5"/>
+  <rect x="1028" y="206" width="96" height="16" rx="4" fill="#22d3ee" opacity="0.85"/>
+  <rect x="1028" y="232" width="96" height="8" rx="3" fill="#334155"/>
+  <rect x="1028" y="248" width="72" height="8" rx="3" fill="#334155"/>
+  <rect x="1028" y="264" width="84" height="8" rx="3" fill="#334155"/>
+  <text class="t an" x="648" y="344">先有结构，再有样式</text>
+  <use href="#taggyv2" transform="translate(950,352) scale(0.5)"/>
+
+  <!-- ===== 格3 · 落地收束 ===== -->
+  <rect x="40" y="390" width="1120" height="230" rx="16" fill="#131c2e" stroke="#334155" stroke-width="3"/>
+  <rect x="40" y="390" width="1120" height="230" rx="16" fill="url(#ht)"/>
+  <circle cx="66" cy="416" r="14" fill="#fbbf24"/>
+  <text class="m" x="66" y="421" text-anchor="middle" font-size="15" font-weight="bold" fill="#0b1220">3</text>
+  <text class="t pt" x="92" y="422">落地收束 · 样式齐了</text>
+  <rect x="64" y="444" width="240" height="140" rx="10" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <text class="t an" x="80" y="468" fill="#64748b">改前</text>
+  <rect x="80" y="482" width="200" height="10" rx="4" fill="#334155"/>
+  <rect x="80" y="502" width="160" height="10" rx="4" fill="#334155"/>
+  <rect x="80" y="522" width="180" height="10" rx="4" fill="#334155"/>
+  <rect x="80" y="542" width="120" height="10" rx="4" fill="#334155"/>
+  <line x1="322" y1="514" x2="412" y2="514" stroke="#22d3ee" stroke-width="3" stroke-linecap="round"/>
+  <polygon points="420,514 405,507 405,521" fill="#22d3ee"/>
+  <rect x="428" y="444" width="240" height="140" rx="10" fill="#1e293b" stroke="#22d3ee" stroke-width="2"/>
+  <text class="t an" x="444" y="468" fill="#22d3ee">改后</text>
+  <rect x="444" y="480" width="208" height="18" rx="4" fill="#22d3ee" opacity="0.85"/>
+  <rect x="444" y="506" width="98" height="10" rx="4" fill="#334155"/>
+  <rect x="444" y="524" width="80" height="10" rx="4" fill="#334155"/>
+  <rect x="444" y="542" width="90" height="10" rx="4" fill="#334155"/>
+  <rect x="554" y="506" width="98" height="10" rx="4" fill="#334155"/>
+  <rect x="554" y="524" width="88" height="10" rx="4" fill="#334155"/>
+  <rect x="554" y="542" width="70" height="10" rx="4" fill="#334155"/>
+  <use href="#pixelv2" transform="translate(800,606) scale(0.8)"/>
+  <path d="M 748 462 l 3 8 8 3 -8 3 -3 8 -3 -8 -8 -3 8 -3 Z" fill="#fbbf24"/>
+  <path d="M 868 444 l 2.5 7 7 2.5 -7 2.5 -2.5 7 -2.5 -7 -7 -2.5 7 -2.5 Z" fill="#fbbf24"/>
+  <text class="t" x="890" y="505" font-size="15" font-weight="bold" fill="#cbd5e1">样式齐了，页面活了</text>
+  <text class="t an" x="890" y="530">焦点只给最亮的一处</text>
+
+  <!-- ===== 知识条 ===== -->
+  <rect x="40" y="640" width="1120" height="152" rx="16" fill="#fbbf24" stroke="#78350f" stroke-width="3"/>
+  <use href="#moov2" transform="translate(150,744) scale(0.62)"/>
+  <text class="t kt" x="230" y="676">码叔划重点</text>
+  <circle cx="248" cy="703" r="4" fill="#b45309"/>
+  <text class="t kb" x="266" y="708">一格只讲一件事：痛点 → 机制 → 结果</text>
+  <circle cx="248" cy="731" r="4" fill="#b45309"/>
+  <text class="t kb" x="266" y="736">霓虹只给当格主角，重要 = 更亮</text>
+  <circle cx="248" cy="759" r="4" fill="#b45309"/>
+  <text class="t kb" x="266" y="764">术语与正文 docs 严格一致，编号定动线</text>
+  <rect x="1000" y="700" width="140" height="32" rx="16" fill="none" stroke="#b45309" stroke-width="1.5"/>
+  <text class="t" x="1070" y="721" text-anchor="middle" font-size="13" font-weight="bold" fill="#b45309">EP.00 · 样板</text>
+
+  <text class="t ft" x="40" y="822">霓虹墨 Neon Ink · 样板页 — 分区坐标与组件规格见 comics/style-guide.md §1 / §5</text>
+</svg>
