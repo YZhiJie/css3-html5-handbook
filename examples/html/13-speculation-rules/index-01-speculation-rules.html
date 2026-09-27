@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Speculation Rules 推测规则 · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 800px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+  .btn {
+    padding: 8px 16px; border-radius: 8px; border: 2px solid #22d3ee;
+    background: #0f172a; color: #22d3ee; font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-right: 8px; margin-bottom: 8px;
+  }
+  .btn.pink { border-color: #f472b6; color: #f472b6; }
+  .btn.amber { border-color: #fbbf24; color: #fbbf24; }
+
+  /* ===== 支持度检测横幅 ===== */
+  .support-banner {
+    max-width: 800px; margin: 0 auto 24px; padding: 12px 16px;
+    border-radius: 10px; font-size: 14px;
+    background: #14532d; border: 2px solid #22c55e; color: #bbf7d0;
+  }
+  @supports not (speculation-rules: prerender) {
+    .support-banner {
+      background: #450a0a; border-color: #ef4444; color: #fecaca;
+    }
+    .support-banner .ok { display: none; }
+  }
+  @supports (speculation-rules: prerender) {
+    .support-banner .no { display: none; }
+  }
+
+  .status-panel {
+    background: #0f172a; border-radius: 10px; padding: 16px;
+    font-family: 'SFMono-Regular', Menlo, monospace; font-size: 13px;
+    color: #94a3b8; line-height: 1.8;
+  }
+  .status-panel .key { color: #22d3ee; }
+  .status-panel .val { color: #fbbf24; }
+  .status-panel .good { color: #4ade80; }
+  .status-panel .bad { color: #f87171; }
+
+  .link-list {
+    display: flex; flex-direction: column; gap: 10px; margin-top: 12px;
+  }
+  .link-list a {
+    padding: 12px 16px; border-radius: 10px; border: 2px solid #334155;
+    background: #1e293b; color: #e2e8f0; text-decoration: none;
+    font-weight: 600; transition: border-color .2s;
+  }
+  .link-list a:hover { border-color: #22d3ee; color: #22d3ee; }
+
+  .eagerness-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  }
+  .eagerness-card {
+    padding: 16px; border-radius: 10px; border: 2px solid #334155;
+    background: #1e293b; text-align: center;
+  }
+  .eagerness-card.active { border-color: #22d3ee; background: #164e63; }
+  .eagerness-card b { display: block; margin-bottom: 6px; font-size: 15px; }
+  .eagerness-card small { color: #94a3b8; font-size: 12px; }
+</style>
+
+<!-- ===== Speculation Rules 配置 ===== -->
+<!-- 注意：file:// 双击打开时 prerender 不生效，需 http://localhost 访问 -->
+<script type="speculationrules">
+{
+  "prerender": [
+    {
+      "source": "list",
+      "urls": ["./page-a.html", "./page-b.html"]
+    },
+    {
+      "source": "document",
+      "where": {
+        "and": [
+          { "href_matches": "./*" },
+          { "not": { "selector_matches": "[data-no-speculate]" } }
+        ]
+      },
+      "eagerness": "moderate"
+    }
+  ],
+  "prefetch": [
+    {
+      "source": "list",
+      "urls": ["./api-health.json"]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<h1>Speculation Rules 推测规则</h1>
+<p class="sub">prerender 预渲染 · prefetch 预获取 · document_rule 自动探测 · eagerness 三档</p>
+
+<div class="support-banner">
+  <span class="ok">✅ 当前浏览器支持 Speculation Rules API</span>
+  <span class="no">⚠️ 当前浏览器不支持 Speculation Rules，或当前为 file:// 协议（需 localhost）</span>
+</div>
+
+<!-- 示例1：运行环境检测 -->
+<section>
+  <h2>示例 1 · 运行环境与预渲染状态检测</h2>
+  <div class="demo-box">
+    <div class="status-panel" id="statusPanel">
+      <div><span class="key">协议</span>：<span class="val" id="proto">-</span></div>
+      <div><span class="key">prerender 支持</span>：<span id="prerenderSupport">-</span></div>
+      <div><span class="key">当前页面 activationStart</span>：<span class="val" id="activationStart">-</span></div>
+      <div><span class="key">是否由 prerender 激活</span>：<span id="wasPrerendered">-</span></div>
+    </div>
+    <p class="note">
+      <code>performance.getEntriesByType('navigation')[0].activationStart</code> 大于 0 表示当前页面由预渲染激活。
+    </p>
+  </div>
+</section>
+
+<!-- 示例2：list rule 显式预渲染 -->
+<section>
+  <h2>示例 2 · list rule 显式 URL 预渲染</h2>
+  <div class="demo-box">
+    <p>页面加载时，浏览器已在后台预渲染以下两个页面：</p>
+    <div class="link-list">
+      <a href="./page-a.html">→ page-a.html（已列入 prerender 清单）</a>
+      <a href="./page-b.html">→ page-b.html（已列入 prerender 清单）</a>
+    </div>
+    <p class="note">
+      若通过 localhost 访问且浏览器支持，点击上述链接应实现「瞬时导航」（LCP ≈ 0ms）。
+      file:// 协议下 speculationrules 会被静默忽略。
+    </p>
+  </div>
+</section>
+
+<!-- 示例3：document_rule 自动探测 -->
+<section>
+  <h2>示例 3 · document_rule 自动探测可视区链接</h2>
+  <div class="demo-box">
+    <p>以下链接进入可视区时会被自动预渲染（eagerness: moderate）：</p>
+    <div class="link-list">
+      <a href="./auto-1.html">→ auto-1.html（自动探测）</a>
+      <a href="./auto-2.html">→ auto-2.html（自动探测）</a>
+      <a href="./auto-3.html" data-no-speculate>→ auto-3.html（已被排除）</a>
+    </div>
+    <p class="note">
+      <code>data-no-speculate</code> 属性通过 <code>selector_matches</code> 排除，
+      该链接不会被预渲染。
+    </p>
+  </div>
+</section>
+
+<!-- 示例4：eagerness 三档对比 -->
+<section>
+  <h2>示例 4 · eagerness 三档策略对比</h2>
+  <div class="demo-box">
+    <div class="eagerness-grid">
+      <div class="eagerness-card" id="cardConservative">
+        <b style="color:#4ade80;">conservative</b>
+        <small>hover / pointerdown 时触发</small>
+      </div>
+      <div class="eagerness-card active" id="cardModerate">
+        <b style="color:#22d3ee;">moderate</b>
+        <small>链接进入可视区时触发</small>
+      </div>
+      <div class="eagerness-card" id="cardEager">
+        <b style="color:#f472b6;">eager</b>
+        <small>页面加载完立即触发</small>
+      </div>
+    </div>
+    <p class="note" style="margin-top:12px;">
+      当前页面使用 <code>moderate</code> 策略。<br>
+      <code>conservative</code> 适合移动端（hover 退化为 touchstart）；<br>
+      <code>eager</code> 资源消耗最大，仅适合极小站点或极重要下一页。
+    </p>
+  </div>
+</section>
+
+<!-- 示例5：与 View Transitions 配合 -->
+<section>
+  <h2>示例 5 · 与 View Transitions 配合实现「瞬时导航 + 动画」</h2>
+  <div class="demo-box">
+    <p>最佳实践组合：</p>
+    <ol style="margin-left:20px;margin-top:8px;color:#94a3b8;font-size:14px;">
+      <li>列表页用 Speculation Rules 预渲染详情页</li>
+      <li>详情页 CSS 声明 <code>@view-transition { navigation: auto; }</code></li>
+      <li>列表与详情页共享元素使用相同 <code>view-transition-name</code></li>
+      <li>用户点击 → 页面已渲染完毕（瞬时）→ View Transitions 执行共享元素补间动画</li>
+    </ol>
+    <p class="note">
+      结果：纯 MPA 架构获得超越多数 SPA 的导航体验，无需前端路由框架。
+    </p>
+  </div>
+</section>
+
+<script>
+// 环境检测
+document.getElementById('proto').textContent = location.protocol;
+
+const hasPrerender = 'prerendering' in document || 
+  (performance.getEntriesByType('navigation')[0] && 
+   'activationStart' in performance.getEntriesByType('navigation')[0]);
+document.getElementById('prerenderSupport').innerHTML = hasPrerender
+  ? '<span class="good">✅ 支持</span>'
+  : '<span class="bad">❌ 不支持（或 file:// 协议）</span>';
+
+const navEntry = performance.getEntriesByType('navigation')[0];
+const activationStart = navEntry ? navEntry.activationStart : 0;
+document.getElementById('activationStart').textContent = activationStart + 'ms';
+document.getElementById('wasPrerendered').innerHTML = activationStart > 0
+  ? '<span class="good">✅ 是（页面由预渲染激活）</span>'
+  : '<span class="bad">❌ 否（普通导航或首次加载）</span>';
+
+// eagerness 卡片交互
+document.querySelectorAll('.eagerness-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.eagerness-card').forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+  });
+});
+</script>
+
+</body>
+</html>

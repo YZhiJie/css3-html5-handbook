@@ -39,6 +39,8 @@
     { "ep": "EP.33", "comic": "css/EP.33-starting-style", "doc": "docs/css/22-starting-style.md", "example": "examples/css/22-starting-style", "title": "@starting-style" },
     { "ep": "EP.34", "comic": "html/EP.34-observers", "doc": "docs/html/11-observers.md", "example": "examples/html/11-observers", "title": "Observer 三件套" },
     { "ep": "EP.35", "comic": "css/EP.35-scroll-snap", "doc": "docs/css/23-scroll-snap.md", "example": "examples/css/23-scroll-snap", "title": "滚动吸附" },
-    { "ep": "EP.36", "comic": "html/EP.36-dialog", "doc": "docs/html/12-dialog.md", "example": "examples/html/12-dialog", "title": "dialog 元素" }
+    { "ep": "EP.36", "comic": "html/EP.36-dialog", "doc": "docs/html/12-dialog.md", "example": "examples/html/12-dialog", "title": "dialog 元素" },
+    { "ep": "EP.37", "comic": "css/EP.37-view-transitions-advanced", "doc": "docs/css/24-view-transitions-advanced.md", "example": "examples/css/24-view-transitions-advanced", "title": "View Transitions 进阶" },
+    { "ep": "EP.38", "comic": "html/EP.38-speculation-rules", "doc": "docs/html/13-speculation-rules.md", "example": "examples/html/13-speculation-rules", "title": "Speculation Rules" }
   ]
 }

@@ -16,18 +16,18 @@ css3-html5-handbook/
 ├── cheatsheet.md           # 高频语法速查表
 ├── design-system.md        # Spark 设计系统（Web 界面用：色彩/字体/组件/动效 token）
 ├── docs/                   # 深度文档（每主题一篇）
-│   ├── css/                # CSS3 十五大主题
-│   └── html/               # HTML5 十二大主题
+│   ├── css/                # CSS3 十六大主题
+│   └── html/               # HTML5 十三大主题
 ├── examples/               # 可运行示例（与文档一一对应）
 │   ├── css/
 │   └── html/
-└── comics/                 # 漫画剧场（「霓虹墨」风格，全 36 话）
+└── comics/                 # 漫画剧场（「霓虹墨」风格，全 38 话）
     ├── style-guide.md      # 漫画美术风格规范
     ├── manifest.json       # 话数清单（校验器依据）
     ├── check-comics.mjs    # SVG 良构 / MD 行数 / 链接一致性校验
     ├── samples/            # 三张风格定妆稿（SVG，不参与编号）
-    ├── css/                # CSS 篇 EP.01–11、EP.22–31、EP.33、EP.35（SVG + 讲解 MD）
-    └── html/               # HTML 篇 EP.12–21、EP.32、EP.34、EP.36（SVG + 讲解 MD）
+    ├── css/                # CSS 篇 EP.01–11、EP.22–31、EP.33、EP.35、EP.37（SVG + 讲解 MD）
+    └── html/               # HTML 篇 EP.12–21、EP.32、EP.34、EP.36、EP.38（SVG + 讲解 MD）
 ```
 
 ## 内容导航
@@ -59,6 +59,7 @@ css3-html5-handbook/
 | 21 | 锚点定位 | [docs/css/21-anchor-positioning.md](docs/css/21-anchor-positioning.md) | [examples/css/21-anchor-positioning/](examples/css/21-anchor-positioning/) |
 | 22 | @starting-style 入场动画 | [docs/css/22-starting-style.md](docs/css/22-starting-style.md) | [examples/css/22-starting-style/](examples/css/22-starting-style/) |
 | 23 | 滚动吸附 | [docs/css/23-scroll-snap.md](docs/css/23-scroll-snap.md) | [examples/css/23-scroll-snap/](examples/css/23-scroll-snap/) |
+| 24 | View Transitions 进阶 | [docs/css/24-view-transitions-advanced.md](docs/css/24-view-transitions-advanced.md) | [examples/css/24-view-transitions-advanced/](examples/css/24-view-transitions-advanced/) |
 
 ### HTML5 篇
 
@@ -76,6 +77,7 @@ css3-html5-handbook/
 | 10 | Popover | [docs/html/10-popover.md](docs/html/10-popover.md) | [examples/html/10-popover/](examples/html/10-popover/) |
 | 11 | Observer 三件套 | [docs/html/11-observers.md](docs/html/11-observers.md) | [examples/html/11-observers/](examples/html/11-observers/) |
 | 12 | dialog 元素 | [docs/html/12-dialog.md](docs/html/12-dialog.md) | [examples/html/12-dialog/](examples/html/12-dialog/) |
+| 13 | Speculation Rules | [docs/html/13-speculation-rules.md](docs/html/13-speculation-rules.md) | [examples/html/13-speculation-rules/](examples/html/13-speculation-rules/) |
 
 ## 漫画剧场 · 霓虹墨 Neon Ink
 
@@ -126,6 +128,8 @@ css3-html5-handbook/
 | EP.34 | Observer 三件套 | [SVG](comics/html/EP.34-observers.svg) | [讲解](comics/html/EP.34-observers.md) |
 | EP.35 | 滚动吸附 | [SVG](comics/css/EP.35-scroll-snap.svg) | [讲解](comics/css/EP.35-scroll-snap.md) |
 | EP.36 | dialog 元素 | [SVG](comics/html/EP.36-dialog.svg) | [讲解](comics/html/EP.36-dialog.md) |
+| EP.37 | View Transitions 进阶 | [SVG](comics/css/EP.37-view-transitions-advanced.svg) | [讲解](comics/css/EP.37-view-transitions-advanced.md) |
+| EP.38 | Speculation Rules | [SVG](comics/html/EP.38-speculation-rules.svg) | [讲解](comics/html/EP.38-speculation-rules.md) |
 
 ## 如何使用
 
@@ -135,6 +139,7 @@ css3-html5-handbook/
    - `06-web-workers`：已采用 Blob 内联 Worker，双击即可运行；多文件写法需 `http-server` 等静态服务。
    - `07-geolocation`：浏览器要求 `https` 或 `localhost`，示例提供 Mock 模式演示。
    - `09-multimedia`：本地音视频文件建议通过 `localhost` 访问以避免自动播放策略限制。
+   - `13-speculation-rules`：prerender/prefetch 需 `http://localhost` 或 `https`，file:// 双击不生效。
 
 ## 编写规范
 
@@ -146,6 +151,7 @@ css3-html5-handbook/
 
 | 版本 | 日期 | 说明 |
 | --- | --- | --- |
+| v1.11.0 | 2026-09-28 | CSS/HTML 篇扩展：新增 View Transitions 进阶（24）与 Speculation Rules（13）两章，配套漫画 EP.37–38，全 38 话 |
 | v1.10.0 | 2026-09-28 | CSS/HTML 篇扩展：新增滚动吸附（23）与 dialog 元素（12）两章，配套漫画 EP.35–36，全 36 话 |
 | v1.9.0 | 2026-09-28 | CSS/HTML 篇扩展：新增 @starting-style 入场动画（22）与 Observer 三件套（11）两章，配套漫画 EP.33–34，全 34 话 |
 | v1.8.0 | 2026-09-28 | CSS/HTML 篇扩展：新增锚点定位（21）与 Popover（10）两章，配套漫画 EP.31–32，全 32 话 |

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>View Transitions 进阶 · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 800px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+  .btn {
+    padding: 8px 16px; border-radius: 8px; border: 2px solid #22d3ee;
+    background: #0f172a; color: #22d3ee; font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-right: 8px; margin-bottom: 8px;
+  }
+  .btn.pink { border-color: #f472b6; color: #f472b6; }
+  .btn.amber { border-color: #fbbf24; color: #fbbf24; }
+
+  /* ===== 支持度检测横幅 ===== */
+  .support-banner {
+    max-width: 800px; margin: 0 auto 24px; padding: 12px 16px;
+    border-radius: 10px; font-size: 14px;
+    background: #14532d; border: 2px solid #22c55e; color: #bbf7d0;
+  }
+  @supports not (view-transition-name: root) {
+    .support-banner {
+      background: #450a0a; border-color: #ef4444; color: #fecaca;
+    }
+    .support-banner .ok { display: none; }
+  }
+  @supports (view-transition-name: root) {
+    .support-banner .no { display: none; }
+  }
+
+  /* ===== 示例1：view-transition-class 批量复用 ===== */
+  .card-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+  }
+  .vt-card {
+    aspect-ratio: 1; border-radius: 12px; border: 2px solid #22d3ee;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 700; cursor: pointer;
+    background: #1e293b; transition: transform .2s;
+  }
+  .vt-card:hover { transform: scale(1.05); border-color: #f472b6; }
+  .vt-card.selected {
+    grid-column: 1 / -1; aspect-ratio: 3/1;
+    background: #4c1d95; border-color: #a78bfa;
+  }
+
+  /* ===== 示例2：active-view-transition-type 类型化转场 ===== */
+  .type-demo {
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  }
+  .type-label { font-size: 13px; color: #94a3b8; width: 100%; }
+
+  /* ===== 示例3：MPA 跨页提示 ===== */
+  .mpa-hint {
+    padding: 16px; border-radius: 10px; border: 2px dashed #fbbf24;
+    background: #422006; color: #fbbf24; font-size: 14px;
+  }
+  .mpa-hint a { color: #22d3ee; }
+
+  /* ===== 示例4：滚动联动转场 ===== */
+  .scroll-zone {
+    height: 200px; overflow-y: auto; border-radius: 12px;
+    border: 2px solid #a78bfa; background: #0f172a; padding: 12px;
+    scroll-snap-type: y mandatory;
+  }
+  .scroll-item {
+    height: 80px; border-radius: 8px; margin-bottom: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; scroll-snap-align: start;
+    background: #1e293b; border: 2px solid #334155;
+  }
+  .scroll-item.active {
+    background: #164e63; border-color: #22d3ee;
+  }
+
+  /* ===== 动画定义 ===== */
+  ::view-transition-group(*.zoom) {
+    animation: zoom-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes zoom-pop {
+    0% { transform: scale(0.3); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  ::view-transition-group(*.slide) {
+    animation: slide-in 0.3s ease;
+  }
+  @keyframes slide-in {
+    from { transform: translateX(60px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  /* 类型化转场动画 */
+  @supports selector(:active-view-transition-type(expand)) {
+    :active-view-transition-type(expand) ::view-transition-group(root) {
+      animation: expand-in 0.4s ease;
+    }
+    @keyframes expand-in {
+      from { clip-path: circle(0% at 50% 50%); }
+      to { clip-path: circle(100% at 50% 50%); }
+    }
+  }
+  @supports selector(:active-view-transition-type(collapse)) {
+    :active-view-transition-type(collapse) ::view-transition-group(root) {
+      animation: collapse-out 0.3s ease;
+    }
+    @keyframes collapse-out {
+      from { clip-path: circle(100% at 50% 50%); }
+      to { clip-path: circle(0% at 50% 50%); }
+    }
+  }
+</style>
+</head>
+<body>
+
+<h1>View Transitions 进阶</h1>
+<p class="sub">view-transition-class · active-view-transition-type · MPA 跨页 · 滚动联动</p>
+
+<div class="support-banner">
+  <span class="ok">✅ 当前浏览器支持 View Transitions API</span>
+  <span class="no">⚠️ 当前浏览器不支持 View Transitions，示例将静默降级为普通 DOM 更新</span>
+</div>
+
+<!-- 示例1：view-transition-class 批量复用 -->
+<section>
+  <h2>示例 1 · view-transition-class 批量复用动画</h2>
+  <div class="demo-box">
+    <div class="card-grid" id="cardGrid">
+      <div class="vt-card" data-id="1">1</div>
+      <div class="vt-card" data-id="2">2</div>
+      <div class="vt-card" data-id="3">3</div>
+      <div class="vt-card" data-id="4">4</div>
+      <div class="vt-card" data-id="5">5</div>
+      <div class="vt-card" data-id="6">6</div>
+      <div class="vt-card" data-id="7">7</div>
+      <div class="vt-card" data-id="8">8</div>
+    </div>
+    <p class="note">
+      点击任意卡片展开为横幅。所有卡片共用 <code>view-transition-class: zoom</code>，
+      一条 CSS 规则 <code>::view-transition-group(*.zoom)</code> 批量命中。
+    </p>
+    <p class="note" style="color:#f87171;">
+      ⚠️ view-transition-name 仍需唯一；class 只解决「动画规则复用」。
+    </p>
+  </div>
+</section>
+
+<!-- 示例2：active-view-transition-type 类型化转场 -->
+<section>
+  <h2>示例 2 · active-view-transition-type 类型化转场</h2>
+  <div class="demo-box">
+    <div class="type-demo">
+      <button class="btn" id="btnExpand">展开（expand 类型）</button>
+      <button class="btn pink" id="btnCollapse">收起（collapse 类型）</button>
+      <button class="btn amber" id="btnNone">无类型（默认）</button>
+    </div>
+    <p class="note">
+      不同转场类型触发不同根动画：<code>expand</code> 为圆形扩散，<code>collapse</code> 为圆形收缩，无类型为默认淡入淡出。
+    </p>
+    <div id="typeTarget" style="margin-top:16px;padding:24px;border-radius:12px;background:#1e293b;border:2px solid #334155;text-align:center;font-weight:700;">
+      目标区域 — 点击上方按钮切换类型
+    </div>
+  </div>
+</section>
+
+<!-- 示例3：MPA 跨页转场提示 -->
+<section>
+  <h2>示例 3 · MPA 跨页转场（@view-transition { navigation: auto }）</h2>
+  <div class="demo-box">
+    <div class="mpa-hint">
+      <strong>⚠️ 本示例为单文件 HTML，无法直接演示跨页导航。</strong><br>
+      跨页 View Transitions 需要两个同站 HTML 页面，且各自在 CSS 中声明：<br>
+      <code>@view-transition { navigation: auto; }</code><br>
+      然后在 A 页点击 <code>&lt;a href="b.html"&gt;</code> 跳转，浏览器自动在两页之间拍快照并补间动画。<br>
+      建议：复制本文件为 <code>b.html</code>，修改标题后通过 localhost 访问体验。
+    </div>
+    <p class="note" style="margin-top:12px;">
+      关键限制：仅同站同源、非 download、非 target="_blank"、非 302 重定向的导航才会触发。
+    </p>
+  </div>
+</section>
+
+<!-- 示例4：滚动联动转场 -->
+<section>
+  <h2>示例 4 · 滚动吸附联动转场</h2>
+  <div class="demo-box">
+    <div class="scroll-zone" id="scrollZone">
+      <div class="scroll-item" data-idx="0">滚动区域 1</div>
+      <div class="scroll-item" data-idx="1">滚动区域 2</div>
+      <div class="scroll-item" data-idx="2">滚动区域 3</div>
+      <div class="scroll-item" data-idx="3">滚动区域 4</div>
+      <div class="scroll-item" data-idx="4">滚动区域 5</div>
+    </div>
+    <p class="note">
+      滚动到某区域后，浏览器通过 <code>scroll-snap-align</code> 停稳，
+      同时可配合 <code>startViewTransition</code> 高亮当前项。
+      下方按钮模拟「滚动停止后自动触发转场高亮」。
+    </p>
+    <button class="btn" id="btnScrollHighlight">模拟滚动停止 → 高亮当前项</button>
+  </div>
+</section>
+
+<script>
+// ===== 示例1：view-transition-class =====
+const grid = document.getElementById('cardGrid');
+grid.addEventListener('click', (e) => {
+  const card = e.target.closest('.vt-card');
+  if (!card) return;
+  // 移除其他卡片的 selected
+  document.querySelectorAll('.vt-card.selected').forEach(c => c.classList.remove('selected'));
+  // 给当前卡片加 selected，并触发动画
+  card.classList.add('selected');
+  // 如果有 VT 支持，用 startViewTransition 包裹 DOM 变化
+  if (document.startViewTransition) {
+    document.startViewTransition(() => {
+      // 实际状态已在上面更新，这里重新触发以确保快照正确
+    });
+  }
+});
+
+// ===== 示例2：active-view-transition-type =====
+const target = document.getElementById('typeTarget');
+function triggerType(type) {
+  if (!document.startViewTransition) {
+    target.textContent = `类型 ${type}（浏览器不支持 VT）`;
+    target.style.background = type === 'expand' ? '#164e63' : type === 'collapse' ? '#701a4b' : '#1e293b';
+    return;
+  }
+  document.startViewTransition({
+    type: type,
+    update: () => {
+      target.textContent = `类型 ${type} — ${type === 'expand' ? '圆形扩散入场' : type === 'collapse' ? '圆形收缩入场' : '默认淡入淡出'}`;
+      target.style.background = type === 'expand' ? '#164e63' : type === 'collapse' ? '#701a4b' : '#1e293b';
+    }
+  });
+}
+document.getElementById('btnExpand').addEventListener('click', () => triggerType('expand'));
+document.getElementById('btnCollapse').addEventListener('click', () => triggerType('collapse'));
+document.getElementById('btnNone').addEventListener('click', () => triggerType(''));
+
+// ===== 示例4：滚动联动 =====
+const zone = document.getElementById('scrollZone');
+let scrollTimer;
+zone.addEventListener('scroll', () => {
+  clearTimeout(scrollTimer);
+  scrollTimer = setTimeout(() => {
+    // 找到当前吸附项
+    const items = zone.querySelectorAll('.scroll-item');
+    let activeIdx = 0;
+    items.forEach((item, idx) => {
+      const rect = item.getBoundingClientRect();
+      const zoneRect = zone.getBoundingClientRect();
+      if (rect.top >= zoneRect.top - 10 && rect.top <= zoneRect.top + 100) {
+        activeIdx = idx;
+      }
+    });
+    items.forEach((item, idx) => {
+      item.classList.toggle('active', idx === activeIdx);
+    });
+  }, 100);
+});
+
+document.getElementById('btnScrollHighlight').addEventListener('click', () => {
+  const items = zone.querySelectorAll('.scroll-item');
+  const active = zone.querySelector('.scroll-item.active');
+  if (active) active.classList.remove('active');
+  const nextIdx = Math.floor(Math.random() * items.length);
+  if (document.startViewTransition) {
+    document.startViewTransition(() => {
+      items[nextIdx].classList.add('active');
+    });
+  } else {
+    items[nextIdx].classList.add('active');
+  }
+});
+</script>
+
+</body>
+</html>
