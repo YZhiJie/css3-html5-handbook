@@ -14,12 +14,20 @@
 css3-html5-handbook/
 ├── README.md               # 项目导航（本文件）
 ├── cheatsheet.md           # 高频语法速查表
+├── design-system.md        # Spark 设计系统（Web 界面用：色彩/字体/组件/动效 token）
 ├── docs/                   # 深度文档（每主题一篇）
 │   ├── css/                # CSS3 九大主题
 │   └── html/               # HTML5 九大主题
-└── examples/               # 可运行示例（与文档一一对应）
-    ├── css/
-    └── html/
+├── examples/               # 可运行示例（与文档一一对应）
+│   ├── css/
+│   └── html/
+└── comics/                 # 漫画剧场（「霓虹墨」风格，全 21 话）
+    ├── style-guide.md      # 漫画美术风格规范
+    ├── manifest.json       # 话数清单（校验器依据）
+    ├── check-comics.mjs    # SVG 良构 / MD 行数 / 链接一致性校验
+    ├── samples/            # 三张风格定妆稿（SVG，不参与编号）
+    ├── css/                # CSS 篇 EP.01–11（SVG + 讲解 MD）
+    └── html/               # HTML 篇 EP.12–21（SVG + 讲解 MD）
 ```
 
 ## 内容导航
@@ -52,6 +60,41 @@ css3-html5-handbook/
 | 08 | 拖放 API | [docs/html/08-drag-drop.md](docs/html/08-drag-drop.md) | [examples/html/08-drag-drop/](examples/html/08-drag-drop/) |
 | 09 | 多媒体元素 | [docs/html/09-multimedia.md](docs/html/09-multimedia.md) | [examples/html/09-multimedia/](examples/html/09-multimedia/) |
 
+## 漫画剧场 · 霓虹墨 Neon Ink
+
+> 像素酱、标签君与码叔主演的三格技术漫画：每话 = 一张可无损缩放的 SVG 原画 + 一篇讲解（剧情梗概 / 分格解读 / 码叔划重点 / 自测题 / 动手实验）。
+
+### CSS 篇（EP.01–11）
+
+| 话数 | 标题 | 原画 | 讲解 |
+| --- | --- | --- | --- |
+| EP.01 | 选择器 | [SVG](comics/css/EP.01-selectors.svg) | [讲解](comics/css/EP.01-selectors.md) |
+| EP.02 | 动画与过渡 | [SVG](comics/css/EP.02-animation-transition.svg) | [讲解](comics/css/EP.02-animation-transition.md) |
+| EP.03 | Flexbox | [SVG](comics/css/EP.03-flexbox.svg) | [讲解](comics/css/EP.03-flexbox.md) |
+| EP.04 | Grid | [SVG](comics/css/EP.04-grid.svg) | [讲解](comics/css/EP.04-grid.md) |
+| EP.05 | 响应式 | [SVG](comics/css/EP.05-responsive.svg) | [讲解](comics/css/EP.05-responsive.md) |
+| EP.06 | 变量与 calc | [SVG](comics/css/EP.06-variables-calc.svg) | [讲解](comics/css/EP.06-variables-calc.md) |
+| EP.07 | 阴影 | [SVG](comics/css/EP.07-shadows.svg) | [讲解](comics/css/EP.07-shadows.md) |
+| EP.08 | 渐变 | [SVG](comics/css/EP.08-gradients.svg) | [讲解](comics/css/EP.08-gradients.md) |
+| EP.09 | Transform | [SVG](comics/css/EP.09-transform.svg) | [讲解](comics/css/EP.09-transform.md) |
+| EP.10 | 文本截断 | [SVG](comics/css/EP.10-text-truncation.svg) | [讲解](comics/css/EP.10-text-truncation.md) |
+| EP.11 | CSS 进阶技巧 | [SVG](comics/css/EP.11-pro-tips.svg) | [讲解](comics/css/EP.11-pro-tips.md) |
+
+### HTML 篇（EP.12–21）
+
+| 话数 | 标题 | 原画 | 讲解 |
+| --- | --- | --- | --- |
+| EP.12 | 语义化标签 | [SVG](comics/html/EP.12-semantic.svg) | [讲解](comics/html/EP.12-semantic.md) |
+| EP.13 | 表单 | [SVG](comics/html/EP.13-forms.svg) | [讲解](comics/html/EP.13-forms.md) |
+| EP.14 | Canvas | [SVG](comics/html/EP.14-canvas.svg) | [讲解](comics/html/EP.14-canvas.md) |
+| EP.15 | SVG | [SVG](comics/html/EP.15-svg.svg) | [讲解](comics/html/EP.15-svg.md) |
+| EP.16 | Web Storage | [SVG](comics/html/EP.16-web-storage.svg) | [讲解](comics/html/EP.16-web-storage.md) |
+| EP.17 | Web Workers | [SVG](comics/html/EP.17-web-workers.svg) | [讲解](comics/html/EP.17-web-workers.md) |
+| EP.18 | 地理定位 | [SVG](comics/html/EP.18-geolocation.svg) | [讲解](comics/html/EP.18-geolocation.md) |
+| EP.19 | 拖放 API | [SVG](comics/html/EP.19-drag-drop.svg) | [讲解](comics/html/EP.19-drag-drop.md) |
+| EP.20 | 多媒体元素 | [SVG](comics/html/EP.20-multimedia.svg) | [讲解](comics/html/EP.20-multimedia.md) |
+| EP.21 | HTML 进阶技巧（完结篇） | [SVG](comics/html/EP.21-pro-tips.svg) | [讲解](comics/html/EP.21-pro-tips.md) |
+
 ## 如何使用
 
 1. **阅读文档**：从上方导航表进入任意主题文档，按「概念 → 语法 → 兼容性 → 场景 → 案例 → 最佳实践」的顺序学习。
@@ -71,5 +114,7 @@ css3-html5-handbook/
 
 | 版本 | 日期 | 说明 |
 | --- | --- | --- |
+| v1.2.0 | 2026-09-27 | 「霓虹墨」漫画剧场全 21 话量产完成：CSS 篇 EP.01–11 + HTML 篇 EP.12–21，每话含 SVG 原画与讲解 MD，附话数清单与质量校验器 |
+| v1.1.0 | 2026-09-27 | 新增「霓虹墨」漫画风格规范 + 三张定妆稿（样板页/角色表/配色构图）与 Spark Web 设计系统，漫画剧场量产启动 |
 | v1.0.0 | 2026-09-23 | 全部 18 个主题完成：CSS3 九大主题 + HTML5 九大主题，18 篇深度文档 + 61 个可运行示例 + 速查表 |
 | v0.1.0 | 2026-09-23 | 项目骨架：目录结构、导航文档、git 初始化 |
