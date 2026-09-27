@@ -21,12 +21,12 @@ css3-html5-handbook/
 ├── examples/               # 可运行示例（与文档一一对应）
 │   ├── css/
 │   └── html/
-└── comics/                 # 漫画剧场（「霓虹墨」风格，全 28 话）
+└── comics/                 # 漫画剧场（「霓虹墨」风格，全 30 话）
     ├── style-guide.md      # 漫画美术风格规范
     ├── manifest.json       # 话数清单（校验器依据）
     ├── check-comics.mjs    # SVG 良构 / MD 行数 / 链接一致性校验
     ├── samples/            # 三张风格定妆稿（SVG，不参与编号）
-    ├── css/                # CSS 篇 EP.01–11、EP.22–26（SVG + 讲解 MD）
+    ├── css/                # CSS 篇 EP.01–11、EP.22–30（SVG + 讲解 MD）
     └── html/               # HTML 篇 EP.12–21（SVG + 讲解 MD）
 ```
 
@@ -54,6 +54,8 @@ css3-html5-handbook/
 | 16 | :has() 选择器 | [docs/css/16-has-selector.md](docs/css/16-has-selector.md) | [examples/css/16-has-selector/](examples/css/16-has-selector/) |
 | 17 | View Transitions | [docs/css/17-view-transitions.md](docs/css/17-view-transitions.md) | [examples/css/17-view-transitions/](examples/css/17-view-transitions/) |
 | 18 | CSS 嵌套 | [docs/css/18-css-nesting.md](docs/css/18-css-nesting.md) | [examples/css/18-css-nesting/](examples/css/18-css-nesting/) |
+| 19 | @scope 作用域 | [docs/css/19-scope.md](docs/css/19-scope.md) | [examples/css/19-scope/](examples/css/19-scope/) |
+| 20 | @property 注册 | [docs/css/20-property.md](docs/css/20-property.md) | [examples/css/20-property/](examples/css/20-property/) |
 
 ### HTML5 篇
 
@@ -110,6 +112,8 @@ css3-html5-handbook/
 | EP.26 | :has() 选择器 | [SVG](comics/css/EP.26-has-selector.svg) | [讲解](comics/css/EP.26-has-selector.md) |
 | EP.27 | View Transitions | [SVG](comics/css/EP.27-view-transitions.svg) | [讲解](comics/css/EP.27-view-transitions.md) |
 | EP.28 | CSS 嵌套 | [SVG](comics/css/EP.28-css-nesting.svg) | [讲解](comics/css/EP.28-css-nesting.md) |
+| EP.29 | @scope 作用域 | [SVG](comics/css/EP.29-scope.svg) | [讲解](comics/css/EP.29-scope.md) |
+| EP.30 | @property 注册 | [SVG](comics/css/EP.30-property.svg) | [讲解](comics/css/EP.30-property.md) |
 
 ## 如何使用
 
@@ -130,6 +134,7 @@ css3-html5-handbook/
 
 | 版本 | 日期 | 说明 |
 | --- | --- | --- |
+| v1.7.0 | 2026-09-28 | CSS 篇扩展：新增 @scope 作用域（19）与 @property 注册（20）两章，配套漫画 EP.29–30，全 30 话 |
 | v1.6.0 | 2026-09-28 | CSS 篇扩展：新增 View Transitions（17）与 CSS 嵌套（18）两章，配套漫画 EP.27–28，全 28 话 |
 | v1.5.0 | 2026-09-28 | CSS 篇扩展：新增滚动驱动动画（15）与 :has() 选择器（16）两章，配套漫画 EP.25–26，全 26 话 |
 | v1.4.0 | 2026-09-27 | CSS 篇扩展：新增现代颜色（14）一章，配套漫画 EP.24，全 24 话 |

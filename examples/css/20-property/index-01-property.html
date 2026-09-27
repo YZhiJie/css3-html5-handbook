@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>@property · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 800px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+
+  /* ===== 注册变量 ===== */
+  @property --fill   { syntax: "<color>";    inherits: false; initial-value: #334155; }
+  @property --mix    { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
+  @property --angle  { syntax: "<angle>";    inherits: false; initial-value: 0deg; }
+  @property --shift  { syntax: "<length>";   inherits: false; initial-value: 0px; }
+  @property --scale  { syntax: "<number>";   inherits: false; initial-value: 1; }
+  /* 未注册对照组 */
+  :root { --raw-color: #334155; }
+
+  /* ===== 示例1：颜色过渡（注册 vs 未注册） ===== */
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .chip {
+    padding: 20px; border-radius: 10px; text-align: center;
+    font-size: 13px; font-weight: 700; cursor: pointer; user-select: none;
+  }
+  .chip-registered {
+    --fill: #334155;
+    background: var(--fill);
+    transition: --fill 0.8s ease;
+  }
+  .chip-registered.on { --fill: #22d3ee; color: #0b1220; }
+  .chip-raw {
+    --raw-color: #334155;
+    background: var(--raw-color);
+    transition: --raw-color 0.8s ease;
+  }
+  .chip-raw.on { --raw-color: #22d3ee; color: #0b1220; }
+
+  /* ===== 示例2：color-mix 参数动画 ===== */
+  .mix-btn {
+    --mix: 0%;
+    padding: 16px; border-radius: 10px; border: none; cursor: pointer;
+    background: color-mix(in oklab, #22d3ee var(--mix), #7c3aed);
+    color: #fff; font-size: 14px; font-weight: 700; width: 100%;
+    transition: --mix 0.9s ease;
+  }
+  .mix-btn.on { --mix: 100%; }
+
+  /* ===== 示例3：transform 串联 ===== */
+  .stage { display: flex; gap: 16px; justify-content: center; padding: 20px 0; }
+  .cube {
+    --shift: 0px; --scale: 1; --angle: 0deg;
+    width: 64px; height: 64px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: #0b1220; cursor: pointer; user-select: none;
+    transform: translateX(var(--shift)) scale(var(--scale)) rotate(var(--angle));
+    transition: --shift 0.5s ease, --scale 0.5s ease, --angle 0.5s ease;
+  }
+  .cube.a { background: #22d3ee; }
+  .cube.b { background: #a78bfa; }
+  .cube.on { --shift: 24px; --scale: 1.2; --angle: 45deg; }
+
+  /* ===== 示例4：进度环（锥形渐变角度动画） ===== */
+  .ring {
+    --angle: 0deg;
+    width: 120px; height: 120px; border-radius: 50%; margin: 0 auto;
+    background: conic-gradient(#22d3ee var(--angle), #1e293b var(--angle));
+    display: flex; align-items: center; justify-content: center;
+    transition: --angle 1.2s ease;
+  }
+  .ring::after {
+    content: attr(data-label);
+    width: 84px; height: 84px; border-radius: 50%;
+    background: #131c2e; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: #e2e8f0;
+  }
+  .ring.full { --angle: 360deg; }
+
+  .btn-row { text-align: center; margin-top: 12px; }
+  .btn-row button {
+    padding: 8px 20px; border: none; border-radius: 8px;
+    background: #22d3ee; color: #0b1220; font-weight: 700; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<h1>@property</h1>
+<p class="sub">注册后的 CSS 变量：有类型、可动画、可继承</p>
+
+<!-- 示例1：注册 vs 未注册 -->
+<section>
+  <h2>示例 1 · 颜色过渡：注册变量平滑补间，未注册瞬间跳变</h2>
+  <div class="demo-box">
+    <div class="pair">
+      <div class="chip chip-registered" id="chipA">已注册 &lt;color&gt;（点击切换）</div>
+      <div class="chip chip-raw" id="chipB">未注册字符串（点击切换）</div>
+    </div>
+  </div>
+  <div class="note">
+    左侧注册 <code>@property --fill { syntax: "&lt;color&gt;" }</code>，过渡平滑；
+    右侧未注册，浏览器视为字符串，0.8s 后瞬间变色——没有中间帧。
+  </div>
+</section>
+
+<!-- 示例2：color-mix 参数 -->
+<section>
+  <h2>示例 2 · 驱动 color-mix() 百分比参数</h2>
+  <div class="demo-box">
+    <button class="mix-btn" id="mixBtn">点击切换渐变混合比例（0% ↔ 100%）</button>
+  </div>
+  <div class="note">
+    <code>background: color-mix(in oklab, #22d3ee var(--mix), #7c3aed)</code>，
+    注册 <code>--mix: &lt;percentage&gt;</code> 后可直接 <code>transition: --mix</code>。
+  </div>
+</section>
+
+<!-- 示例3：transform 串联 -->
+<section>
+  <h2>示例 3 · 三个注册变量串联 transform</h2>
+  <div class="demo-box">
+    <div class="stage">
+      <div class="cube a" id="cubeA">A</div>
+      <div class="cube b" id="cubeB">B</div>
+    </div>
+    <div class="btn-row"><button id="cubeBtn">切换位移 + 缩放 + 旋转</button></div>
+  </div>
+  <div class="note">
+    <code>--shift: &lt;length&gt;</code>、<code>--scale: &lt;number&gt;</code>、<code>--angle: &lt;angle&gt;</code>
+    三个变量各自动画，transform 引用它们——一个 transition 声明控制三个维度。
+  </div>
+</section>
+
+<!-- 示例4：进度环 -->
+<section>
+  <h2>示例 4 · 锥形渐变进度环：角度变量驱动</h2>
+  <div class="demo-box">
+    <div class="ring" id="ring" data-label="0%"></div>
+    <div class="btn-row"><button id="ringBtn">充能到 100%</button></div>
+  </div>
+  <div class="note">
+    <code>conic-gradient(#22d3ee var(--angle), #1e293b var(--angle))</code>，
+    注册 <code>--angle: &lt;angle&gt;</code> 后 <code>transition: --angle</code> 即可让进度环平滑转圈。
+  </div>
+</section>
+
+<script>
+  const toggle = (el) => el.classList.toggle('on');
+
+  chipA.addEventListener('click', () => toggle(chipA));
+  chipB.addEventListener('click', () => toggle(chipB));
+  mixBtn.addEventListener('click', () => toggle(mixBtn));
+
+  cubeBtn.addEventListener('click', () => { toggle(cubeA); toggle(cubeB); });
+
+  ringBtn.addEventListener('click', () => {
+    const r = document.getElementById('ring');
+    const full = r.classList.toggle('full');
+    ringBtn.textContent = full ? '重置' : '充能到 100%';
+    r.dataset.label = full ? '100%' : '0%';
+  });
+</script>
+
+</body>
+</html>

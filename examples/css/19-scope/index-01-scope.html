@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>@scope 作用域 · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 800px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+
+  /* ===== 全局上古规则：模拟老系统污染 ===== */
+  .title { font-size: 20px; color: #cbd5e1; font-weight: 700; }
+  .btn { padding: 6px 12px; border-radius: 4px; background: #334155; color: #fff; font-size: 13px; }
+
+  /* ===== 示例1：组件作用域圈地 ===== */
+  @scope (.nova-card) {
+    & { background: #1e293b; border: 2px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+    .title { font-size: 16px; color: #22d3ee; margin-bottom: 6px; }
+    .body { font-size: 13px; color: #94a3b8; margin-bottom: 10px; }
+    .btn { padding: 8px 16px; border-radius: 8px; background: #22d3ee; color: #0b1220; font-weight: 700; }
+  }
+
+  /* ===== 示例2：甜甜圈作用域 ===== */
+  @scope (.richtext) to ([data-component]) {
+    p { margin: 1em 0; line-height: 1.8; color: #e2e8f0; }
+    h3 { font-size: 18px; color: #fbbf24; margin-top: 1.2em; }
+    img { max-width: 100%; border-radius: 8px; }
+  }
+
+  /* ===== 示例3：主题区域近距优先 ===== */
+  @scope ([data-theme="ocean"]) {
+    & { background: #0c4a6e; border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 2px solid #0ea5e9; }
+    .title { color: #bae6fd; }
+    .btn { background: #0284c7; color: #fff; }
+    a { color: #7dd3fc; text-decoration: underline; }
+  }
+  @scope ([data-theme="sunset"]) {
+    & { background: #7c2d12; border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 2px solid #fb923c; }
+    .title { color: #fed7aa; }
+    .btn { background: #ea580c; color: #fff; }
+    a { color: #fdba74; text-decoration: underline; }
+  }
+
+  /* ===== 示例4：嵌套主题下的近距优先 ===== */
+  .nested-theme-a { border: 2px dashed #334155; padding: 12px; border-radius: 8px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<h1>@scope 作用域</h1>
+<p class="sub">用作用域根圈地，用 to 挖洞，用近距优先裁决主题冲突</p>
+
+<!-- 示例1：组件圈地 -->
+<section>
+  <h2>示例 1 · 组件圈地：.title / .btn 不泄漏到全局</h2>
+  <div class="demo-box">
+    <p style="font-size:12px;color:#94a3b8;margin-bottom:10px;">全局 .title 字号 20px；nova-card 作用域内 .title 被覆盖为 16px 青色——只影响卡片内部。</p>
+    <div class="nova-card">
+      <div class="title">卡片标题（作用域内）</div>
+      <div class="body">内容区域，.btn 的圆角和背景色也由作用域接管。</div>
+      <button class="btn">作用域按钮</button>
+    </div>
+    <div class="title">页面级标题（全局规则，不受作用域影响）</div>
+    <button class="btn">全局按钮</button>
+  </div>
+  <div class="note">
+    <code>@scope (.nova-card)</code> 里的 <code>.title</code> 与全局 <code>.title</code> 特异性相同，但作用域规则在命中范围内与全局规则竞争时，浏览器视为「更具体」。
+  </div>
+</section>
+
+<!-- 示例2：甜甜圈 -->
+<section>
+  <h2>示例 2 · 甜甜圈作用域：富文本排版，遇到组件立即「挖洞」</h2>
+  <div class="demo-box">
+    <div class="richtext">
+      <h3>富文本标题</h3>
+      <p>这是一段正文，受 richtext 作用域的 line-height: 1.8 和 margin 控制。</p>
+      <p>第二段同样享受排版规则。</p>
+      <div data-component="chart">
+        <h3>图表组件标题</h3>
+        <p>组件内部的 p 和 h3 ——<strong>不受 richtext 作用域规则命中</strong>（to ([data-component]) 挖了洞）。</p>
+      </div>
+      <p>图表之后的段落回到作用域内，继续享受 line-height 和 margin。</p>
+    </div>
+  </div>
+  <div class="note">
+    <code>@scope (.richtext) to ([data-component])</code> 中，<code>[data-component]</code> 自身及其所有后代都不受规则影响。注意：demo 中图表内部的 <code>h3</code> 颜色是浏览器默认（因无作用域规则），与外部 <code>h3</code> 不同——这正体现了「挖洞」效果。
+  </div>
+</section>
+
+<!-- 示例3：主题区域 -->
+<section>
+  <h2>示例 3 · 主题区域：两个主题并存，互不污染</h2>
+  <div class="demo-box">
+    <div data-theme="ocean">
+      <div class="title">Ocean 主题</div>
+      <a href="#">链接颜色</a>
+      <button class="btn" style="margin-top:8px;">按钮</button>
+    </div>
+    <div data-theme="sunset">
+      <div class="title">Sunset 主题</div>
+      <a href="#">链接颜色</a>
+      <button class="btn" style="margin-top:8px;">按钮</button>
+    </div>
+  </div>
+  <div class="note">
+    两个 <code>@scope</code> 各管自己的区域；同名类（<code>.title</code>、<code>.btn</code>、<code>a</code>）在不同主题下展示不同配色，无需前缀或嵌套层叠。
+  </div>
+</section>
+
+<!-- 示例4：近距优先 -->
+<section>
+  <h2>示例 4 · 近距优先：嵌套主题下，更近的根获胜</h2>
+  <div class="demo-box">
+    <div class="nested-theme-a" data-theme="ocean">
+      <p>外层：Ocean 主题</p>
+      <div class="nested-theme-a" data-theme="sunset">
+        <p>内层：Sunset 主题（更近，获胜）</p>
+        <button class="btn">内层按钮</button>
+      </div>
+      <button class="btn">外层按钮（回到 Ocean）</button>
+    </div>
+  </div>
+  <div class="note">
+    内层按钮位于 <code>data-theme="sunset"</code> 内部，DOM 上离它更近，所以应用 sunset 的 <code>.btn</code> 样式；外层按钮回到 ocean。这是作用域独有的「近距优先」层叠维度。
+  </div>
+</section>
+
+</body>
+</html>

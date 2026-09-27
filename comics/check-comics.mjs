@@ -2,7 +2,7 @@
 /**
  * comics/check-comics.mjs
  * CSS3 × HTML5 漫画剧场零依赖校验器：
- *  1. manifest.json 可解析、EP 编号唯一且连续（EP.01..EP.28）
+ *  1. manifest.json 可解析、EP 编号唯一且连续（EP.01..EP.30）
  *  2. manifest 登记的 svg/md/正文 doc/examples 目录全部存在
  *  3. comics/css 与 comics/html 下实际存在的 .svg/.md 与 manifest 双向一致（无孤儿、无缺登记）
  *     （samples/ 与 comics 根目录文件不参与校验）
@@ -38,7 +38,7 @@ try {
 
 if (manifest) {
   const eps = manifest.episodes ?? [];
-  if (eps.length !== 28) fail(`manifest 应有 28 话，实际 ${eps.length} 话`);
+  if (eps.length !== 30) fail(`manifest 应有 30 话，实际 ${eps.length} 话`);
 
   const seen = new Set();
   eps.forEach((item, i) => {

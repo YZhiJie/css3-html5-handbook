@@ -1,4 +1,4 @@
-<!-- EP.27 · View Transitions — DOM 状态变化的自动补间动画，规范见 ../style-guide.md -->
+<!-- EP.30 · @property — 给 CSS 变量上户口，注册后即可补间，规范见 ../style-guide.md -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 840">
   <defs>
     <style>
@@ -117,9 +117,9 @@
   <rect x="40" y="6" width="120" height="6" rx="3" fill="#22d3ee"/>
   <rect x="40" y="16" width="120" height="6" rx="3" fill="#f472b6"/>
   <text class="t st" x="40" y="40">前端漫画实验室 · CSS3 × HTML5 漫画剧场 · CSS 篇</text>
-  <text class="t bt" x="40" y="80">第 27 话 · View Transitions — 告别手写 FLIP</text>
+  <text class="t bt" x="40" y="80">第 30 话 · @property — 给变量上户口</text>
   <rect x="1020" y="26" width="140" height="44" rx="22" fill="#f472b6"/>
-  <text class="m" x="1090" y="54" text-anchor="middle" font-size="19" font-weight="bold" fill="#0b1220">EP.27</text>
+  <text class="m" x="1090" y="54" text-anchor="middle" font-size="19" font-weight="bold" fill="#0b1220">EP.30</text>
   <line x1="0" y1="96" x2="1200" y2="96" stroke="#1e293b" stroke-width="2"/>
 
   <!-- ===== 格1 · 痛点现场 ===== -->
@@ -127,24 +127,23 @@
   <rect x="40" y="120" width="556" height="250" rx="16" fill="url(#ht)"/>
   <circle cx="66" cy="146" r="14" fill="#f472b6"/>
   <text class="m" x="66" y="151" text-anchor="middle" font-size="15" font-weight="bold" fill="#0b1220">1</text>
-  <text class="t pt" x="92" y="152">痛点现场 · 瞬间跳变，没有过渡</text>
+  <text class="t pt" x="92" y="152">痛点现场 · 变量是字符串，动画全跳变</text>
   <rect x="64" y="176" width="248" height="170" rx="10" fill="#1e293b" stroke="#f87171" stroke-width="2"/>
-  <text class="t" x="78" y="198" font-size="12" font-weight="bold" fill="#f87171">传统 DOM 更新</text>
-  <text class="m" x="78" y="220" font-size="10" fill="#cbd5e1">item.remove();     /* 没了 */</text>
-  <text class="m" x="78" y="238" font-size="10" fill="#cbd5e1">render(newState);  /* 新内容 */</text>
-  <text class="m" x="78" y="258" font-size="10" fill="#f87171">/* 帧 1：旧 DOM，帧 2：新 DOM */</text>
-  <text class="m" x="78" y="278" font-size="10" fill="#f87171">/* 中间没有任何过渡 */</text>
-  <text class="t" x="78" y="302" font-size="10" fill="#94a3b8">卡片→详情、列表增删、</text>
-  <text class="t" x="78" y="318" font-size="10" fill="#94a3b8">暗色切换……全是一闪而过</text>
+  <text class="t" x="78" y="198" font-size="12" font-weight="bold" fill="#f87171">未注册的变量</text>
+  <text class="m" x="78" y="220" font-size="10" fill="#cbd5e1">:root { --c: red; }</text>
+  <text class="m" x="78" y="238" font-size="10" fill="#cbd5e1">.a { background: var(--c);</text>
+  <text class="m" x="78" y="254" font-size="10" fill="#cbd5e1">     transition: --c 1s; }</text>
+  <text class="m" x="78" y="270" font-size="10" fill="#cbd5e1">.a:hover { --c: blue; }</text>
+  <text class="t" x="78" y="292" font-size="10" fill="#f87171">浏览器看到 red→blue 两个字符串</text>
+  <text class="t" x="78" y="310" font-size="10" fill="#f87171">不知如何补间，1 秒后瞬间跳变</text>
   <rect x="326" y="176" width="246" height="170" rx="10" fill="#1e293b" stroke="#334155" stroke-width="2"/>
-  <text class="t" x="340" y="198" font-size="12" font-weight="bold" fill="#94a3b8">手写 FLIP 的痛苦</text>
-  <text class="t" x="340" y="220" font-size="10" fill="#f87171">· 记录 First 状态</text>
-  <text class="t" x="340" y="238" font-size="10" fill="#f87171">· 更新 DOM 获取 Last</text>
-  <text class="t" x="340" y="256" font-size="10" fill="#f87171">· Invert 计算 transform</text>
-  <text class="t" x="340" y="274" font-size="10" fill="#f87171">· Play 开启动画</text>
-  <text class="t" x="340" y="296" font-size="10" fill="#94a3b8">连续连点易穿帮，</text>
-  <text class="t" x="340" y="314" font-size="10" fill="#94a3b8">定位滚动易偏差，约 50 行 JS</text>
-  <text class="t" x="64" y="362" font-size="13" font-weight="bold" fill="#f87171">「DOM 更新能不能自带动画过渡？」</text>
+  <text class="t" x="340" y="198" font-size="12" font-weight="bold" fill="#94a3b8">更多「跳变」现场</text>
+  <text class="t" x="340" y="220" font-size="10" fill="#f87171">· 渐变角度 0deg→360deg 不转</text>
+  <text class="t" x="340" y="238" font-size="10" fill="#f87171">· 进度条 0%→100% 瞬移</text>
+  <text class="t" x="340" y="256" font-size="10" fill="#f87171">· color-mix 参数不可动画</text>
+  <text class="t" x="340" y="278" font-size="10" fill="#94a3b8">变通方案：JS 逐帧改值</text>
+  <text class="t" x="340" y="296" font-size="10" fill="#94a3b8">rAF + 手写插值，又回老路</text>
+  <text class="t" x="64" y="362" font-size="13" font-weight="bold" fill="#f87171">「变量动画为什么不会补间？」</text>
   <use href="#pixelv2" transform="translate(524,352) scale(0.55)"/>
   <text class="t" x="552" y="284" font-size="20" font-weight="bold" fill="#f87171">?</text>
 
@@ -153,26 +152,26 @@
   <rect x="616" y="120" width="544" height="250" rx="16" fill="url(#ht)"/>
   <circle cx="642" cy="146" r="14" fill="#a78bfa"/>
   <text class="m" x="642" y="151" text-anchor="middle" font-size="15" font-weight="bold" fill="#0b1220">2</text>
-  <text class="t pt" x="668" y="152">机制登场 · 拍旧照、更新、拍新照</text>
+  <text class="t pt" x="668" y="152">机制登场 · 三件套注册进类型系统</text>
   <rect x="648" y="176" width="250" height="170" rx="10" fill="#1e293b" stroke="#22d3ee" stroke-width="2"/>
-  <text class="t" x="662" y="198" font-size="12" font-weight="bold" fill="#22d3ee">API 调用</text>
-  <text class="m" x="662" y="218" font-size="10" fill="#cbd5e1">document.startViewTransition(</text>
-  <text class="m" x="662" y="234" font-size="10" fill="#cbd5e1">  () =&gt; updateDOM()</text>
-  <text class="m" x="662" y="250" font-size="10" fill="#cbd5e1">);</text>
-  <text class="t" x="662" y="270" font-size="10" fill="#94a3b8">三步走：</text>
-  <text class="t" x="662" y="286" font-size="10" fill="#94a3b8">1 拍旧照 → 2 执行更新</text>
-  <text class="t" x="662" y="302" font-size="10" fill="#94a3b8">3 拍新照 + 交叉淡化 + 位置补间</text>
-  <text class="t" x="662" y="322" font-size="10" fill="#22d3ee">全程合成器线程，不阻塞主线程</text>
+  <text class="t" x="662" y="198" font-size="12" font-weight="bold" fill="#22d3ee">注册声明</text>
+  <text class="m" x="662" y="218" font-size="10" fill="#cbd5e1">@property --c {</text>
+  <text class="m" x="662" y="234" font-size="10" fill="#cbd5e1">  syntax: "&lt;color&gt;";</text>
+  <text class="m" x="662" y="250" font-size="10" fill="#cbd5e1">  inherits: false;</text>
+  <text class="m" x="662" y="266" font-size="10" fill="#cbd5e1">  initial-value: transparent;</text>
+  <text class="m" x="662" y="282" font-size="10" fill="#cbd5e1">}</text>
+  <text class="t" x="662" y="304" font-size="10" fill="#94a3b8">浏览器按 color 规则逐帧插值</text>
+  <text class="t" x="662" y="322" font-size="10" fill="#22d3ee">red → blue 平滑过渡，不再跳变</text>
   <rect x="914" y="176" width="230" height="170" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
-  <text class="t" x="928" y="198" font-size="12" font-weight="bold" fill="#a78bfa">共享元素补间</text>
-  <text class="m" x="928" y="218" font-size="10" fill="#cbd5e1">.card  {</text>
-  <text class="m" x="928" y="234" font-size="10" fill="#cbd5e1">  view-transition-name: hero;</text>
-  <text class="m" x="928" y="250" font-size="10" fill="#cbd5e1">}</text>
-  <text class="m" x="928" y="266" font-size="10" fill="#cbd5e1">.viewer .hero {</text>
-  <text class="m" x="928" y="282" font-size="10" fill="#cbd5e1">  view-transition-name: hero;</text>
-  <text class="m" x="928" y="298" font-size="10" fill="#cbd5e1">}</text>
-  <text class="t" x="928" y="320" font-size="10" fill="#fbbf24">同名配对：自动补间位置/尺寸</text>
-  <text class="t" x="648" y="344" font-size="13" font-weight="bold" fill="#a78bfa">「旧快照淡出，新快照淡入，同名元素自动飞过去」</text>
+  <text class="t" x="928" y="198" font-size="12" font-weight="bold" fill="#a78bfa">syntax 类型表</text>
+  <text class="m" x="928" y="218" font-size="10" fill="#cbd5e1">&lt;color&gt; &lt;length&gt; &lt;number&gt;</text>
+  <text class="m" x="928" y="234" font-size="10" fill="#cbd5e1">&lt;percentage&gt; &lt;angle&gt; &lt;time&gt;</text>
+  <text class="m" x="928" y="250" font-size="10" fill="#cbd5e1">&lt;transform-function&gt; &lt;image&gt;</text>
+  <text class="t" x="928" y="272" font-size="10" fill="#94a3b8">赋值不合法 → 静默回退</text>
+  <text class="t" x="928" y="288" font-size="10" fill="#94a3b8">到 initial-value（兜底层）</text>
+  <text class="t" x="928" y="308" font-size="10" fill="#fbbf24">JS 也可注册：</text>
+  <text class="m" x="928" y="324" font-size="10" fill="#cbd5e1">CSS.registerProperty({...})</text>
+  <text class="t" x="648" y="344" font-size="13" font-weight="bold" fill="#a78bfa">「变量从字符串升级为有类型的计算值」</text>
   <use href="#taggyv2" transform="translate(1105,356) scale(0.44)"/>
 
   <!-- ===== 格3 · 落地收束 ===== -->
@@ -181,42 +180,43 @@
   <circle cx="66" cy="416" r="14" fill="#fbbf24"/>
   <text class="m" x="66" y="421" text-anchor="middle" font-size="15" font-weight="bold" fill="#0b1220">3</text>
   <text class="t pt" x="92" y="422">落地收束 · 四大实战场景</text>
-  <!-- 列表增删 -->
+  <!-- 颜色过渡 -->
   <rect x="64" y="440" width="250" height="160" rx="12" fill="#1e293b" stroke="#22d3ee" stroke-width="2"/>
-  <text class="t" x="78" y="462" font-size="12" font-weight="bold" fill="#22d3ee">列表增删</text>
-  <text class="m" x="78" y="484" font-size="10" fill="#cbd5e1">el.style.viewTransitionName</text>
-  <text class="m" x="78" y="500" font-size="10" fill="#cbd5e1">  = 'leaving';</text>
-  <text class="m" x="78" y="520" font-size="10" fill="#cbd5e1">view-transition-class: todo;</text>
-  <text class="m" x="78" y="536" font-size="10" fill="#cbd5e1">  /* 批量复用离场/补位动画 */</text>
-  <text class="m" x="78" y="560" font-size="10" fill="#fbbf24">/* JS 15 行代替 FLIP 50 行 */</text>
-  <!-- 共享元素 -->
+  <text class="t" x="78" y="462" font-size="12" font-weight="bold" fill="#22d3ee">颜色过渡无黑屏</text>
+  <text class="m" x="78" y="484" font-size="10" fill="#cbd5e1">@property --fill {</text>
+  <text class="m" x="78" y="500" font-size="10" fill="#cbd5e1">  syntax: "&lt;color&gt;"; }</text>
+  <text class="m" x="78" y="520" font-size="10" fill="#cbd5e1">.chip { bg: var(--fill);</text>
+  <text class="m" x="78" y="536" font-size="10" fill="#cbd5e1">  transition: --fill .4s; }</text>
+  <text class="m" x="78" y="552" font-size="10" fill="#cbd5e1">.chip:hover { --fill: cyan; }</text>
+  <text class="t" x="78" y="574" font-size="10" fill="#94a3b8">主题切换逐色插值</text>
+  <!-- color-mix -->
   <rect x="330" y="440" width="240" height="160" rx="12" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
-  <text class="t" x="344" y="462" font-size="12" font-weight="bold" fill="#a78bfa">卡片↔详情</text>
-  <text class="m" x="344" y="484" font-size="10" fill="#cbd5e1">缩略图 &amp; 大图</text>
-  <text class="m" x="344" y="500" font-size="10" fill="#cbd5e1">  view-transition-name: hero;</text>
-  <text class="m" x="344" y="520" font-size="10" fill="#cbd5e1">::view-transition-old(hero),</text>
-  <text class="m" x="344" y="536" font-size="10" fill="#cbd5e1">::view-transition-new(hero) {</text>
-  <text class="m" x="344" y="552" font-size="10" fill="#cbd5e1">  animation: none; /* 只要形变 */</text>
-  <text class="m" x="344" y="568" font-size="10" fill="#cbd5e1">}</text>
-  <!-- 标签页 -->
+  <text class="t" x="344" y="462" font-size="12" font-weight="bold" fill="#a78bfa">color-mix 参数动画</text>
+  <text class="m" x="344" y="484" font-size="10" fill="#cbd5e1">@property --mix {</text>
+  <text class="m" x="344" y="500" font-size="10" fill="#cbd5e1">  syntax: "&lt;percentage&gt;"; }</text>
+  <text class="m" x="344" y="520" font-size="10" fill="#cbd5e1">background:</text>
+  <text class="m" x="344" y="536" font-size="10" fill="#cbd5e1">  color-mix(in oklab,</text>
+  <text class="m" x="344" y="552" font-size="10" fill="#cbd5e1">    cyan var(--mix), purple);</text>
+  <text class="t" x="344" y="574" font-size="10" fill="#94a3b8">渐变混合比例平滑推移</text>
+  <!-- transform 串联 -->
   <rect x="586" y="440" width="240" height="160" rx="12" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
-  <text class="t" x="600" y="462" font-size="12" font-weight="bold" fill="#fbbf24">标签页切换</text>
-  <text class="m" x="600" y="484" font-size="10" fill="#cbd5e1">.panel.active {</text>
-  <text class="m" x="600" y="500" font-size="10" fill="#cbd5e1">  view-transition-name: panel;</text>
-  <text class="m" x="600" y="516" font-size="10" fill="#cbd5e1">}</text>
-  <text class="m" x="600" y="536" font-size="10" fill="#cbd5e1">::view-transition-new(panel) {</text>
-  <text class="m" x="600" y="552" font-size="10" fill="#cbd5e1">  animation: 220ms 60ms fade-in;</text>
-  <text class="m" x="600" y="568" font-size="10" fill="#cbd5e1">}</text>
-  <!-- 暗色模式 -->
+  <text class="t" x="600" y="462" font-size="12" font-weight="bold" fill="#fbbf24">transform 多变量串联</text>
+  <text class="m" x="600" y="484" font-size="10" fill="#cbd5e1">--tx:&lt;length&gt; --s:&lt;number&gt;</text>
+  <text class="m" x="600" y="500" font-size="10" fill="#cbd5e1">--rot:&lt;angle&gt; 各自注册</text>
+  <text class="m" x="600" y="520" font-size="10" fill="#cbd5e1">transform: translateX(</text>
+  <text class="m" x="600" y="536" font-size="10" fill="#cbd5e1">  var(--tx)) scale(var(--s))</text>
+  <text class="m" x="600" y="552" font-size="10" fill="#cbd5e1">  rotate(var(--rot));</text>
+  <text class="t" x="600" y="574" font-size="10" fill="#94a3b8">一条 transition 控三维</text>
+  <!-- 进度环 -->
   <rect x="842" y="440" width="302" height="160" rx="12" fill="#1e293b" stroke="#f472b6" stroke-width="2"/>
-  <text class="t" x="856" y="462" font-size="12" font-weight="bold" fill="#f472b6">暗色模式圆形展开</text>
-  <text class="m" x="856" y="484" font-size="10" fill="#cbd5e1">vt.ready.then(() =&gt; {</text>
-  <text class="m" x="856" y="500" font-size="10" fill="#cbd5e1">  animate({ clipPath:</text>
-  <text class="m" x="856" y="516" font-size="10" fill="#cbd5e1">    [`circle(0 at ${x} ${y})`,</text>
-  <text class="m" x="856" y="532" font-size="10" fill="#cbd5e1">     `circle(${r}px at ${x} ${y})`]</text>
-  <text class="m" x="856" y="548" font-size="10" fill="#cbd5e1">  }, { pseudoElement:</text>
-  <text class="m" x="856" y="564" font-size="10" fill="#cbd5e1">    '::view-transition-new(root)' });</text>
-  <text class="m" x="856" y="588" font-size="10" fill="#fbbf24">/* Chrome 111+ / FF 128+ / Safari 18+ */</text>
+  <text class="t" x="856" y="462" font-size="12" font-weight="bold" fill="#f472b6">锥形渐变进度环</text>
+  <text class="m" x="856" y="484" font-size="10" fill="#cbd5e1">@property --angle {</text>
+  <text class="m" x="856" y="500" font-size="10" fill="#cbd5e1">  syntax: "&lt;angle&gt;"; }</text>
+  <text class="m" x="856" y="520" font-size="10" fill="#cbd5e1">background: conic-gradient(</text>
+  <text class="m" x="856" y="536" font-size="10" fill="#cbd5e1">  cyan var(--angle),</text>
+  <text class="m" x="856" y="552" font-size="10" fill="#cbd5e1">  dark var(--angle));</text>
+  <text class="t" x="856" y="574" font-size="10" fill="#94a3b8">纯 CSS 环形充能动画</text>
+  <text class="m" x="856" y="592" font-size="10" fill="#fbbf24">/* Chrome 85+ / Safari 16.4+ / FF 128+ */</text>
   <path d="M 552 428 l 3 8 8 3 -8 3 -3 8 -3 -8 -8 -3 8 -3 Z" fill="#fbbf24"/>
 
   <!-- ===== 知识条 ===== -->
@@ -224,13 +224,13 @@
   <use href="#moov2" transform="translate(150,744) scale(0.62)"/>
   <text class="t kt" x="230" y="676">码叔划重点</text>
   <circle cx="248" cy="703" r="4" fill="#b45309"/>
-  <text class="t kb" x="266" y="708">startViewTransition 把 DOM 更新包成快照过渡动画，零手动计算位置</text>
+  <text class="t kb" x="266" y="708">syntax / inherits / initial-value 三件套注册后，变量才可被浏览器插值动画</text>
   <circle cx="248" cy="731" r="4" fill="#b45309"/>
-  <text class="t kb" x="266" y="736">view-transition-name 同名配对实现「共享元素」补间，名字须唯一、用完即释放</text>
+  <text class="t kb" x="266" y="736">transition 目标是变量本身：transition: --x，引用它的属性随变量逐帧重算</text>
   <circle cx="248" cy="759" r="4" fill="#b45309"/>
-  <text class="t kb" x="266" y="764">务必特性检测 if (document.startViewTransition)，不支持的浏览器直接更新 DOM</text>
+  <text class="t kb" x="266" y="764">赋值不合法静默回退 initial-value——调试时看 DevTools 的 invalid 标记</text>
   <rect x="1000" y="700" width="140" height="32" rx="16" fill="none" stroke="#b45309" stroke-width="1.5"/>
-  <text class="t" x="1070" y="721" text-anchor="middle" font-size="13" font-weight="bold" fill="#b45309">EP.27 · VT</text>
+  <text class="t" x="1070" y="721" text-anchor="middle" font-size="13" font-weight="bold" fill="#b45309">EP.30 · @property</text>
 
-  <text class="t ft" x="40" y="822">霓虹墨 Neon Ink · 第 27 话 — 深入阅读 docs/css/17-view-transitions.md · 示例 examples/css/17-view-transitions</text>
+  <text class="t ft" x="40" y="822">霓虹墨 Neon Ink · 第 30 话 — 深入阅读 docs/css/20-property.md · 示例 examples/css/20-property</text>
 </svg>
