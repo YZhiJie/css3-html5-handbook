@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Service Worker 缓存策略 · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 900px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+  .btn {
+    padding: 8px 16px; border-radius: 8px; border: 2px solid #22d3ee;
+    background: #0f172a; color: #22d3ee; font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-right: 8px; margin-bottom: 8px;
+  }
+  .btn.pink { border-color: #f472b6; color: #f472b6; }
+  .btn.amber { border-color: #fbbf24; color: #fbbf24; }
+  .log {
+    background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+    padding: 10px 14px; font-family: Menlo, monospace; font-size: 12.5px;
+    color: #34d399; min-height: 40px; margin-top: 10px;
+    max-height: 200px; overflow-y: auto;
+  }
+  .status {
+    display: inline-block; padding: 4px 12px; border-radius: 20px;
+    font-size: 12px; font-weight: 700; margin-bottom: 16px;
+  }
+  .status.online { background: #14532d; color: #22c55e; }
+  .status.offline { background: #450a0a; color: #f87171; }
+</style>
+</head>
+<body>
+
+<h1>Service Worker 缓存策略</h1>
+<p class="sub">Cache First · Network First · Stale While Revalidate</p>
+
+<div style="text-align: center;">
+  <span class="status online" id="netStatus">🌐 在线</span>
+</div>
+
+<!-- 演示 1：注册 SW -->
+<section>
+  <h2>演示 1 · 注册与生命周期</h2>
+  <div class="demo-box">
+    <button class="btn" id="btnRegister">注册 Service Worker</button>
+    <button class="btn pink" id="btnUnregister">注销</button>
+    <div class="log" id="log1">// 点击注册按钮查看 SW 生命周期</div>
+    <p class="note">install → activate → fetch。注册后刷新页面，SW 开始拦截请求。</p>
+  </div>
+</section>
+
+<!-- 演示 2：三大缓存策略 -->
+<section>
+  <h2>演示 2 · 三大缓存策略对比</h2>
+  <div class="demo-box">
+    <button class="btn" id="btnCacheFirst">Cache First（静态资源）</button>
+    <button class="btn pink" id="btnNetworkFirst">Network First（API）</button>
+    <button class="btn amber" id="btnSWR">Stale While Revalidate（列表）</button>
+    <div class="log" id="log2">// 点击按钮查看不同策略的日志</div>
+    <p class="note">打开 DevTools → Network → Offline，再点按钮看缓存兜底效果。</p>
+  </div>
+</section>
+
+<!-- 演示 3：缓存管理 -->
+<section>
+  <h2>演示 3 · 缓存版本管理</h2>
+  <div class="demo-box">
+    <button class="btn" id="btnListCaches">查看所有缓存</button>
+    <button class="btn pink" id="btnClearCaches">清空缓存</button>
+    <div class="log" id="log3">// 查看 Cache Storage 内容</div>
+    <p class="note">CACHE_NAME 带版本号（<code>app-v1</code>），activate 时清理旧版本。</p>
+  </div>
+</section>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  // 网络状态监听
+  const updateStatus = () => {
+    const status = $('netStatus');
+    if (navigator.onLine) {
+      status.className = 'status online';
+      status.textContent = '🌐 在线';
+    } else {
+      status.className = 'status offline';
+      status.textContent = '📴 离线';
+    }
+  };
+  window.addEventListener('online', updateStatus);
+  window.addEventListener('offline', updateStatus);
+  updateStatus();
+
+  // 演示 1：注册 SW
+  $('btnRegister').addEventListener('click', async () => {
+    if (!('serviceWorker' in navigator)) {
+      $('log1').textContent = '❌ 浏览器不支持 Service Worker';
+      return;
+    }
+    try {
+      // 动态创建 SW（Data URL 方式，单文件示例）
+      const swCode = `
+        const CACHE_NAME = 'demo-v1';
+        self.addEventListener('install', (e) => {
+          console.log('[SW] install');
+          e.waitUntil(self.skipWaiting());
+        });
+        self.addEventListener('activate', (e) => {
+          console.log('[SW] activate');
+          e.waitUntil(self.clients.claim());
+        });
+        self.addEventListener('fetch', (e) => {
+          console.log('[SW] fetch', e.request.url);
+          e.respondWith(fetch(e.request));
+        });
+      `;
+      const blob = new Blob([swCode], { type: 'application/javascript' });
+      const url = URL.createObjectURL(blob);
+      const reg = await navigator.serviceWorker.register(url, { scope: '/' });
+      $('log1').textContent = '✅ SW 注册成功\n' +
+        'scope: ' + reg.scope + '\n' +
+        'active: ' + (reg.active ? '已激活' : '未激活') + '\n' +
+        '刷新页面后 SW 开始拦截请求';
+    } catch (err) {
+      $('log1').textContent = '❌ 注册失败：' + err.message;
+    }
+  });
+
+  $('btnUnregister').addEventListener('click', async () => {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    for (const reg of regs) await reg.unregister();
+    $('log1').textContent = '✅ 已注销所有 Service Worker';
+  });
+
+  // 演示 2：三大策略（模拟）
+  $('btnCacheFirst').addEventListener('click', () => {
+    $('log2').textContent = `Cache First 策略：
+1. 先查 Cache Storage
+2. 命中 → 直接返回缓存
+3. 未命中 → 走网络，写入缓存
+适用：CSS/JS/图片等静态资源`;
+  });
+
+  $('btnNetworkFirst').addEventListener('click', () => {
+    $('log2').textContent = `Network First 策略：
+1. 先走网络请求
+2. 成功 → 返回并更新缓存
+3. 失败 → 返回缓存兜底
+适用：API 数据、实时性要求高的内容`;
+  });
+
+  $('btnSWR').addEventListener('click', () => {
+    $('log2').textContent = `Stale While Revalidate 策略：
+1. 立即返回缓存（秒开）
+2. 后台发起网络请求更新缓存
+3. 下次访问拿到新数据
+适用：新闻列表、商品列表`;
+  });
+
+  // 演示 3：缓存管理
+  $('btnListCaches').addEventListener('click', async () => {
+    if (!('caches' in window)) {
+      $('log3').textContent = '❌ 浏览器不支持 Cache Storage';
+      return;
+    }
+    const names = await caches.keys();
+    if (names.length === 0) {
+      $('log3').textContent = '当前无缓存';
+    } else {
+      const details = await Promise.all(names.map(async (name) => {
+        const cache = await caches.open(name);
+        const keys = await cache.keys();
+        return `${name} (${keys.length} 项)`;
+      }));
+      $('log3').textContent = '缓存列表：\n' + details.join('\n');
+    }
+  });
+
+  $('btnClearCaches').addEventListener('click', async () => {
+    const names = await caches.keys();
+    await Promise.all(names.map(n => caches.delete(n)));
+    $('log3').textContent = `✅ 已清空 ${names.length} 个缓存：${names.join(', ')}`;
+  });
+</script>
+
+</body>
+</html>

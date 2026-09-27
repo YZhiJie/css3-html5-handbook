@@ -47,6 +47,8 @@
     { "ep": "EP.41", "comic": "css/EP.41-container-advanced", "doc": "docs/css/26-container-advanced.md", "example": "examples/css/26-container-advanced", "title": "@container 进阶" },
     { "ep": "EP.42", "comic": "html/EP.42-web-locks", "doc": "docs/html/15-web-locks.md", "example": "examples/html/15-web-locks", "title": "Web Locks API" },
     { "ep": "EP.43", "comic": "css/EP.43-text-wrap-field-sizing", "doc": "docs/css/27-text-wrap-field-sizing.md", "example": "examples/css/27-text-wrap-field-sizing", "title": "text-wrap 与 field-sizing" },
-    { "ep": "EP.44", "comic": "html/EP.44-web-components", "doc": "docs/html/16-web-components.md", "example": "examples/html/16-web-components", "title": "Web Components 入门" }
+    { "ep": "EP.44", "comic": "html/EP.44-web-components", "doc": "docs/html/16-web-components.md", "example": "examples/html/16-web-components", "title": "Web Components 入门" },
+    { "ep": "EP.45", "comic": "css/EP.45-layer-advanced", "doc": "docs/css/28-layer-advanced.md", "example": "examples/css/28-layer-advanced", "title": "@layer 进阶" },
+    { "ep": "EP.46", "comic": "html/EP.46-service-worker-cache", "doc": "docs/html/17-service-worker-cache.md", "example": "examples/html/17-service-worker-cache", "title": "Service Worker 缓存" }
   ]
 }

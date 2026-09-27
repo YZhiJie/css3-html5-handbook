@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>@layer 进阶 · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #22d3ee; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 900px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+
+  /* ===== 演示 1：嵌套层 ===== */
+  @layer demo1 {
+    @layer base {
+      .nested-card { padding: 16px; border-radius: 8px; background: #1e293b; }
+    }
+    @layer theme {
+      .nested-card { background: #0f172a; border: 2px solid #22d3ee; }
+    }
+    @layer variant {
+      .nested-card { background: #14532d; border-color: #22c55e; }
+    }
+  }
+
+  /* ===== 演示 2：匿名层 ===== */
+  @layer demo2-named {
+    .anon-card { padding: 16px; border-radius: 8px; background: #1e293b; }
+  }
+  /* 匿名层：排在命名层之后 */
+  @layer {
+    .anon-card { border: 2px solid #f472b6; }
+  }
+
+  /* ===== 演示 3：revert-layer ===== */
+  @layer demo3-base {
+    .revert-card { color: #f8fafc; background: #1e293b; padding: 16px; border-radius: 8px; }
+  }
+  @layer demo3-components {
+    .revert-card {
+      color: revert-layer;    /* 回退到 base 层的 #f8fafc */
+      background: #7f1d1d;     /* 覆盖背景 */
+    }
+  }
+
+  /* ===== 演示 4：第三方库覆盖 ===== */
+  /* 模拟第三方库（无 @layer，直接写全局） */
+  .lib-btn {
+    padding: 8px 16px; border-radius: 6px;
+    background: #64748b; color: white; border: none; cursor: pointer;
+  }
+
+  /* 用 @layer 覆盖第三方 */
+  @layer demo4 {
+    .lib-btn {
+      background: #7c3aed;  /* 紫色覆盖灰色 */
+      border-radius: 20px;   /* 圆角覆盖 */
+    }
+  }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .label { font-size: 12px; color: #64748b; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>@layer 进阶</h1>
+<p class="sub">嵌套层 · 匿名层 · revert-layer · 第三方库覆盖</p>
+
+<!-- 演示 1：嵌套层 -->
+<section>
+  <h2>演示 1 · 嵌套层（base → theme → variant）</h2>
+  <div class="demo-box">
+    <div class="nested-card">
+      嵌套层卡片：base 层定义基础样式，theme 层加边框，variant 层改背景为绿色。<br>
+      <span class="label">最终样式 = base + theme + variant 三层叠加</span>
+    </div>
+    <p class="note"><code>@layer demo1 { @layer base { } @layer theme { } @layer variant { } }</code> —— 同父层内按声明顺序覆盖。</p>
+  </div>
+</section>
+
+<!-- 演示 2：匿名层 -->
+<section>
+  <h2>演示 2 · 匿名层（包裹第三方 CSS）</h2>
+  <div class="demo-box">
+    <div class="anon-card">
+      匿名层卡片：命名层定义背景，匿名层加粉色边框。<br>
+      <span class="label">匿名层排在所有命名层之后</span>
+    </div>
+    <p class="note">不带名字的 <code>@layer { }</code> 用于包裹第三方库，避免污染命名层体系。</p>
+  </div>
+</section>
+
+<!-- 演示 3：revert-layer -->
+<section>
+  <h2>演示 3 · revert-layer（精确撤销覆盖）</h2>
+  <div class="demo-box">
+    <div class="revert-card">
+      revert-layer 卡片：components 层用 <code>color: revert-layer</code> 回退到 base 层的白色文字，但覆盖背景为红色。
+    </div>
+    <p class="note"><code>revert-layer</code> 回退到上一层，<code>revert</code> 回退到浏览器默认。</p>
+  </div>
+</section>
+
+<!-- 演示 4：第三方库覆盖 -->
+<section>
+  <h2>演示 4 · 第三方库样式覆盖</h2>
+  <div class="demo-box">
+    <button class="lib-btn">被 @layer 覆盖的按钮</button>
+    <p class="note">第三方库按钮原本是灰色圆角小，<code>@layer demo4</code> 覆盖为紫色大圆角——无需 !important 或提高特异性。</p>
+  </div>
+</section>
+
+</body>
+</html>
