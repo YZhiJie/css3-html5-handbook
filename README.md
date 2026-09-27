@@ -16,18 +16,18 @@ css3-html5-handbook/
 ├── cheatsheet.md           # 高频语法速查表
 ├── design-system.md        # Spark 设计系统（Web 界面用：色彩/字体/组件/动效 token）
 ├── docs/                   # 深度文档（每主题一篇）
-│   ├── css/                # CSS3 十三大主题
-│   └── html/               # HTML5 十大主题
+│   ├── css/                # CSS3 十四大主题
+│   └── html/               # HTML5 十一大主题
 ├── examples/               # 可运行示例（与文档一一对应）
 │   ├── css/
 │   └── html/
-└── comics/                 # 漫画剧场（「霓虹墨」风格，全 32 话）
+└── comics/                 # 漫画剧场（「霓虹墨」风格，全 34 话）
     ├── style-guide.md      # 漫画美术风格规范
     ├── manifest.json       # 话数清单（校验器依据）
     ├── check-comics.mjs    # SVG 良构 / MD 行数 / 链接一致性校验
     ├── samples/            # 三张风格定妆稿（SVG，不参与编号）
-    ├── css/                # CSS 篇 EP.01–11、EP.22–31（SVG + 讲解 MD）
-    └── html/               # HTML 篇 EP.12–21、EP.32（SVG + 讲解 MD）
+    ├── css/                # CSS 篇 EP.01–11、EP.22–31、EP.33（SVG + 讲解 MD）
+    └── html/               # HTML 篇 EP.12–21、EP.32、EP.34（SVG + 讲解 MD）
 ```
 
 ## 内容导航
@@ -57,6 +57,7 @@ css3-html5-handbook/
 | 19 | @scope 作用域 | [docs/css/19-scope.md](docs/css/19-scope.md) | [examples/css/19-scope/](examples/css/19-scope/) |
 | 20 | @property 注册 | [docs/css/20-property.md](docs/css/20-property.md) | [examples/css/20-property/](examples/css/20-property/) |
 | 21 | 锚点定位 | [docs/css/21-anchor-positioning.md](docs/css/21-anchor-positioning.md) | [examples/css/21-anchor-positioning/](examples/css/21-anchor-positioning/) |
+| 22 | @starting-style 入场动画 | [docs/css/22-starting-style.md](docs/css/22-starting-style.md) | [examples/css/22-starting-style/](examples/css/22-starting-style/) |
 
 ### HTML5 篇
 
@@ -72,6 +73,7 @@ css3-html5-handbook/
 | 08 | 拖放 API | [docs/html/08-drag-drop.md](docs/html/08-drag-drop.md) | [examples/html/08-drag-drop/](examples/html/08-drag-drop/) |
 | 09 | 多媒体元素 | [docs/html/09-multimedia.md](docs/html/09-multimedia.md) | [examples/html/09-multimedia/](examples/html/09-multimedia/) |
 | 10 | Popover | [docs/html/10-popover.md](docs/html/10-popover.md) | [examples/html/10-popover/](examples/html/10-popover/) |
+| 11 | Observer 三件套 | [docs/html/11-observers.md](docs/html/11-observers.md) | [examples/html/11-observers/](examples/html/11-observers/) |
 
 ## 漫画剧场 · 霓虹墨 Neon Ink
 
@@ -118,6 +120,8 @@ css3-html5-handbook/
 | EP.30 | @property 注册 | [SVG](comics/css/EP.30-property.svg) | [讲解](comics/css/EP.30-property.md) |
 | EP.31 | 锚点定位 | [SVG](comics/css/EP.31-anchor-positioning.svg) | [讲解](comics/css/EP.31-anchor-positioning.md) |
 | EP.32 | Popover | [SVG](comics/html/EP.32-popover.svg) | [讲解](comics/html/EP.32-popover.md) |
+| EP.33 | @starting-style | [SVG](comics/css/EP.33-starting-style.svg) | [讲解](comics/css/EP.33-starting-style.md) |
+| EP.34 | Observer 三件套 | [SVG](comics/html/EP.34-observers.svg) | [讲解](comics/html/EP.34-observers.md) |
 
 ## 如何使用
 
@@ -138,6 +142,7 @@ css3-html5-handbook/
 
 | 版本 | 日期 | 说明 |
 | --- | --- | --- |
+| v1.9.0 | 2026-09-28 | CSS/HTML 篇扩展：新增 @starting-style 入场动画（22）与 Observer 三件套（11）两章，配套漫画 EP.33–34，全 34 话 |
 | v1.8.0 | 2026-09-28 | CSS/HTML 篇扩展：新增锚点定位（21）与 Popover（10）两章，配套漫画 EP.31–32，全 32 话 |
 | v1.7.0 | 2026-09-28 | CSS 篇扩展：新增 @scope 作用域（19）与 @property 注册（20）两章，配套漫画 EP.29–30，全 30 话 |
 | v1.6.0 | 2026-09-28 | CSS 篇扩展：新增 View Transitions（17）与 CSS 嵌套（18）两章，配套漫画 EP.27–28，全 28 话 |

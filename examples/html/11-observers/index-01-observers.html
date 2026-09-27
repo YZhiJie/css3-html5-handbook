@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Observer 三件套 · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 800px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+  .btn {
+    padding: 8px 16px; border-radius: 8px; border: 2px solid #22d3ee;
+    background: #0f172a; color: #22d3ee; font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-right: 8px; margin-bottom: 8px;
+  }
+  .btn.pink { border-color: #f472b6; color: #f472b6; }
+
+  /* ===== 示例1：图片懒加载 ===== */
+  .lazy-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .lazy-item {
+    background: #1e293b; border: 2px solid #334155; border-radius: 10px;
+    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; color: #94a3b8; overflow: hidden;
+    opacity: 0; translate: 0 12px;
+    transition: opacity .4s ease, translate .4s ease;
+  }
+  .lazy-item.loaded { opacity: 1; translate: 0 0; }
+  .lazy-item img { width: 100%; height: 100%; object-fit: cover; }
+  /* 懒加载入场动画：进入视口时淡入上浮 */
+  @starting-style {
+    .lazy-item { opacity: 0; translate: 0 12px; }
+  }
+
+  /* ===== 示例2：无限滚动 ===== */
+  .scroll-box {
+    height: 220px; overflow: auto;
+    border: 1px dashed #334155; border-radius: 10px;
+    padding: 12px;
+  }
+  .scroll-item {
+    background: #1e293b; border: 2px solid #a78bfa; border-radius: 8px;
+    padding: 10px 14px; margin-bottom: 8px; font-size: 14px;
+  }
+  #sentinel {
+    height: 2px; background: transparent;
+  }
+  .loading-hint { text-align: center; font-size: 12px; color: #64748b; padding: 8px; }
+
+  /* ===== 示例3：吸顶导航 ===== */
+  .sticky-stage { height: 200px; overflow: auto; border: 1px dashed #334155; border-radius: 10px; }
+  .sticky-header {
+    position: sticky; top: 0; z-index: 10;
+    background: #1e293b; padding: 12px 16px;
+    border-bottom: 2px solid transparent;
+    transition: background .25s, border-color .25s, box-shadow .25s;
+  }
+  .sticky-header.stuck {
+    background: #0f172a;
+    border-bottom-color: #f472b6;
+    box-shadow: 0 4px 12px rgba(0,0,0,.4);
+  }
+  .sticky-content { padding: 16px; font-size: 14px; }
+  .sticky-content p { margin-bottom: 12px; }
+
+  /* ===== 示例4：ResizeObserver 响应式卡片 ===== */
+  .resize-stage { display: flex; gap: 16px; }
+  .resize-card {
+    flex: 1; min-width: 200px;
+    background: #1e293b; border: 2px solid #22d3ee; border-radius: 12px;
+    padding: 16px; transition: all .3s;
+  }
+  .resize-card.compact {
+    border-color: #fbbf24;
+  }
+  .resize-card.compact .card-body { display: none; }
+  .resize-card .card-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .resize-card .card-body { font-size: 13px; color: #94a3b8; }
+  .resize-info {
+    font-size: 12px; color: #64748b; margin-top: 8px;
+    font-family: Menlo, monospace;
+  }
+
+  /* ===== 示例5：MutationObserver DOM 变化日志 ===== */
+  .dom-stage {
+    background: #1e293b; border: 2px solid #f472b6; border-radius: 10px;
+    padding: 12px; min-height: 80px; margin-bottom: 12px;
+  }
+  .dom-item {
+    background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+    padding: 6px 10px; margin: 4px 0; font-size: 13px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .dom-item .del { color: #f87171; cursor: pointer; font-size: 12px; }
+  .log-box {
+    background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+    padding: 10px; font-size: 12px; font-family: Menlo, monospace;
+    max-height: 120px; overflow: auto; color: #94a3b8;
+  }
+  .log-box .add { color: #34d399; }
+  .log-box .remove { color: #f87171; }
+  .log-box .attr { color: #fbbf24; }
+</style>
+</head>
+<body>
+
+<h1>Observer 三件套</h1>
+<p class="sub">IntersectionObserver · ResizeObserver · MutationObserver</p>
+
+<!-- 示例1：图片懒加载 -->
+<section>
+  <h2>示例 1 · 图片懒加载（IntersectionObserver）</h2>
+  <div class="demo-box">
+    <div class="lazy-grid" id="lazyGrid"></div>
+    <p class="note">向下滚动页面，图片进入视口前 200px 时自动加载（<code>rootMargin: '200px'</code>）。加载后 <code>unobserve</code> 停止观察。</p>
+  </div>
+</section>
+
+<!-- 示例2：无限滚动 -->
+<section>
+  <h2>示例 2 · 无限滚动（哨兵模式）</h2>
+  <div class="demo-box">
+    <div class="scroll-box" id="scrollBox">
+      <div id="scrollList"></div>
+      <div id="sentinel"></div>
+      <div class="loading-hint" id="loadingHint">下拉加载更多</div>
+    </div>
+    <p class="note">哨兵元素进入视口即触发加载，无需 scroll 监听与节流。</p>
+  </div>
+</section>
+
+<!-- 示例3：吸顶导航 -->
+<section>
+  <h2>示例 3 · 吸顶导航（替代 scroll 监听）</h2>
+  <div class="demo-box">
+    <div class="sticky-stage" id="stickyStage">
+      <div class="sticky-header" id="stickyHeader">导航栏 — 滚动我</div>
+      <div class="sticky-content">
+        <p>内容 1</p><p>内容 2</p><p>内容 3</p><p>内容 4</p><p>内容 5</p>
+        <p>内容 6</p><p>内容 7</p><p>内容 8</p><p>内容 9</p><p>内容 10</p>
+      </div>
+    </div>
+    <p class="note">用 IntersectionObserver 观察导航栏是否与容器顶部交叉，切换 <code>.stuck</code> 类实现阴影/变色。</p>
+  </div>
+</section>
+
+<!-- 示例4：ResizeObserver 响应式卡片 -->
+<section>
+  <h2>示例 4 · 响应式卡片（ResizeObserver）</h2>
+  <div class="demo-box">
+    <div class="resize-stage">
+      <div class="resize-card" id="cardA">
+        <div class="card-title">卡片 A</div>
+        <div class="card-body">宽度 &lt; 260px 时自动切换为紧凑模式，隐藏正文只留标题。</div>
+        <div class="resize-info" id="infoA">width: --</div>
+      </div>
+      <div class="resize-card" id="cardB">
+        <div class="card-title">卡片 B</div>
+        <div class="card-body">拖动窗口或缩小侧边栏试试。</div>
+        <div class="resize-info" id="infoB">width: --</div>
+      </div>
+    </div>
+    <p class="note">与 window.resize 解耦：卡片自身尺寸变化即触发，侧边栏收起/展开也能正确响应。</p>
+  </div>
+</section>
+
+<!-- 示例5：MutationObserver -->
+<section>
+  <h2>示例 5 · DOM 变化日志（MutationObserver）</h2>
+  <div class="demo-box">
+    <button class="btn" id="btnAddNode">添加节点</button>
+    <button class="btn pink" id="btnToggleAttr">切换属性</button>
+    <div class="dom-stage" id="domStage">
+      <div class="dom-item">初始节点 <span class="del">×</span></div>
+    </div>
+    <div class="log-box" id="logBox">// 操作上方按钮或点击 × 删除节点，观察日志</div>
+    <p class="note">MutationObserver 监听 childList + attributes + subtree，所有增删改实时推送。</p>
+  </div>
+</section>
+
+<script>
+  // ===== 示例1：图片懒加载 =====
+  const lazyGrid = document.getElementById('lazyGrid');
+  // 用占位色块模拟图片（真实场景替换为 img[data-src]）
+  for (let i = 1; i <= 12; i++) {
+    const div = document.createElement('div');
+    div.className = 'lazy-item';
+    div.dataset.index = i;
+    div.innerHTML = `<span>图 ${i}<br>未加载</span>`;
+    lazyGrid.appendChild(div);
+  }
+  const lazyIO = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const el = e.target;
+      const i = el.dataset.index;
+      // 模拟加载延迟
+      setTimeout(() => {
+        el.innerHTML = `<div style="width:100%;height:100%;background:linear-gradient(135deg,hsl(${i*30},70%,60%),hsl(${i*30+40},70%,50%));display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;">图 ${i}</div>`;
+        el.classList.add('loaded');
+      }, 300);
+      lazyIO.unobserve(el);
+    });
+  }, { rootMargin: '200px' });
+  document.querySelectorAll('.lazy-item').forEach(el => lazyIO.observe(el));
+
+  // ===== 示例2：无限滚动 =====
+  let page = 0;
+  const scrollList = document.getElementById('scrollList');
+  const loadingHint = document.getElementById('loadingHint');
+  function loadNextPage() {
+    page++;
+    loadingHint.textContent = '加载中...';
+    setTimeout(() => {
+      for (let i = 1; i <= 5; i++) {
+        const item = document.createElement('div');
+        item.className = 'scroll-item';
+        item.textContent = `第 ${page} 页 · 数据 ${(page-1)*5 + i}`;
+        scrollList.appendChild(item);
+      }
+      loadingHint.textContent = page >= 3 ? '没有更多了' : '下拉加载更多';
+      if (page >= 3) sentinelIO.disconnect();
+    }, 600);
+  }
+  const sentinelIO = new IntersectionObserver(([e]) => {
+    if (e.isIntersecting) loadNextPage();
+  });
+  sentinelIO.observe(document.getElementById('sentinel'));
+  loadNextPage(); // 初始加载
+
+  // ===== 示例3：吸顶导航 =====
+  const stickyIO = new IntersectionObserver(([e]) => {
+    document.getElementById('stickyHeader').classList.toggle('stuck', !e.isIntersecting);
+  }, { threshold: [0] });
+  // 在导航栏前面插一个哨兵（实际场景可直接观察 header 自身 + rootMargin）
+  const sentinelTop = document.createElement('div');
+  sentinelTop.style.height = '1px';
+  document.getElementById('stickyStage').insertBefore(sentinelTop, document.getElementById('stickyHeader'));
+  stickyIO.observe(sentinelTop);
+
+  // ===== 示例4：ResizeObserver =====
+  const cardRO = new ResizeObserver((entries) => {
+    entries.forEach(e => {
+      const w = Math.round(e.contentRect.width);
+      const info = e.target.id === 'cardA' ? infoA : infoB;
+      info.textContent = `width: ${w}px`;
+      e.target.classList.toggle('compact', w < 260);
+    });
+  });
+  cardRO.observe(document.getElementById('cardA'));
+  cardRO.observe(document.getElementById('cardB'));
+
+  // ===== 示例5：MutationObserver =====
+  let nodeCount = 1;
+  const domStage = document.getElementById('domStage');
+  const logBox = document.getElementById('logBox');
+  function log(type, text) {
+    const line = document.createElement('div');
+    line.className = type;
+    line.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+    logBox.prepend(line);
+  }
+  const mo = new MutationObserver((mutations) => {
+    mutations.forEach(m => {
+      if (m.type === 'childList') {
+        m.addedNodes.forEach(n => n.nodeType === 1 && log('add', `新增节点: ${n.textContent.trim().slice(0,20)}`));
+        m.removedNodes.forEach(n => n.nodeType === 1 && log('remove', `移除节点: ${n.textContent.trim().slice(0,20)}`));
+      }
+      if (m.type === 'attributes') {
+        log('attr', `属性变化: ${m.attributeName} → ${m.target.getAttribute(m.attributeName)}`);
+      }
+    });
+  });
+  mo.observe(domStage, { childList: true, attributes: true, subtree: true });
+
+  document.getElementById('btnAddNode').addEventListener('click', () => {
+    nodeCount++;
+    const item = document.createElement('div');
+    item.className = 'dom-item';
+    item.innerHTML = `节点 ${nodeCount} <span class="del">×</span>`;
+    domStage.appendChild(item);
+  });
+  document.getElementById('btnToggleAttr').addEventListener('click', () => {
+    const first = domStage.querySelector('.dom-item');
+    if (first) first.setAttribute('data-state', first.getAttribute('data-state') === 'on' ? 'off' : 'on');
+  });
+  domStage.addEventListener('click', (e) => {
+    if (e.target.classList.contains('del')) e.target.closest('.dom-item').remove();
+  });
+</script>
+
+</body>
+</html>
