@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>:has() 选择器 · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 800px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+
+  /* ===== 示例1：父选择器基础 ===== */
+  .card {
+    background: #1e293b; border: 2px solid #334155; border-radius: 10px;
+    padding: 16px; margin-bottom: 12px; transition: border-color .2s;
+  }
+  .card:has(img) {
+    border-color: #a78bfa;
+  }
+  .card:has(img) img {
+    width: 100%; height: 120px; object-fit: cover;
+    border-radius: 6px; margin-bottom: 10px;
+  }
+  .card h3 { font-size: 15px; color: #22d3ee; margin-bottom: 4px; }
+  .card p { font-size: 13px; color: #94a3b8; }
+  .card-tag {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    background: #f472b6; color: #0b1220; font-size: 11px; font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .card:has(.card-tag) {
+    border-color: #f472b6;
+  }
+
+  /* ===== 示例2：表单验证状态 ===== */
+  .form-demo label {
+    display: block; margin-bottom: 12px; padding: 12px;
+    background: #1e293b; border-radius: 8px; border: 2px solid #334155;
+    transition: all .2s;
+  }
+  .form-demo label:has(input:focus-visible) {
+    border-color: #22d3ee; background: #1a2e3e;
+  }
+  .form-demo label:has(input:invalid) {
+    border-color: #ef4444;
+  }
+  .form-demo label span {
+    display: block; font-size: 13px; margin-bottom: 4px; color: #cbd5e1;
+  }
+  .form-demo input {
+    width: 100%; padding: 8px 12px; border-radius: 6px;
+    border: 1px solid #334155; background: #0b1220; color: #e2e8f0;
+    font-size: 14px;
+  }
+  .form-demo input:focus { outline: none; border-color: #22d3ee; }
+  .form-demo .submit-btn {
+    padding: 10px 24px; border-radius: 8px; border: none;
+    background: #22d3ee; color: #0b1220; font-weight: 700; cursor: pointer;
+  }
+  .form-demo:has(input:invalid) .submit-btn {
+    opacity: 0.4; pointer-events: none;
+  }
+
+  /* ===== 示例3：数量感知布局 ===== */
+  .grid-demo { display: grid; gap: 10px; margin-bottom: 16px; }
+  .grid-item {
+    background: #1e293b; border: 2px solid #334155; border-radius: 8px;
+    padding: 16px; text-align: center; font-size: 14px;
+    transition: all .2s;
+  }
+
+  /* ≤ 3 项：单列大卡片 */
+  .grid-demo:has(> :nth-child(3):last-child) {
+    grid-template-columns: 1fr;
+  }
+  .grid-demo:has(> :nth-child(3):last-child) .grid-item {
+    font-size: 1.15em; padding: 24px;
+  }
+
+  /* ≥ 6 项：密集小卡片 */
+  .grid-demo:has(> :nth-child(6)) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .grid-demo:has(> :nth-child(6)) .grid-item {
+    font-size: 0.85em; padding: 10px;
+  }
+
+  /* 4-5 项：两列中等 */
+  .grid-demo:not(:has(> :nth-child(3):last-child)):not(:has(> :nth-child(6))) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* ===== 示例4：兄弟前置选择 ===== */
+  .figure-demo {
+    background: #1e293b; border-radius: 10px; padding: 16px; margin-bottom: 12px;
+  }
+  .figure-demo img {
+    width: 100%; height: 100px; object-fit: cover; border-radius: 6px;
+    margin-bottom: 8px;
+  }
+  .figure-demo img:has(+ figcaption) {
+    border-radius: 6px 6px 0 0; margin-bottom: 0;
+  }
+  .figure-demo figcaption {
+    background: #0b1220; padding: 8px; border-radius: 0 0 6px 6px;
+    font-size: 12px; color: #94a3b8; text-align: center;
+  }
+
+  /* ===== 示例5：嵌套导航 ===== */
+  .nav-demo ul {
+    list-style: none; display: flex; gap: 16px;
+  }
+  .nav-demo li {
+    position: relative; padding: 8px 14px;
+    background: #1e293b; border-radius: 6px;
+  }
+  .nav-demo li:has(> ul) > span::after {
+    content: " ▼"; font-size: 0.7em; color: #fbbf24;
+  }
+  .nav-demo li ul {
+    display: none; position: absolute; top: 100%; left: 0;
+    flex-direction: column; gap: 4px; padding-top: 8px;
+    min-width: 140px;
+  }
+  .nav-demo li:has(> ul):hover > ul {
+    display: flex;
+  }
+  .nav-demo li ul li {
+    background: #1e293b; border: 1px solid #334155;
+    padding: 8px 12px; font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<h1>:has() 选择器</h1>
+<p class="sub">CSS 的「父选择器」—— 纯 CSS 实现 DOM 反向匹配</p>
+
+<!-- 示例1：父选择器 -->
+<section>
+  <h2>示例 1 · 父选择器：有图片的卡片高亮</h2>
+  <div class="demo-box">
+    <div class="card">
+      <div class="card-tag">促销</div>
+      <h3>有标签的卡片</h3>
+      <p>此卡片包含 .card-tag，边框自动变为品红色。</p>
+    </div>
+    <div class="card">
+      <img src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='120'><rect fill='%2322d3ee' width='400' height='120'/><text x='200' y='70' text-anchor='middle' fill='%230b1220' font-size='20' font-weight='bold'>示例图片</text></svg>" alt="示例">
+      <h3>有图片的卡片</h3>
+      <p>此卡片包含 img，边框自动变为紫色。</p>
+    </div>
+    <div class="card">
+      <h3>普通卡片</h3>
+      <p>无标签、无图片，保持默认边框。</p>
+    </div>
+  </div>
+  <div class="note">
+    <code>.card:has(img)</code> — 包含图片的卡片自动获得紫色边框。<br>
+    <code>.card:has(.card-tag)</code> — 包含标签的卡片获得品红色边框。
+  </div>
+</section>
+
+<!-- 示例2：表单验证 -->
+<section>
+  <h2>示例 2 · 表单验证状态联动</h2>
+  <div class="demo-box">
+    <form class="form-demo" onsubmit="return false;">
+      <label>
+        <span>邮箱（必填）</span>
+        <input type="email" placeholder="example@email.com" required>
+      </label>
+      <label>
+        <span>密码（至少 6 位）</span>
+        <input type="password" minlength="6" placeholder="******">
+      </label>
+      <button class="submit-btn" type="submit">提交</button>
+    </form>
+  </div>
+  <div class="note">
+    <code>label:has(input:focus-visible)</code> — 聚焦时 label 边框高亮。<br>
+    <code>label:has(input:invalid)</code> — 无效时边框变红。<br>
+    <code>form:has(input:invalid) .submit-btn</code> — 有无效字段时禁用提交按钮。
+  </div>
+</section>
+
+<!-- 示例3：数量感知 -->
+<section>
+  <h2>示例 3 · 数量感知布局</h2>
+  <div class="demo-box">
+    <p style="font-size:13px; color:#94a3b8; margin-bottom:12px;">3 项：单列大卡片</p>
+    <div class="grid-demo">
+      <div class="grid-item">A</div>
+      <div class="grid-item">B</div>
+      <div class="grid-item">C</div>
+    </div>
+    <p style="font-size:13px; color:#94a3b8; margin-bottom:12px;">4 项：两列中等</p>
+    <div class="grid-demo">
+      <div class="grid-item">A</div>
+      <div class="grid-item">B</div>
+      <div class="grid-item">C</div>
+      <div class="grid-item">D</div>
+    </div>
+    <p style="font-size:13px; color:#94a3b8; margin-bottom:12px;">6 项：四列密集</p>
+    <div class="grid-demo">
+      <div class="grid-item">A</div><div class="grid-item">B</div>
+      <div class="grid-item">C</div><div class="grid-item">D</div>
+      <div class="grid-item">E</div><div class="grid-item">F</div>
+    </div>
+  </div>
+  <div class="note">
+    <code>.grid:has(> :nth-child(3):last-child)</code> — 恰好 3 项时单列大卡片。<br>
+    <code>.grid:has(> :nth-child(6))</code> — ≥6 项时四列密集。<br>
+    <code>:not()</code> 兜底：4-5 项时两列中等。
+  </div>
+</section>
+
+<!-- 示例4：兄弟前置 -->
+<section>
+  <h2>示例 4 · 兄弟前置选择器</h2>
+  <div class="demo-box">
+    <div class="figure-demo">
+      <img src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='100'><rect fill='%23a78bfa' width='400' height='100'/><text x='200' y='55' text-anchor='middle' fill='%230b1220' font-size='16' font-weight='bold'>有标题的图片</text></svg>" alt="">
+      <figcaption>此图片后面跟着 figcaption，圆角变为上方</figcaption>
+    </div>
+    <div class="figure-demo">
+      <img src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='100'><rect fill='%23f472b6' width='400' height='100'/><text x='200' y='55' text-anchor='middle' fill='%230b1220' font-size='16' font-weight='bold'>无标题的图片</text></svg>" alt="">
+    </div>
+  </div>
+  <div class="note">
+    <code>img:has(+ figcaption)</code> — 后面跟着标题的图片，圆角只在上边，下边与标题连为一体。
+  </div>
+</section>
+
+<!-- 示例5：导航嵌套 -->
+<section>
+  <h2>示例 5 · 导航子菜单标记</h2>
+  <div class="demo-box">
+    <nav class="nav-demo">
+      <ul>
+        <li><span>首页</span></li>
+        <li>
+          <span>产品</span>
+          <ul>
+            <li>产品 A</li>
+            <li>产品 B</li>
+          </ul>
+        </li>
+        <li><span>关于</span></li>
+        <li>
+          <span>服务</span>
+          <ul>
+            <li>咨询</li>
+            <li>开发</li>
+            <li>运维</li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+  </div>
+  <div class="note">
+    <code>li:has(> ul) > span::after</code> — 有子菜单的导航项自动添加 ▼ 箭头。<br>
+    <code>li:has(> ul):hover > ul</code> — 悬停有子菜单的项时展开子菜单。
+  </div>
+</section>
+
+</body>
+</html>

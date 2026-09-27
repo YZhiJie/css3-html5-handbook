@@ -1,0 +1,247 @@
+<!-- EP.25 · 滚动驱动动画 — scroll()/view() 纯 CSS 实现视差与进出场，规范见 ../style-guide.md -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 840">
+  <defs>
+    <style>
+      .t{font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;}
+      .m{font-family:'SFMono-Regular',Menlo,Consolas,monospace;}
+      .st{font-size:15px;fill:#94a3b8;}
+      .bt{font-size:30px;font-weight:bold;fill:#f8fafc;}
+      .pt{font-size:19px;font-weight:bold;fill:#f8fafc;}
+      .an{font-size:12.5px;fill:#94a3b8;}
+      .cd{font-size:11.5px;fill:#cbd5e1;}
+      .kt{font-size:20px;font-weight:bold;fill:#451a03;}
+      .kb{font-size:15px;fill:#451a03;}
+      .ft{font-size:12.5px;fill:#64748b;}
+    </style>
+    <pattern id="ht" width="14" height="14" patternUnits="userSpaceOnUse">
+      <circle cx="3" cy="3" r="1.8" fill="#f8fafc" opacity="0.05"/>
+    </pattern>
+    <g id="pixelv2">
+      <ellipse cx="0" cy="0" rx="46" ry="9" fill="#020617" opacity="0.5"/>
+      <rect x="-24" y="-8" width="18" height="9" rx="4" fill="#f8fafc" stroke="#0b1220" stroke-width="2.5"/>
+      <rect x="6" y="-8" width="18" height="9" rx="4" fill="#f8fafc" stroke="#0b1220" stroke-width="2.5"/>
+      <rect x="-18" y="-30" width="11" height="24" fill="#f8d8bf" stroke="#0b1220" stroke-width="2"/>
+      <rect x="7" y="-30" width="11" height="24" fill="#f8d8bf" stroke="#0b1220" stroke-width="2"/>
+      <path d="M 30 -128 Q 58 -120 54 -92 Q 51 -74 38 -70 Q 48 -86 42 -100 Q 38 -114 26 -120 Z" fill="#22d3ee" stroke="#0b1220" stroke-width="3"/>
+      <circle cx="29" cy="-124" r="5" fill="#fbbf24" stroke="#0b1220" stroke-width="2"/>
+      <path d="M -32 -84 L 32 -84 L 26 -26 L -26 -26 Z" fill="#f472b6" stroke="#0b1220" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M -26 -34 L 26 -34" stroke="#db2777" stroke-width="2"/>
+      <path d="M -6 -80 L -9 -64" stroke="#f8fafc" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M 6 -80 L 9 -64" stroke="#f8fafc" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="-9" cy="-62" r="2" fill="#f8fafc"/>
+      <circle cx="9" cy="-62" r="2" fill="#f8fafc"/>
+      <rect x="-14" y="-60" width="28" height="14" rx="4" fill="#22d3ee" stroke="#0b1220" stroke-width="2"/>
+      <text class="m" x="0" y="-50" text-anchor="middle" font-size="9" font-weight="bold" fill="#0b1220">CSS</text>
+      <rect x="-46" y="-72" width="14" height="36" rx="7" fill="#f472b6" stroke="#0b1220" stroke-width="2.5"/>
+      <rect x="30" y="-106" width="14" height="34" rx="7" fill="#f472b6" stroke="#0b1220" stroke-width="2.5" transform="rotate(-55 37 -89)"/>
+      <circle cx="0" cy="-106" r="31" fill="#ffdfc8" stroke="#0b1220" stroke-width="3"/>
+      <path d="M -33 -104 Q -35 -142 0 -142 Q 35 -142 33 -104 L 33 -96 Q 17 -110 0 -110 Q -17 -110 -33 -96 Z" fill="#22d3ee" stroke="#0b1220" stroke-width="3"/>
+      <path d="M -33 -114 L -39 -76 Q -33 -68 -26 -78 Z" fill="#22d3ee" stroke="#0b1220" stroke-width="2"/>
+      <path d="M 33 -114 L 39 -76 Q 33 -68 26 -78 Z" fill="#22d3ee" stroke="#0b1220" stroke-width="2"/>
+      <path d="M 8 -140 Q 20 -124 17 -108 L 24 -111 Q 27 -128 19 -138 Z" fill="#a78bfa" stroke="#0b1220" stroke-width="2"/>
+      <path d="M -19 -130 Q -25 -123 -19 -116" stroke="#fbbf24" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <ellipse cx="-12" cy="-108" rx="4.5" ry="6" fill="#0b1220"/>
+      <ellipse cx="12" cy="-108" rx="4.5" ry="6" fill="#0b1220"/>
+      <circle cx="-13.5" cy="-110.5" r="1.8" fill="#ffffff"/>
+      <circle cx="10.5" cy="-110.5" r="1.8" fill="#ffffff"/>
+      <path d="M -18 -118 Q -12 -121 -6 -119" stroke="#0b1220" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <path d="M 18 -118 Q 12 -121 6 -119" stroke="#0b1220" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <circle cx="-20" cy="-100" r="4" fill="#fb7185" opacity="0.55"/>
+      <circle cx="20" cy="-100" r="4" fill="#fb7185" opacity="0.55"/>
+      <path d="M -9 -94 Q 0 -83 9 -94" stroke="#0b1220" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </g>
+    <g id="taggyv2">
+      <ellipse cx="0" cy="0" rx="42" ry="8" fill="#020617" opacity="0.5"/>
+      <rect x="-26" y="-8" width="20" height="10" rx="5" fill="#f8fafc" stroke="#0b1220" stroke-width="2.5"/>
+      <rect x="6" y="-8" width="20" height="10" rx="5" fill="#f8fafc" stroke="#0b1220" stroke-width="2.5"/>
+      <rect x="-21" y="-24" width="13" height="18" fill="#c2410c" stroke="#0b1220" stroke-width="2"/>
+      <rect x="8" y="-24" width="13" height="18" fill="#c2410c" stroke="#0b1220" stroke-width="2"/>
+      <rect x="-34" y="-78" width="68" height="60" rx="14" fill="#fb923c" stroke="#0b1220" stroke-width="3"/>
+      <polygon points="-13,-70 13,-70 10,-48 0,-44 -10,-48" fill="#0b1220" stroke="#0b1220" stroke-width="2"/>
+      <text class="m" x="0" y="-52" text-anchor="middle" font-size="11" font-weight="bold" fill="#fbbf24">5</text>
+      <rect x="-34" y="-26" width="68" height="8" fill="#c2410c" stroke="#0b1220" stroke-width="2"/>
+      <rect x="-6" y="-27" width="12" height="10" rx="2" fill="#fbbf24" stroke="#0b1220" stroke-width="2"/>
+      <rect x="-48" y="-68" width="14" height="34" rx="7" fill="#fb923c" stroke="#0b1220" stroke-width="2.5"/>
+      <circle cx="-41" cy="-66" r="5" fill="#fdba74" stroke="#0b1220" stroke-width="2"/>
+      <rect x="32" y="-71" width="34" height="13" rx="6.5" fill="#fb923c" stroke="#0b1220" stroke-width="2.5" transform="rotate(-20 32 -65)"/>
+      <circle cx="38" cy="-64" r="5" fill="#fdba74" stroke="#0b1220" stroke-width="2"/>
+      <rect x="-30" y="-128" width="60" height="46" rx="13" fill="#fdba74" stroke="#0b1220" stroke-width="3"/>
+      <rect x="-36" y="-112" width="8" height="18" rx="3" fill="#fb923c" stroke="#0b1220" stroke-width="2"/>
+      <rect x="28" y="-112" width="8" height="18" rx="3" fill="#fb923c" stroke="#0b1220" stroke-width="2"/>
+      <rect x="-23" y="-118" width="46" height="22" rx="8" fill="#0b1220"/>
+      <text class="m" x="-10" y="-102" text-anchor="middle" font-size="16" font-weight="bold" fill="#22d3ee">&lt;</text>
+      <text class="m" x="10" y="-102" text-anchor="middle" font-size="16" font-weight="bold" fill="#22d3ee">&gt;</text>
+      <circle cx="-6" cy="-90" r="1.5" fill="#0b1220"/>
+      <circle cx="0" cy="-90" r="1.5" fill="#0b1220"/>
+      <circle cx="6" cy="-90" r="1.5" fill="#0b1220"/>
+      <line x1="0" y1="-128" x2="0" y2="-142" stroke="#0b1220" stroke-width="3"/>
+      <circle cx="0" cy="-147" r="9" fill="none" stroke="#fbbf24" stroke-width="1.5" opacity="0.4"/>
+      <circle cx="0" cy="-147" r="5.5" fill="#fbbf24" stroke="#0b1220" stroke-width="2"/>
+    </g>
+    <g id="moov2">
+      <ellipse cx="0" cy="68" rx="48" ry="7" fill="#020617" opacity="0.5"/>
+      <line x1="-9" y1="60" x2="-9" y2="66" stroke="#78350f" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="9" y1="60" x2="9" y2="66" stroke="#78350f" stroke-width="3.5" stroke-linecap="round"/>
+      <ellipse cx="0" cy="12" rx="30" ry="22" fill="#b45309" stroke="#78350f" stroke-width="3"/>
+      <ellipse cx="0" cy="16" rx="17" ry="13" fill="#fde68a"/>
+      <path d="M -30 18 L 30 18 L 38 52 Q 0 60 -38 52 Z" fill="#1e293b" stroke="#0b1220" stroke-width="2.5"/>
+      <line x1="0" y1="22" x2="0" y2="54" stroke="#334155" stroke-width="2"/>
+      <path d="M -30 2 Q -46 12 -37 28 Q -30 20 -28 6 Z" fill="#92400e" stroke="#78350f" stroke-width="2.5"/>
+      <path d="M 30 -4 Q 44 -14 40 -28 Q 30 -22 26 -8 Z" fill="#92400e" stroke="#78350f" stroke-width="2.5"/>
+      <line x1="40" y1="-28" x2="56" y2="-56" stroke="#b45309" stroke-width="3.5" stroke-linecap="round"/>
+      <circle cx="56" cy="-56" r="3.5" fill="#fbbf24" stroke="#78350f" stroke-width="1.5"/>
+      <polygon points="-9,10 0,6 0,14" fill="#f472b6" stroke="#0b1220" stroke-width="1.5"/>
+      <polygon points="9,10 0,6 0,14" fill="#f472b6" stroke="#0b1220" stroke-width="1.5"/>
+      <circle cx="0" cy="10" r="2.5" fill="#db2777"/>
+      <circle cx="0" cy="-26" r="33" fill="#f59e0b" stroke="#78350f" stroke-width="3"/>
+      <polygon points="-27,-50 0,-62 27,-50 0,-42" fill="#1e293b" stroke="#0b1220" stroke-width="2"/>
+      <circle cx="0" cy="-62" r="2.5" fill="#fbbf24"/>
+      <path d="M 27 -50 L 33 -34" stroke="#fbbf24" stroke-width="2"/>
+      <circle cx="33" cy="-31" r="3" fill="#fbbf24"/>
+      <circle cx="-12" cy="-30" r="12.5" fill="#fffbeb" stroke="#78350f" stroke-width="2"/>
+      <circle cx="12" cy="-30" r="12.5" fill="#fffbeb" stroke="#78350f" stroke-width="2"/>
+      <line x1="-1" y1="-30" x2="1" y2="-30" stroke="#78350f" stroke-width="2"/>
+      <line x1="-24.5" y1="-30" x2="-30" y2="-32" stroke="#78350f" stroke-width="2"/>
+      <line x1="24.5" y1="-30" x2="30" y2="-32" stroke="#78350f" stroke-width="2"/>
+      <circle cx="-12" cy="-30" r="4.5" fill="#0b1220"/>
+      <circle cx="12" cy="-30" r="4.5" fill="#0b1220"/>
+      <circle cx="-13.5" cy="-32" r="1.5" fill="#ffffff"/>
+      <circle cx="10.5" cy="-32" r="1.5" fill="#ffffff"/>
+      <polygon points="0,-14 -6,-22 6,-22" fill="#f97316" stroke="#78350f" stroke-width="2"/>
+    </g>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="840" fill="#0b1220"/>
+
+  <!-- ===== 顶部横幅 ===== -->
+  <rect x="40" y="6" width="120" height="6" rx="3" fill="#22d3ee"/>
+  <rect x="40" y="16" width="120" height="6" rx="3" fill="#f472b6"/>
+  <text class="t st" x="40" y="40">前端漫画实验室 · CSS3 × HTML5 漫画剧场 · CSS 篇</text>
+  <text class="t bt" x="40" y="80">第 25 话 · 滚动驱动动画 — scroll() / view()</text>
+  <rect x="1020" y="26" width="140" height="44" rx="22" fill="#22d3ee"/>
+  <text class="m" x="1090" y="54" text-anchor="middle" font-size="19" font-weight="bold" fill="#0b1220">EP.25</text>
+  <line x1="0" y1="96" x2="1200" y2="96" stroke="#1e293b" stroke-width="2"/>
+
+  <!-- ===== 格1 · 痛点现场 ===== -->
+  <rect x="40" y="120" width="556" height="250" rx="16" fill="#131c2e" stroke="#334155" stroke-width="3"/>
+  <rect x="40" y="120" width="556" height="250" rx="16" fill="url(#ht)"/>
+  <circle cx="66" cy="146" r="14" fill="#f472b6"/>
+  <text class="m" x="66" y="151" text-anchor="middle" font-size="15" font-weight="bold" fill="#0b1220">1</text>
+  <text class="t pt" x="92" y="152">痛点现场 · JS 滚动监听三大坑</text>
+  <rect x="64" y="176" width="248" height="170" rx="10" fill="#1e293b" stroke="#f87171" stroke-width="2"/>
+  <text class="m" x="78" y="198" font-size="10" fill="#f87171">// 阅读进度条</text>
+  <text class="m" x="78" y="216" font-size="10" fill="#cbd5e1">window.addEventListener('scroll',</text>
+  <text class="m" x="78" y="232" font-size="10" fill="#cbd5e1">  () =＞ {</text>
+  <text class="m" x="78" y="248" font-size="10" fill="#cbd5e1">    bar.style.transform =</text>
+  <text class="m" x="78" y="264" font-size="10" fill="#cbd5e1">      \`scaleX(${scrollY / total})\`</text>
+  <text class="m" x="78" y="280" font-size="10" fill="#cbd5e1">  }, { passive: true }</text>
+  <text class="m" x="78" y="296" font-size="10" fill="#cbd5e1">);</text>
+  <text class="t" x="78" y="318" font-size="10" fill="#f87171">scroll 事件在主线程高频触发</text>
+  <text class="t" x="78" y="334" font-size="10" fill="#f87171">JS 阻塞时动画卡顿</text>
+  <rect x="326" y="176" width="246" height="170" rx="10" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <text class="m" x="340" y="198" font-size="10" fill="#64748b">// 进出场动画</text>
+  <text class="m" x="340" y="216" font-size="10" fill="#cbd5e1">const obs = new</text>
+  <text class="m" x="340" y="232" font-size="10" fill="#cbd5e1">  IntersectionObserver(</text>
+  <text class="m" x="340" y="248" font-size="10" fill="#cbd5e1">    entries =＞ entries.forEach(</text>
+  <text class="m" x="340" y="264" font-size="10" fill="#cbd5e1">      e =＞ e.target.classList</text>
+  <text class="m" x="340" y="280" font-size="10" fill="#cbd5e1">        .toggle('visible')</text>
+  <text class="m" x="340" y="296" font-size="10" fill="#cbd5e1">    )</text>
+  <text class="m" x="340" y="312" font-size="10" fill="#cbd5e1">  );</text>
+  <text class="t" x="340" y="334" font-size="10" fill="#94a3b8">IntersectionObserver</text>
+  <text class="t" x="340" y="348" font-size="10" fill="#94a3b8">需要手动管理 observer</text>
+  <text class="t" x="64" y="362" font-size="13" font-weight="bold" fill="#f87171">scroll 监听 + rAF + IO = 60 行 JS，只为一个进度条</text>
+  <use href="#pixelv2" transform="translate(524,352) scale(0.55)"/>
+
+  <!-- ===== 格2 · 机制登场 ===== -->
+  <rect x="616" y="120" width="544" height="250" rx="16" fill="#131c2e" stroke="#334155" stroke-width="3"/>
+  <rect x="616" y="120" width="544" height="250" rx="16" fill="url(#ht)"/>
+  <circle cx="642" cy="146" r="14" fill="#a78bfa"/>
+  <text class="m" x="642" y="151" text-anchor="middle" font-size="15" font-weight="bold" fill="#0b1220">2</text>
+  <text class="t pt" x="668" y="152">机制登场 · 滚动即时间轴</text>
+  <rect x="648" y="176" width="250" height="170" rx="10" fill="#1e293b" stroke="#22d3ee" stroke-width="2"/>
+  <text class="t" x="662" y="198" font-size="12" font-weight="bold" fill="#22d3ee">scroll() 滚动时间轴</text>
+  <text class="m" x="662" y="218" font-size="10" fill="#cbd5e1">.bar {</text>
+  <text class="m" x="662" y="234" font-size="10" fill="#cbd5e1">  animation: grow linear;</text>
+  <text class="m" x="662" y="250" font-size="10" fill="#22d3ee">  animation-timeline: scroll();</text>
+  <text class="m" x="662" y="266" font-size="10" fill="#cbd5e1">}</text>
+  <text class="m" x="662" y="286" font-size="10" fill="#64748b">@keyframes grow {</text>
+  <text class="m" x="662" y="302" font-size="10" fill="#64748b">  from { scaleX: 0; }</text>
+  <text class="m" x="662" y="318" font-size="10" fill="#64748b">  to   { scaleX: 1; }</text>
+  <text class="m" x="662" y="334" font-size="10" fill="#64748b">}</text>
+  <text class="t" x="662" y="352" font-size="10" fill="#22d3ee">滚动位置 → 动画进度，0 JS</text>
+  <rect x="914" y="176" width="230" height="170" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+  <text class="t" x="928" y="198" font-size="12" font-weight="bold" fill="#a78bfa">view() 视图时间轴</text>
+  <text class="m" x="928" y="218" font-size="10" fill="#cbd5e1">.card {</text>
+  <text class="m" x="928" y="234" font-size="10" fill="#cbd5e1">  animation: fade-in linear;</text>
+  <text class="m" x="928" y="250" font-size="10" fill="#a78bfa">  animation-timeline: view();</text>
+  <text class="m" x="928" y="266" font-size="10" fill="#a78bfa">  animation-range:</text>
+  <text class="m" x="928" y="282" font-size="10" fill="#a78bfa">    entry 0% entry 100%;</text>
+  <text class="m" x="928" y="298" font-size="10" fill="#cbd5e1">}</text>
+  <text class="t" x="928" y="320" font-size="10" fill="#a78bfa">元素进入视口 = 动画开始</text>
+  <text class="t" x="928" y="336" font-size="10" fill="#a78bfa">完全进入 = 动画结束</text>
+  <text class="t" x="648" y="344" font-size="13" font-weight="bold" fill="#a78bfa">animation-duration 被忽略，进度由滚动决定</text>
+  <use href="#taggyv2" transform="translate(1105,356) scale(0.44)"/>
+
+  <!-- ===== 格3 · 落地收束 ===== -->
+  <rect x="40" y="390" width="1120" height="230" rx="16" fill="#131c2e" stroke="#334155" stroke-width="3"/>
+  <rect x="40" y="390" width="1120" height="230" rx="16" fill="url(#ht)"/>
+  <circle cx="66" cy="416" r="14" fill="#fbbf24"/>
+  <text class="m" x="66" y="421" text-anchor="middle" font-size="15" font-weight="bold" fill="#0b1220">3</text>
+  <text class="t pt" x="92" y="422">落地收束 · 时间轴类型与触发区间</text>
+  <!-- 左侧：三种时间轴 -->
+  <rect x="64" y="440" width="200" height="160" rx="12" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <text class="t" x="78" y="462" font-size="12" font-weight="bold" fill="#fbbf24">三种时间轴</text>
+  <text class="m" x="78" y="484" font-size="10" fill="#94a3b8">1. 文档时间轴</text>
+  <text class="m" x="78" y="502" font-size="10" fill="#cbd5e1">   animation-duration</text>
+  <text class="m" x="78" y="520" font-size="10" fill="#22d3ee">2. scroll() 滚动</text>
+  <text class="m" x="78" y="538" font-size="10" fill="#22d3ee">   滚动容器位置</text>
+  <text class="m" x="78" y="556" font-size="10" fill="#a78bfa">3. view() 视图</text>
+  <text class="m" x="78" y="574" font-size="10" fill="#a78bfa">   元素在视口中</text>
+  <!-- 中间：animation-range -->
+  <rect x="280" y="440" width="260" height="160" rx="12" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <text class="t" x="294" y="462" font-size="12" font-weight="bold" fill="#a78bfa">animation-range</text>
+  <text class="m" x="294" y="484" font-size="10" fill="#64748b">entry 0% entry 100%</text>
+  <text class="m" x="294" y="500" font-size="10" fill="#94a3b8">   刚进入 → 完全进入</text>
+  <text class="m" x="294" y="520" font-size="10" fill="#64748b">exit 0% exit 100%</text>
+  <text class="m" x="294" y="536" font-size="10" fill="#94a3b8">   刚离开 → 完全离开</text>
+  <text class="m" x="294" y="556" font-size="10" fill="#64748b">cover 0% cover 100%</text>
+  <text class="m" x="294" y="572" font-size="10" fill="#94a3b8">   进入底部 → 离开顶部</text>
+  <text class="m" x="294" y="590" font-size="10" fill="#64748b">contain 0% contain 100%</text>
+  <!-- 右侧：性能与兼容性 -->
+  <rect x="556" y="440" width="280" height="160" rx="12" fill="#1e293b" stroke="#22d3ee" stroke-width="2"/>
+  <text class="t" x="570" y="462" font-size="12" font-weight="bold" fill="#22d3ee">合成器线程 · 零 JS</text>
+  <text class="t" x="570" y="484" font-size="11" fill="#cbd5e1">动画在合成器线程运行</text>
+  <text class="t" x="570" y="502" font-size="11" fill="#cbd5e1">不受主线程 JS 阻塞影响</text>
+  <text class="t" x="570" y="524" font-size="11" fill="#fbbf24">⚠ 仅 transform/opacity</text>
+  <text class="t" x="570" y="542" font-size="11" fill="#fbbf24">   走合成器</text>
+  <text class="t" x="570" y="566" font-size="11" fill="#94a3b8">Chrome 115+ / Firefox 110+</text>
+  <text class="t" x="570" y="582" font-size="11" fill="#94a3b8">Safari 26+</text>
+  <!-- 右侧代码 -->
+  <rect x="856" y="440" width="284" height="160" rx="12" fill="#0b1220" stroke="#334155" stroke-width="2"/>
+  <text class="m" x="870" y="462" font-size="10" fill="#64748b">/* 命名时间轴 + timeline-scope */</text>
+  <text class="m" x="870" y="480" font-size="10" fill="#cbd5e1">.scroller {</text>
+  <text class="m" x="870" y="496" font-size="10" fill="#22d3ee">  scroll-timeline-name: --t;</text>
+  <text class="m" x="870" y="512" font-size="10" fill="#cbd5e1">}</text>
+  <text class="m" x="870" y="532" font-size="10" fill="#cbd5e1">.parent {</text>
+  <text class="m" x="870" y="548" font-size="10" fill="#22d3ee">  timeline-scope: --t;</text>
+  <text class="m" x="870" y="564" font-size="10" fill="#cbd5e1">}</text>
+  <text class="m" x="870" y="584" font-size="10" fill="#cbd5e1">.sibling {</text>
+  <text class="m" x="870" y="600" font-size="10" fill="#a78bfa">  animation-timeline: --t;</text>
+  <text class="m" x="870" y="616" font-size="10" fill="#cbd5e1">}</text>
+  <path d="M 552 428 l 3 8 8 3 -8 3 -3 8 -3 -8 -8 -3 8 -3 Z" fill="#fbbf24"/>
+
+  <!-- ===== 知识条 ===== -->
+  <rect x="40" y="640" width="1120" height="152" rx="16" fill="#fbbf24" stroke="#78350f" stroke-width="3"/>
+  <use href="#moov2" transform="translate(150,744) scale(0.62)"/>
+  <text class="t kt" x="230" y="676">码叔划重点</text>
+  <circle cx="248" cy="703" r="4" fill="#b45309"/>
+  <text class="t kb" x="266" y="708">scroll() 跟踪滚动容器，view() 跟踪元素在视口中的可见进度</text>
+  <circle cx="248" cy="731" r="4" fill="#b45309"/>
+  <text class="t kb" x="266" y="736">animation-range 精确控制触发区间：entry / exit / cover / contain</text>
+  <circle cx="248" cy="759" r="4" fill="#b45309"/>
+  <text class="t kb" x="266" y="764">动画在合成器线程运行，优先使用 transform 和 opacity 避免 layout</text>
+  <rect x="1000" y="700" width="140" height="32" rx="16" fill="none" stroke="#b45309" stroke-width="1.5"/>
+  <text class="t" x="1070" y="721" text-anchor="middle" font-size="13" font-weight="bold" fill="#b45309">EP.25 · 滚动驱动动画</text>
+
+  <text class="t ft" x="40" y="822">霓虹墨 Neon Ink · 第 25 话 — 深入阅读 docs/css/15-scroll-driven-animations.md · 示例 examples/css/15-scroll-driven-animations</text>
+</svg>

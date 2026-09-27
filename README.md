@@ -21,12 +21,12 @@ css3-html5-handbook/
 ├── examples/               # 可运行示例（与文档一一对应）
 │   ├── css/
 │   └── html/
-└── comics/                 # 漫画剧场（「霓虹墨」风格，全 24 话）
+└── comics/                 # 漫画剧场（「霓虹墨」风格，全 26 话）
     ├── style-guide.md      # 漫画美术风格规范
     ├── manifest.json       # 话数清单（校验器依据）
     ├── check-comics.mjs    # SVG 良构 / MD 行数 / 链接一致性校验
     ├── samples/            # 三张风格定妆稿（SVG，不参与编号）
-    ├── css/                # CSS 篇 EP.01–11、EP.22–24（SVG + 讲解 MD）
+    ├── css/                # CSS 篇 EP.01–11、EP.22–26（SVG + 讲解 MD）
     └── html/               # HTML 篇 EP.12–21（SVG + 讲解 MD）
 ```
 
@@ -50,6 +50,8 @@ css3-html5-handbook/
 | 12 | 容器查询 | [docs/css/12-container-queries.md](docs/css/12-container-queries.md) | [examples/css/12-container-queries/](examples/css/12-container-queries/) |
 | 13 | 层叠层 | [docs/css/13-cascade-layers.md](docs/css/13-cascade-layers.md) | [examples/css/13-cascade-layers/](examples/css/13-cascade-layers/) |
 | 14 | 现代颜色 | [docs/css/14-modern-colors.md](docs/css/14-modern-colors.md) | [examples/css/14-modern-colors/](examples/css/14-modern-colors/) |
+| 15 | 滚动驱动动画 | [docs/css/15-scroll-driven-animations.md](docs/css/15-scroll-driven-animations.md) | [examples/css/15-scroll-driven-animations/](examples/css/15-scroll-driven-animations/) |
+| 16 | :has() 选择器 | [docs/css/16-has-selector.md](docs/css/16-has-selector.md) | [examples/css/16-has-selector/](examples/css/16-has-selector/) |
 
 ### HTML5 篇
 
@@ -102,6 +104,8 @@ css3-html5-handbook/
 | EP.22 | 容器查询 | [SVG](comics/css/EP.22-container-queries.svg) | [讲解](comics/css/EP.22-container-queries.md) |
 | EP.23 | 层叠层 | [SVG](comics/css/EP.23-cascade-layers.svg) | [讲解](comics/css/EP.23-cascade-layers.md) |
 | EP.24 | 现代颜色 | [SVG](comics/css/EP.24-modern-colors.svg) | [讲解](comics/css/EP.24-modern-colors.md) |
+| EP.25 | 滚动驱动动画 | [SVG](comics/css/EP.25-scroll-driven-animations.svg) | [讲解](comics/css/EP.25-scroll-driven-animations.md) |
+| EP.26 | :has() 选择器 | [SVG](comics/css/EP.26-has-selector.svg) | [讲解](comics/css/EP.26-has-selector.md) |
 
 ## 如何使用
 
@@ -122,6 +126,7 @@ css3-html5-handbook/
 
 | 版本 | 日期 | 说明 |
 | --- | --- | --- |
+| v1.5.0 | 2026-09-28 | CSS 篇扩展：新增滚动驱动动画（15）与 :has() 选择器（16）两章，配套漫画 EP.25–26，全 26 话 |
 | v1.4.0 | 2026-09-27 | CSS 篇扩展：新增现代颜色（14）一章，配套漫画 EP.24，全 24 话 |
 | v1.3.0 | 2026-09-27 | CSS 篇扩展：新增容器查询（12）与层叠层（13）两章，配套漫画 EP.22–23，全 23 话 |
 | v1.2.0 | 2026-09-27 | 「霓虹墨」漫画剧场全 21 话量产完成：CSS 篇 EP.01–11 + HTML 篇 EP.12–21，每话含 SVG 原画与讲解 MD，附话数清单与质量校验器 |

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>滚动驱动动画 Scroll-Driven Animations · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    line-height: 1.6;
+  }
+
+  /* ===== 示例1：页面阅读进度条 ===== */
+  .progress-bar {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 4px;
+    background: linear-gradient(90deg, #22d3ee, #a78bfa, #f472b6);
+    transform-origin: left;
+    transform: scaleX(0);
+    z-index: 100;
+    animation: progress linear;
+    animation-timeline: scroll();
+  }
+  @keyframes progress {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+  }
+
+  /* ===== 示例2：卡片进入视口动画 ===== */
+  .cards-section {
+    max-width: 800px; margin: 60px auto; padding: 0 24px;
+  }
+  .cards-section h2 {
+    font-size: 20px; color: #fbbf24; margin-bottom: 20px;
+    padding-bottom: 8px; border-bottom: 1px solid #334155;
+  }
+  .card {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 24px; margin-bottom: 20px;
+    animation: fade-in-up linear;
+    animation-timeline: view();
+    animation-range: entry 0% entry 100%;
+  }
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(40px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .card h3 { font-size: 16px; color: #22d3ee; margin-bottom: 8px; }
+  .card p { font-size: 14px; color: #94a3b8; }
+
+  /* ===== 示例3：视差滚动 ===== */
+  .parallax-hero {
+    position: relative;
+    height: 300px;
+    overflow: hidden;
+    border-radius: 16px;
+    margin: 40px auto;
+    max-width: 800px;
+  }
+  .parallax-bg {
+    position: absolute; inset: -100px 0;
+    background: linear-gradient(135deg, #1e293b, #0b1220);
+    display: flex; align-items: center; justify-content: center;
+    animation: parallax-slow linear;
+    animation-timeline: view();
+    animation-range: cover 0% cover 100%;
+  }
+  @keyframes parallax-slow {
+    from { transform: translateY(0); }
+    to   { transform: translateY(-80px); }
+  }
+  .parallax-content {
+    position: relative; z-index: 1;
+    height: 100%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  .parallax-content h2 { font-size: 28px; color: #f472b6; margin-bottom: 8px; }
+  .parallax-content p { color: #94a3b8; font-size: 14px; }
+
+  /* ===== 示例4：图片滚动揭示 ===== */
+  .reveal-section {
+    max-width: 800px; margin: 40px auto; padding: 0 24px;
+  }
+  .reveal-img {
+    width: 100%; height: 200px; border-radius: 12px;
+    background: linear-gradient(135deg, #22d3ee 0%, #a78bfa 50%, #f472b6 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700; color: #0b1220;
+    animation: clip-reveal linear;
+    animation-timeline: view();
+    animation-range: entry 25% cover 50%;
+  }
+  @keyframes clip-reveal {
+    from { clip-path: inset(100% 0 0 0); border-radius: 12px; }
+    to   { clip-path: inset(0 0 0 0); border-radius: 12px; }
+  }
+
+  /* ===== 示例5：命名时间轴 + timeline-scope ===== */
+  .scope-section {
+    max-width: 800px; margin: 40px auto; padding: 0 24px;
+    timeline-scope: --page-scroll;
+  }
+  .scroll-indicator {
+    position: sticky; top: 20px;
+    background: #1e293b; border: 2px solid #fbbf24; border-radius: 10px;
+    padding: 12px 20px; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .scroll-indicator .dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #fbbf24;
+    animation: pulse-dot linear;
+    animation-timeline: --page-scroll;
+  }
+  @keyframes pulse-dot {
+    0%   { transform: scale(0.5); opacity: 0.3; }
+    50%  { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(0.5); opacity: 0.3; }
+  }
+  .scope-text { font-size: 14px; color: #94a3b8; }
+  .scope-text strong { color: #fbbf24; }
+
+  /* 页面内容 */
+  .page-header {
+    text-align: center; padding: 80px 24px 40px;
+  }
+  .page-header h1 {
+    font-size: 32px;
+    background: linear-gradient(90deg, #22d3ee, #a78bfa, #f472b6);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent; margin-bottom: 8px;
+  }
+  .page-header p { color: #94a3b8; font-size: 15px; }
+
+  .spacer { height: 60vh; display: flex; align-items: center; justify-content: center; }
+  .spacer p { color: #334155; font-size: 14px; }
+
+  .footer-note {
+    max-width: 800px; margin: 40px auto; padding: 20px 24px;
+    background: #1e293b; border-radius: 10px; border-left: 3px solid #22d3ee;
+    font-size: 13px; color: #94a3b8;
+  }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 12px; color: #22d3ee;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card, .parallax-bg, .reveal-img, .scroll-indicator .dot, .progress-bar {
+      animation: none;
+    }
+    .card { opacity: 1; transform: none; }
+    .parallax-bg { transform: none; }
+    .reveal-img { clip-path: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 进度条 -->
+<div class="progress-bar"></div>
+
+<div class="page-header">
+  <h1>滚动驱动动画</h1>
+  <p>animation-timeline: scroll() / view() — 纯 CSS 实现滚动视差与进出场动画</p>
+</div>
+
+<!-- 示例1：命名时间轴 + timeline-scope -->
+<div class="scope-section">
+  <div class="scroll-indicator">
+    <div class="dot"></div>
+    <div class="scope-text">
+      <strong>timeline-scope 示例</strong> — 滚动时此指示器脉冲，由命名时间轴 <code>--page-scroll</code> 驱动。
+      滚动容器在父级声明 <code>scroll-timeline-name</code>，当前元素通过 <code>timeline-scope</code> 跨层级使用。
+    </div>
+  </div>
+</div>
+
+<!-- 示例2：卡片进入视口 -->
+<div class="cards-section">
+  <h2>示例 · 卡片进入视口动画（view() + animation-range）</h2>
+  <div class="card">
+    <h3>entry 0% entry 100%</h3>
+    <p>元素底边刚进入视口时动画开始（0%），元素顶边到达视口顶边时动画结束（100%）。这是最常用的进出场触发区间。</p>
+  </div>
+  <div class="card">
+    <h3>感知均匀的进度</h3>
+    <p>动画进度与滚动位置线性对应，不受时间影响。快速滚动时动画加速，慢速滚动时减速——这是与时间驱动动画的本质区别。</p>
+  </div>
+  <div class="card">
+    <h3>合成器线程运行</h3>
+    <p>滚动驱动动画在合成器线程执行，不受主线程 JS 阻塞影响。即使页面在加载大量数据，滚动动画依然流畅。</p>
+  </div>
+</div>
+
+<!-- 示例3：视差滚动 -->
+<div class="parallax-hero">
+  <div class="parallax-bg">
+    <div class="parallax-content">
+      <h2>视差滚动</h2>
+      <p>背景以不同速度移动，营造深度感</p>
+    </div>
+  </div>
+</div>
+
+<!-- 示例4：图片滚动揭示 -->
+<div class="reveal-section">
+  <h2 style="font-size:18px; color:#a78bfa; margin-bottom:16px;">示例 · 图片滚动揭示（clip-path + view()）</h2>
+  <div class="reveal-img">clip-path: inset() 揭示效果</div>
+</div>
+
+<div class="spacer"><p>↓ 继续滚动查看更多示例 ↓</p></div>
+
+<div class="cards-section">
+  <h2>更多卡片</h2>
+  <div class="card">
+    <h3>animation-range: cover</h3>
+    <p><code>cover 0% cover 100%</code>：元素从进入视口底部到离开视口顶部的整个过程。适合持续性的滚动效果（如视差）。</p>
+  </div>
+  <div class="card">
+    <h3>animation-range: contain</h3>
+    <p><code>contain 0% contain 100%</code>：元素完全可见的期间。适合元素完全进入后才开始动画的场景。</p>
+  </div>
+  <div class="card">
+    <h3>animation-range: exit</h3>
+    <p><code>exit 0% exit 100%</code>：元素离开视口的过程。适合"离开时淡出"的效果。</p>
+  </div>
+</div>
+
+<div class="footer-note">
+  <strong>注意：</strong>本页面所有动画均由 CSS <code>animation-timeline</code> 驱动，零 JavaScript。
+  开启系统「减少动画」偏好（<code>prefers-reduced-motion</code>）后所有动画自动降级为静态。
+  浏览器兼容性：Chrome 115+ / Firefox 110+ / Safari 26+。
+</div>
+
+</body>
+</html>
