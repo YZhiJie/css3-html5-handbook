@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>text-wrap · field-sizing · interpolate-size 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 800px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+
+  /* ===== text-wrap: balance / pretty ===== */
+  .balance-box { text-align: center; max-width: 400px; margin: 0 auto; }
+  .balance-box h3 {
+    font-size: 20px; margin-bottom: 16px;
+    background: linear-gradient(90deg, #22d3ee, #a78bfa);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .balance-wrap { margin-bottom: 16px; padding: 16px; background: #0f172a; border-radius: 10px; }
+  .balance-wrap h4 { font-size: 14px; color: #fbbf24; margin-bottom: 8px; }
+
+  .text-normal  { text-wrap: wrap; }
+  .text-balance { text-wrap: balance; }
+  .text-pretty  { text-wrap: pretty; }
+
+  .slider-wrap { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+  .slider-wrap input[type="range"] { flex: 1; }
+  .slider-wrap span { font-size: 13px; color: #64748b; min-width: 60px; text-align: right; }
+
+  /* ===== field-sizing ===== */
+  .field-demo {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  }
+  .field-demo label { font-size: 12px; color: #64748b; margin-bottom: 4px; display: block; }
+  .field-demo textarea, .field-demo input {
+    width: 100%; padding: 10px 12px; background: #0f172a; border: 1px solid #334155;
+    border-radius: 8px; color: #e2e8f0; font-family: inherit; font-size: 14px; resize: vertical;
+  }
+  .field-demo textarea.content-sizing {
+    field-sizing: content;
+    min-height: 3lh;
+    max-height: 8lh;
+  }
+
+  /* ===== interpolate-size ===== */
+  :root { interpolate-size: allow-keywords; }
+  .panel {
+    background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+    overflow: hidden; margin-bottom: 12px;
+  }
+  .panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; cursor: pointer; font-weight: 700;
+  }
+  .panel-body {
+    height: 0; overflow: hidden;
+    transition: height .35s ease, padding .35s ease;
+    padding: 0 16px;
+  }
+  .panel.open .panel-body {
+    height: auto;
+    padding: 0 16px 16px;
+  }
+  .panel-head .toggle { font-size: 18px; color: #22d3ee; transition: transform .25s; }
+  .panel.open .toggle { transform: rotate(45deg); }
+</style>
+</head>
+<body>
+
+<h1>排版细节三件套</h1>
+<p class="sub">text-wrap: balance/pretty · field-sizing: content · interpolate-size: allow-keywords</p>
+
+<!-- ===== text-wrap ===== -->
+<section>
+  <h2>1. text-wrap：标题均分 vs 段落防孤词</h2>
+  <div class="demo-box">
+    <p class="note">拖动滑块改变容器宽度，观察三种换行策略的差异。</p>
+    <div class="slider-wrap">
+      <span>容器宽度</span>
+      <input type="range" id="width-slider" min="200" max="600" value="360">
+      <span id="width-val">360px</span>
+    </div>
+    <div class="balance-box" id="balance-container" style="width:360px">
+      <div class="balance-wrap">
+        <h4>默认 wrap</h4>
+        <h3 class="text-normal">深入理解 CSS 容器查询的原理与实践方法</h3>
+      </div>
+      <div class="balance-wrap">
+        <h4>text-wrap: balance</h4>
+        <h3 class="text-balance">深入理解 CSS 容器查询的原理与实践方法</h3>
+      </div>
+      <div class="balance-wrap" style="text-align:left;">
+        <h4>text-wrap: pretty</h4>
+        <p class="text-pretty">这是一段比较长的示例文本，用于演示 pretty 换行策略如何避免最后一行只出现一个孤立的单词，从而提升阅读体验。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== field-sizing ===== -->
+<section>
+  <h2>2. field-sizing：输入框随内容自动伸缩</h2>
+  <div class="demo-box">
+    <div class="field-demo">
+      <div>
+        <label>固定尺寸（传统）</label>
+        <textarea rows="3" placeholder="固定 3 行，内容多了出滚动条">这是固定的 3 行文本框。继续输入看看——内容多了会出现滚动条，不会自动增高。</textarea>
+      </div>
+      <div>
+        <label>field-sizing: content（自适应）</label>
+        <textarea class="content-sizing" placeholder="随内容自动增高，最少 3 行最多 8 行">这是自适应文本框。
+继续输入换行——它会自动增高，最多到 8 行后出滚动条。
+最少保持 3 行高度。</textarea>
+      </div>
+    </div>
+    <p class="note">右侧 textarea 使用 <code>field-sizing: content; min-height: 3lh; max-height: 8lh;</code>，高度随内容自动伸缩。左侧为传统固定行数。</p>
+  </div>
+</section>
+
+<!-- ===== interpolate-size ===== -->
+<section>
+  <h2>3. interpolate-size：height: auto 也能平滑过渡</h2>
+  <div class="demo-box">
+    <p class="note">点击标题展开/收起——<code>:root { interpolate-size: allow-keywords }</code> 让 <code>height: 0 → auto</code> 参与过渡。</p>
+    <div class="panel" id="panel1">
+      <div class="panel-head">
+        <span>展开查看详细内容</span>
+        <span class="toggle">+</span>
+      </div>
+      <div class="panel-body">
+        <p>这是折叠面板的内容区域。在过去，<code>height: 0</code> 到 <code>height: auto</code> 无法平滑过渡，只能用 <code>max-height</code> hack。</p>
+        <p>现在有了 <code>interpolate-size: allow-keywords</code>，所有关键字（auto、min-content、max-content、fit-content）都可以参与 CSS 过渡动画。</p>
+      </div>
+    </div>
+    <div class="panel" id="panel2">
+      <div class="panel-head">
+        <span>更多演示</span>
+        <span class="toggle">+</span>
+      </div>
+      <div class="panel-body">
+        <p>这是第二个折叠面板。注意展开时的平滑动画效果——不需要任何 JavaScript 计算高度。</p>
+        <p>Chrome 129+ / Safari 18.4+ / Firefox 136+ 已支持，旧浏览器回退为瞬时展开。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // text-wrap 宽度滑块
+  const slider = document.getElementById('width-slider');
+  const widthVal = document.getElementById('width-val');
+  const container = document.getElementById('balance-container');
+  slider.addEventListener('input', () => {
+    container.style.width = slider.value + 'px';
+    widthVal.textContent = slider.value + 'px';
+  });
+
+  // 折叠面板
+  document.querySelectorAll('.panel-head').forEach(head => {
+    head.addEventListener('click', () => {
+      head.closest('.panel').classList.toggle('open');
+    });
+  });
+</script>
+
+</body>
+</html>

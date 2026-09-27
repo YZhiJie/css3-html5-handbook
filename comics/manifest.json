@@ -45,6 +45,8 @@
     { "ep": "EP.39", "comic": "css/EP.39-color-mix-light-dark", "doc": "docs/css/25-color-mix-light-dark.md", "example": "examples/css/25-color-mix-light-dark", "title": "color-mix 与 light-dark" },
     { "ep": "EP.40", "comic": "html/EP.40-details-advanced", "doc": "docs/html/14-details-advanced.md", "example": "examples/html/14-details-advanced", "title": "details 进阶" },
     { "ep": "EP.41", "comic": "css/EP.41-container-advanced", "doc": "docs/css/26-container-advanced.md", "example": "examples/css/26-container-advanced", "title": "@container 进阶" },
-    { "ep": "EP.42", "comic": "html/EP.42-web-locks", "doc": "docs/html/15-web-locks.md", "example": "examples/html/15-web-locks", "title": "Web Locks API" }
+    { "ep": "EP.42", "comic": "html/EP.42-web-locks", "doc": "docs/html/15-web-locks.md", "example": "examples/html/15-web-locks", "title": "Web Locks API" },
+    { "ep": "EP.43", "comic": "css/EP.43-text-wrap-field-sizing", "doc": "docs/css/27-text-wrap-field-sizing.md", "example": "examples/css/27-text-wrap-field-sizing", "title": "text-wrap 与 field-sizing" },
+    { "ep": "EP.44", "comic": "html/EP.44-web-components", "doc": "docs/html/16-web-components.md", "example": "examples/html/16-web-components", "title": "Web Components 入门" }
   ]
 }
