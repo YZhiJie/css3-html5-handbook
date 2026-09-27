@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>color-mix · light-dark · color-scheme · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: light-dark(#f1f5f9, #0b1220);
+    color: light-dark(#0f172a, #e2e8f0);
+    padding: 24px;
+    line-height: 1.6;
+    color-scheme: light dark;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: light-dark(#64748b, #94a3b8); margin-bottom: 32px; }
+  section { max-width: 800px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: light-dark(#ffffff, #131c2e); border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: light-dark(#64748b, #94a3b8); margin-top: 8px; }
+  code {
+    background: light-dark(#e2e8f0, #0f172a); padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+  .btn {
+    padding: 8px 16px; border-radius: 8px; border: 2px solid #22d3ee;
+    background: light-dark(#f8fafc, #0f172a); color: #22d3ee; font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-right: 8px; margin-bottom: 8px;
+  }
+  .btn.pink { border-color: #f472b6; color: #f472b6; }
+
+  /* ===== 支持度检测横幅 ===== */
+  .support-banner {
+    max-width: 800px; margin: 0 auto 24px; padding: 12px 16px;
+    border-radius: 10px; font-size: 14px;
+    background: #14532d; border: 2px solid #22c55e; color: #bbf7d0;
+  }
+  @supports not (color: color-mix(in oklch, red, blue)) {
+    .support-banner { background: #450a0a; border-color: #ef4444; color: #fecaca; }
+    .support-banner .ok { display: none; }
+  }
+  @supports (color: color-mix(in oklch, red, blue)) {
+    .support-banner .no { display: none; }
+  }
+
+  /* ===== 示例1：color-mix 色彩空间对比 ===== */
+  .mix-row { display: flex; gap: 12px; margin-bottom: 12px; align-items: center; }
+  .mix-label { width: 80px; font-size: 13px; font-weight: 700; }
+  .mix-swatch {
+    flex: 1; height: 48px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: white;
+    text-shadow: 0 1px 2px rgba(0,0,0,.5);
+  }
+
+  /* ===== 示例2：light-dark 主题卡片 ===== */
+  .theme-card {
+    padding: 24px; border-radius: 12px; margin-bottom: 12px;
+    border: 2px solid light-dark(#e2e8f0, #334155);
+  }
+  .theme-card h3 { margin-bottom: 8px; }
+  .theme-card p { font-size: 14px; color: light-dark(#475569, #94a3b8); }
+
+  /* ===== 示例3：color-scheme 控件 ===== */
+  .controls-demo {
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .controls-demo input, .controls-demo select {
+    padding: 10px 12px; border-radius: 8px; font-size: 14px;
+    border: 2px solid light-dark(#cbd5e1, #334155);
+  }
+
+  /* ===== 示例4：品牌色动态变体 ===== */
+  .brand-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+  }
+  .brand-swatch {
+    aspect-ratio: 1; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: white;
+    text-shadow: 0 1px 2px rgba(0,0,0,.5);
+  }
+</style>
+</head>
+<body>
+
+<h1>color-mix · light-dark · color-scheme</h1>
+<p class="sub">浏览器原生的动态调色与明暗自适应</p>
+
+<div class="support-banner">
+  <span class="ok">✅ 当前浏览器支持 color-mix()</span>
+  <span class="no">⚠️ 当前浏览器不支持 color-mix()，示例将显示为静态颜色</span>
+</div>
+
+<!-- 示例1：color-mix 四色彩空间对比 -->
+<section>
+  <h2>示例 1 · color-mix 四色彩空间混合对比</h2>
+  <div class="demo-box">
+    <p style="margin-bottom:12px;font-size:14px;">蓝色 #3b82f6 + 橙色 #f97316，各 50% 混合：</p>
+    <div class="mix-row">
+      <span class="mix-label">srgb</span>
+      <div class="mix-swatch" style="background: color-mix(in srgb, #3b82f6, #f97316);">srgb</div>
+    </div>
+    <div class="mix-row">
+      <span class="mix-label">hsl</span>
+      <div class="mix-swatch" style="background: color-mix(in hsl, #3b82f6, #f97316);">hsl</div>
+    </div>
+    <div class="mix-row">
+      <span class="mix-label">lab</span>
+      <div class="mix-swatch" style="background: color-mix(in lab, #3b82f6, #f97316);">lab</div>
+    </div>
+    <div class="mix-row">
+      <span class="mix-label">oklch</span>
+      <div class="mix-swatch" style="background: color-mix(in oklch, #3b82f6, #f97316);">oklch（推荐）</div>
+    </div>
+    <p class="note">srgb 混合可能产生不自然的中间色；oklch 感知最均匀，推荐用于品牌色阶生成。</p>
+  </div>
+</section>
+
+<!-- 示例2：light-dark 主题切换 -->
+<section>
+  <h2>示例 2 · light-dark() 明暗自适应</h2>
+  <div class="demo-box">
+    <div class="theme-card">
+      <h3>light-dark() 自动主题卡片</h3>
+      <p>背景：<code>light-dark(#ffffff, #1e293b)</code>，文字：<code>light-dark(#0f172a, #e2e8f0)</code></p>
+      <p style="margin-top:8px;">切换系统/浏览器明暗模式，观察卡片自动变色。</p>
+    </div>
+    <p class="note">需 <code>color-scheme: light dark</code> 声明后，light-dark() 才会响应暗色偏好。</p>
+  </div>
+</section>
+
+<!-- 示例3：color-scheme 控件适配 -->
+<section>
+  <h2>示例 3 · color-scheme 原生控件适配</h2>
+  <div class="demo-box">
+    <div class="controls-demo">
+      <input type="text" placeholder="文本输入框" value="input 自动适配暗色">
+      <input type="date" value="2026-09-28">
+      <select><option>下拉选择</option><option>选项 A</option></select>
+      <input type="range" value="50">
+    </div>
+    <p class="note">
+      本页根元素已设置 <code>color-scheme: light dark</code>，
+      切换系统暗色模式后，表单控件、滚动条、选中色自动适配。
+    </p>
+  </div>
+</section>
+
+<!-- 示例4：品牌色动态变体 -->
+<section>
+  <h2>示例 4 · 品牌色动态变体生成</h2>
+  <div class="demo-box">
+    <p style="margin-bottom:12px;font-size:14px;">品牌色 #7c3aed 的 5 级变体（color-mix 实时生成）：</p>
+    <div class="brand-grid">
+      <div class="brand-swatch" style="background: color-mix(in oklch, #7c3aed, white 80%);">20%</div>
+      <div class="brand-swatch" style="background: color-mix(in oklch, #7c3aed, white 40%);">40%</div>
+      <div class="brand-swatch" style="background: #7c3aed;">base</div>
+      <div class="brand-swatch" style="background: color-mix(in oklch, #7c3aed, black 40%);">-40%</div>
+      <div class="brand-swatch" style="background: color-mix(in oklch, #7c3aed, black 80%);">-80%</div>
+    </div>
+    <p class="note">无需预处理器，改一个变量即可换整套主题色。</p>
+  </div>
+</section>
+
+</body>
+</html>

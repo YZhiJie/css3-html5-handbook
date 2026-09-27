@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>details 与 summary 进阶 · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 800px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+  .btn {
+    padding: 8px 16px; border-radius: 8px; border: 2px solid #22d3ee;
+    background: #0f172a; color: #22d3ee; font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-right: 8px; margin-bottom: 8px;
+  }
+  .btn.pink { border-color: #f472b6; color: #f472b6; }
+
+  /* ===== 支持度检测横幅 ===== */
+  .support-banner {
+    max-width: 800px; margin: 0 auto 24px; padding: 12px 16px;
+    border-radius: 10px; font-size: 14px;
+    background: #14532d; border: 2px solid #22c55e; color: #bbf7d0;
+  }
+  @supports not selector(::details-content) {
+    .support-banner { background: #450a0a; border-color: #ef4444; color: #fecaca; }
+    .support-banner .ok { display: none; }
+  }
+  @supports selector(::details-content) {
+    .support-banner .no { display: none; }
+  }
+
+  /* ===== 示例1：基础折叠 ===== */
+  .basic-details {
+    border: 2px solid #22d3ee; border-radius: 10px; margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .basic-details summary {
+    padding: 14px 16px; font-weight: 700; cursor: pointer;
+    background: #1e293b; list-style: none;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .basic-details summary::after {
+    content: '+'; font-size: 20px; color: #22d3ee; transition: transform .2s;
+  }
+  .basic-details[open] summary::after {
+    content: '-'; transform: rotate(180deg);
+  }
+  .basic-details .content {
+    padding: 16px; border-top: 1px solid #334155;
+    background: #0f172a;
+  }
+
+  /* ===== 示例2：互斥手风琴 ===== */
+  .accordion details {
+    border: 2px solid #a78bfa; border-radius: 10px; margin-bottom: 8px;
+    overflow: hidden;
+  }
+  .accordion summary {
+    padding: 14px 16px; font-weight: 700; cursor: pointer;
+    background: #1e293b; list-style: none;
+  }
+  .accordion summary::-webkit-details-marker { display: none; }
+  .accordion .content {
+    padding: 16px; border-top: 1px solid #334155;
+  }
+
+  /* ===== 示例3：::details-content 动画 ===== */
+  .animated-details {
+    border: 2px solid #fbbf24; border-radius: 10px; margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .animated-details summary {
+    padding: 14px 16px; font-weight: 700; cursor: pointer;
+    background: #1e293b; list-style: none;
+  }
+  .animated-details summary::-webkit-details-marker { display: none; }
+  .animated-details::details-content {
+    transition: height 0.35s ease, opacity 0.35s ease;
+    height: 0;
+    opacity: 0;
+  }
+  .animated-details[open]::details-content {
+    height: auto;
+    opacity: 1;
+  }
+  .animated-details .content {
+    padding: 16px; border-top: 1px solid #334155;
+  }
+
+  /* 允许 height: auto 过渡 */
+  :root {
+    interpolate-size: allow-keywords;
+  }
+
+  /* ===== 示例4：与 View Transitions 配合 ===== */
+  .vt-details {
+    border: 2px solid #f472b6; border-radius: 10px; margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .vt-details summary {
+    padding: 14px 16px; font-weight: 700; cursor: pointer;
+    background: #1e293b; list-style: none;
+  }
+  .vt-details summary::-webkit-details-marker { display: none; }
+  .vt-details .content {
+    padding: 16px; border-top: 1px solid #334155;
+  }
+</style>
+</head>
+<body>
+
+<h1>details 与 summary 进阶</h1>
+<p class="sub">原生折叠面板 · 互斥手风琴 · ::details-content 动画 · 零 JS</p>
+
+<div class="support-banner">
+  <span class="ok">✅ 当前浏览器支持 ::details-content</span>
+  <span class="no">⚠️ 当前浏览器不支持 ::details-content，示例 3 将无动画（功能正常）</span>
+</div>
+
+<!-- 示例1：基础折叠 -->
+<section>
+  <h2>示例 1 · 基础折叠（零 JS）</h2>
+  <div class="demo-box">
+    <details class="basic-details" open>
+      <summary>什么是 HTML5？</summary>
+      <div class="content">HTML5 是 HTML 的第五次重大修订，新增语义化标签、表单增强、多媒体、Canvas、Web Storage 等能力。</div>
+    </details>
+    <details class="basic-details">
+      <summary>details 需要 JS 吗？</summary>
+      <div class="content">不需要。浏览器原生处理展开/收起、键盘交互（Enter/Space）和屏幕阅读器。</div>
+    </details>
+    <p class="note"><code>open</code> 属性控制默认展开；<code>summary</code> 必须是第一个子元素。</p>
+  </div>
+</section>
+
+<!-- 示例2：互斥手风琴 -->
+<section>
+  <h2>示例 2 · 互斥手风琴（name 属性）</h2>
+  <div class="demo-box">
+    <div class="accordion">
+      <details name="faq">
+        <summary>如何申请退款？</summary>
+        <div class="content">订单页点击「申请退款」，7 天内无理由。</div>
+      </details>
+      <details name="faq">
+        <summary>支持哪些支付方式？</summary>
+        <div class="content">微信、支付宝、云闪付、银行卡。</div>
+      </details>
+      <details name="faq">
+        <summary>发票如何开具？</summary>
+        <div class="content">个人/企业发票均支持，下单后 30 天内申请。</div>
+      </details>
+    </div>
+    <p class="note">相同 <code>name="faq"</code> 的 details 自动互斥，同时只开一个。</p>
+  </div>
+</section>
+
+<!-- 示例3：::details-content 动画 -->
+<section>
+  <h2>示例 3 · ::details-content 平滑动画</h2>
+  <div class="demo-box">
+    <details class="animated-details">
+      <summary>点击展开（平滑高度动画）</summary>
+      <div class="content">
+        <p>Chrome 131+ / Safari 18.4+ / Firefox 136+ 支持 <code>::details-content</code> 伪元素。</p>
+        <p>配合 <code>interpolate-size: allow-keywords</code>，<code>height: auto</code> 也可平滑过渡。</p>
+      </div>
+    </details>
+    <p class="note">不支持时退化为瞬时展开，功能不受影响。</p>
+  </div>
+</section>
+
+<!-- 示例4：与 View Transitions 配合 -->
+<section>
+  <h2>示例 4 · 与 View Transitions 配合</h2>
+  <div class="demo-box">
+    <details class="vt-details" id="vtDemo">
+      <summary>展开时触发 View Transition</summary>
+      <div class="content">
+        <p>toggle 事件里调用 <code>document.startViewTransition()</code>，</p>
+        <p>浏览器自动对展开/收起做快照补间动画。</p>
+      </div>
+    </details>
+    <button class="btn" id="btnVT">程序化切换（带 VT）</button>
+    <p class="note">需浏览器同时支持 View Transitions 和 ::details-content。</p>
+  </div>
+</section>
+
+<script>
+// 示例4：View Transitions 配合
+const vtDemo = document.getElementById('vtDemo');
+const btnVT = document.getElementById('btnVT');
+btnVT.addEventListener('click', () => {
+  if (document.startViewTransition) {
+    document.startViewTransition(() => {
+      vtDemo.open = !vtDemo.open;
+    });
+  } else {
+    vtDemo.open = !vtDemo.open;
+  }
+});
+</script>
+
+</body>
+</html>

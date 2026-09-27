@@ -41,6 +41,8 @@
     { "ep": "EP.35", "comic": "css/EP.35-scroll-snap", "doc": "docs/css/23-scroll-snap.md", "example": "examples/css/23-scroll-snap", "title": "滚动吸附" },
     { "ep": "EP.36", "comic": "html/EP.36-dialog", "doc": "docs/html/12-dialog.md", "example": "examples/html/12-dialog", "title": "dialog 元素" },
     { "ep": "EP.37", "comic": "css/EP.37-view-transitions-advanced", "doc": "docs/css/24-view-transitions-advanced.md", "example": "examples/css/24-view-transitions-advanced", "title": "View Transitions 进阶" },
-    { "ep": "EP.38", "comic": "html/EP.38-speculation-rules", "doc": "docs/html/13-speculation-rules.md", "example": "examples/html/13-speculation-rules", "title": "Speculation Rules" }
+    { "ep": "EP.38", "comic": "html/EP.38-speculation-rules", "doc": "docs/html/13-speculation-rules.md", "example": "examples/html/13-speculation-rules", "title": "Speculation Rules" },
+    { "ep": "EP.39", "comic": "css/EP.39-color-mix-light-dark", "doc": "docs/css/25-color-mix-light-dark.md", "example": "examples/css/25-color-mix-light-dark", "title": "color-mix 与 light-dark" },
+    { "ep": "EP.40", "comic": "html/EP.40-details-advanced", "doc": "docs/html/14-details-advanced.md", "example": "examples/html/14-details-advanced", "title": "details 进阶" }
   ]
 }
