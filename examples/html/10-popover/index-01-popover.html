@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Popover API · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 800px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+  .btn {
+    padding: 8px 16px; border-radius: 8px; border: 2px solid #22d3ee;
+    background: #0f172a; color: #22d3ee; font-size: 14px; font-weight: 700;
+    cursor: pointer;
+  }
+  .btn.danger { border-color: #ef4444; color: #ef4444; }
+
+  /* 所有 popover 的公共造型 */
+  [popover] {
+    background: #1e293b; border: 2px solid #334155; border-radius: 12px;
+    color: #e2e8f0; padding: 0;
+    /* 进出场动画三件套：display/overlay 离散过渡 + @starting-style */
+    transition: opacity .25s, translate .25s,
+                display .25s allow-discrete, overlay .25s allow-discrete;
+    opacity: 0; translate: 0 8px;
+  }
+  [popover]:popover-open { opacity: 1; translate: 0 0; }
+  @starting-style {
+    [popover]:popover-open { opacity: 0; translate: 0 8px; }
+  }
+
+  /* ===== 示例1：声明式菜单（auto） ===== */
+  #menu-1 { min-width: 180px; padding: 6px; }
+  #menu-1 a {
+    display: block; padding: 8px 12px; border-radius: 6px;
+    color: #cbd5e1; text-decoration: none; font-size: 14px;
+  }
+  #menu-1 a:hover { background: #334155; color: #22d3ee; }
+
+  /* ===== 示例2：manual 模态 + 背板 ===== */
+  #confirm-2 { padding: 24px; text-align: center; width: 300px; }
+  #confirm-2::backdrop { background: rgb(2 6 23 / .55); backdrop-filter: blur(2px); }
+  #confirm-2 .row { margin-top: 16px; display: flex; gap: 10px; justify-content: center; }
+
+  /* ===== 示例3：Toast（manual + JS） ===== */
+  .toast {
+    background: #065f46; border-color: #34d399; color: #d1fae5;
+    padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 700;
+    /* 多个 toast 手动堆叠在右下角 */
+    position: fixed; right: 20px;
+    bottom: calc(20px + var(--i, 0) * 56px);
+  }
+
+  /* ===== 示例4：popover × 锚点定位 ===== */
+  #avatar-btn {
+    anchor-name: --avatar;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: linear-gradient(135deg, #f472b6, #a78bfa);
+    border: none; font-size: 20px; cursor: pointer;
+  }
+  #user-card {
+    position: absolute;
+    position-anchor: --avatar;
+    position-area: bottom span-left;
+    margin-top: 10px;
+    width: 240px; padding: 16px;
+  }
+  #user-card h3 { font-size: 15px; color: #f472b6; margin-bottom: 4px; }
+  #user-card p { font-size: 13px; color: #94a3b8; }
+
+  /* ===== 示例5：事件日志 ===== */
+  #evt-log {
+    background: #0f172a; border-radius: 8px; padding: 12px;
+    font-family: Menlo, Consolas, monospace; font-size: 12px;
+    color: #22d3ee; height: 120px; overflow: auto; white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+
+<h1>Popover API</h1>
+<p class="sub">popover · popovertarget · top layer · light dismiss · ::backdrop</p>
+
+<!-- 示例1：声明式菜单 -->
+<section>
+  <h2>示例 1 · 零 JS 菜单（auto + light dismiss）</h2>
+  <div class="demo-box">
+    <button class="btn" popovertarget="menu-1">☰ 打开菜单</button>
+    <div id="menu-1" popover>
+      <a href="#ex1" onclick="return false">个人资料</a>
+      <a href="#ex1" onclick="return false">通知偏好</a>
+      <a href="#ex1" onclick="return false">安全与登录</a>
+    </div>
+    <p class="note">没有任何 JS：按钮开、点外部关、Esc 关，全部由 <code>popovertarget</code> + <code>popover</code> 声明完成。菜单默认出现在视口附近 —— 贴边定位见示例 4。</p>
+  </div>
+</section>
+
+<!-- 示例2：manual 模态 -->
+<section>
+  <h2>示例 2 · manual 模态 + ::backdrop</h2>
+  <div class="demo-box">
+    <button class="btn danger" popovertarget="confirm-2" popovertargetaction="show">删除仓库</button>
+    <div id="confirm-2" popover="manual">
+      <p style="font-weight: 700; color: #ef4444;">确定删除仓库？此操作不可撤销。</p>
+      <p class="note">manual 模式：点外部、按 Esc 都不会关，必须显式表态。</p>
+      <div class="row">
+        <button class="btn" popovertarget="confirm-2" popovertargetaction="hide">取消</button>
+        <button class="btn danger" onclick="document.getElementById('confirm-2').hidePopover()">确认删除</button>
+      </div>
+    </div>
+    <p class="note">与 <code>&lt;dialog showModal()&gt;</code> 的差别：popover 不惰性化页面，更轻；真正阻断流程的强模态仍推荐 dialog。</p>
+  </div>
+</section>
+
+<!-- 示例3：Toast -->
+<section>
+  <h2>示例 3 · Toast 通知（manual + JS API）</h2>
+  <div class="demo-box">
+    <button class="btn" id="toastBtn">弹一个 Toast</button>
+    <p class="note"><code>showPopover()</code> 进 top layer 永不遮挡，3 秒后 <code>hidePopover()</code> 并移除 DOM。连续点击可堆叠。</p>
+  </div>
+</section>
+
+<!-- 示例4：黄金搭档 -->
+<section>
+  <h2>示例 4 · Popover × 锚点定位：用户卡片</h2>
+  <div class="demo-box" style="text-align: right; padding-right: 60px; padding-bottom: 180px;">
+    <button id="avatar-btn" popovertarget="user-card" aria-label="用户信息">🦊</button>
+    <div id="user-card" popover>
+      <h3>像素酱</h3>
+      <p>CSS 造型师 · 前端漫画实验室</p>
+      <p style="margin-top: 8px; font-size: 12px; color: #22d3ee;">
+        top layer（层叠）× position-anchor（位置）= 完整原生弹出方案
+      </p>
+    </div>
+    <p class="note">卡片贴在头像左下方（<code>position-area: bottom span-left</code>），浏览器不支持锚点定位时会回退到默认居中，行为不受影响。</p>
+  </div>
+</section>
+
+<!-- 示例5：事件流 -->
+<section>
+  <h2>示例 5 · beforetoggle / toggle 事件流</h2>
+  <div class="demo-box">
+    <button class="btn" popovertarget="probe-5">开关探针 popover</button>
+    <div id="probe-5" popover style="padding: 16px; width: 260px;">
+      观察下方日志：打开与关闭各触发一对 beforetoggle → toggle。
+    </div>
+    <div id="evt-log" style="margin-top: 12px;"></div>
+  </div>
+</section>
+
+<script>
+  // 示例3：Toast
+  let toastCount = 0;
+  document.getElementById('toastBtn').addEventListener('click', () => {
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.popover = 'manual';
+    t.style.setProperty('--i', Math.min(toastCount % 4, 3));
+    t.textContent = `✅ 保存成功（第 ${++toastCount} 条）`;
+    document.body.append(t);
+    t.showPopover();
+    setTimeout(() => { t.hidePopover(); t.remove(); }, 3000);
+  });
+
+  // 示例5：事件日志
+  const log = (msg) => {
+    const el = document.getElementById('evt-log');
+    el.textContent += `${new Date().toLocaleTimeString()}  ${msg}\n`;
+    el.scrollTop = el.scrollHeight;
+  };
+  const probe = document.getElementById('probe-5');
+  probe.addEventListener('beforetoggle', (e) => log(`beforetoggle  ${e.oldState} → ${e.newState}`));
+  probe.addEventListener('toggle', (e) => log(`toggle        ${e.oldState} → ${e.newState}`));
+</script>
+
+</body>
+</html>

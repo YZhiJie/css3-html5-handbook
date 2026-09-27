@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSS 锚点定位 · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 800px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+  .btn {
+    padding: 8px 16px; border-radius: 8px; border: 2px solid #22d3ee;
+    background: #0f172a; color: #22d3ee; font-size: 14px; font-weight: 700;
+    cursor: pointer;
+  }
+
+  /* ===== 支持度检测横幅 ===== */
+  .support-banner {
+    max-width: 800px; margin: 0 auto 24px; padding: 12px 16px;
+    border-radius: 10px; font-size: 14px;
+    background: #14532d; border: 2px solid #22c55e; color: #bbf7d0;
+  }
+  @supports not (anchor-name: --probe) {
+    .support-banner {
+      background: #450a0a; border-color: #ef4444; color: #fecaca;
+    }
+    .support-banner .ok { display: none; }
+  }
+  @supports (anchor-name: --probe) {
+    .support-banner .no { display: none; }
+  }
+
+  /* ===== 示例1：基础 tooltip —— anchor() 函数 + anchor-center ===== */
+  .tip-trigger {
+    anchor-name: --tip-1;
+    /* 普通按钮，仅因 anchor-name 成为参照物 */
+  }
+  .tip-1 {
+    position: absolute;
+    position-anchor: --tip-1;
+    /* 我的底边 = 锚顶边上方 8px；水平与锚中心对齐 */
+    bottom: calc(anchor(top) + 8px);
+    justify-self: anchor-center;
+    background: #f472b6; color: #0b1220;
+    padding: 6px 12px; border-radius: 8px;
+    font-size: 13px; font-weight: 700;
+    opacity: 0; transition: opacity .2s;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .tip-trigger:hover + .tip-1,
+  .tip-trigger:focus-visible + .tip-1 { opacity: 1; }
+
+  /* ===== 示例2：position-area 九宫格切换 ===== */
+  .area-stage { position: relative; height: 220px; }
+  .area-anchor {
+    anchor-name: --area;
+    position: absolute; left: 50%; top: 50%;
+    translate: -50% -50%;
+    width: 120px; padding: 14px 0; text-align: center;
+    background: #a78bfa; color: #0b1220; font-weight: 700;
+    border-radius: 10px;
+  }
+  .area-float {
+    position: absolute;
+    position-anchor: --area;
+    position-area: var(--pos, bottom);   /* JS 切换这个变量即可搬家 */
+    margin: 10px;
+    justify-self: anchor-center;
+    align-self: anchor-center;
+    background: #22d3ee; color: #0b1220;
+    padding: 6px 10px; border-radius: 8px;
+    font-size: 12px; font-weight: 700;
+    white-space: nowrap;
+  }
+  .area-ctrl { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .area-ctrl button {
+    padding: 4px 10px; font-size: 12px; border-radius: 6px;
+    border: 1px solid #334155; background: #0f172a; color: #cbd5e1; cursor: pointer;
+  }
+  .area-ctrl button.active { border-color: #22d3ee; color: #22d3ee; }
+
+  /* ===== 示例3：position-try 防溢出翻转 ===== */
+  .flip-stage {
+    position: relative; height: 200px;
+    overflow: auto;   /* 可滚动：验证跟随 + 翻转 */
+    border: 1px dashed #334155; border-radius: 10px;
+    padding: 12px;
+  }
+  .flip-anchor {
+    anchor-name: --flip;
+    display: inline-block;
+    background: #fbbf24; color: #451a03;
+    padding: 8px 14px; border-radius: 8px; font-weight: 700;
+  }
+  .flip-anchor.a { margin: 10px 0 0 40px; }     /* 靠上：气泡应放下方 */
+  .flip-anchor.b { margin: 120px 0 30px 40px; } /* 靠下：空间不足，自动翻到上方 */
+  .flip-float {
+    position: absolute;
+    position-anchor: --flip;
+    position-area: bottom span-right;  /* 首选：锚下方 */
+    position-try: flip-block;          /* 放不下 → 翻到上方 */
+    margin: 8px;
+    background: #34d399; color: #052e16;
+    padding: 6px 10px; border-radius: 8px;
+    font-size: 12px; font-weight: 700;
+    white-space: nowrap;
+  }
+
+  /* ===== 示例4：anchor-size() 等宽下拉菜单 ===== */
+  .menu-anchor {
+    anchor-name: --menu;
+    width: 220px;
+  }
+  .menu-4 {
+    position: absolute;
+    position-anchor: --menu;
+    position-area: bottom span-right;
+    min-width: anchor-size(width);   /* 至少与触发器等宽 */
+    margin-top: 6px;
+    background: #1e293b; border: 2px solid #a78bfa; border-radius: 10px;
+    padding: 6px; list-style: none;
+    display: none;
+  }
+  .menu-anchor:focus + .menu-4,
+  .menu-4:hover { display: block; }
+  .menu-4 li {
+    padding: 8px 12px; border-radius: 6px; font-size: 13px; cursor: pointer;
+  }
+  .menu-4 li:hover { background: #334155; color: #22d3ee; }
+
+  /* ===== 示例5：滚动跟随 + 显隐 ===== */
+  .scroll-stage {
+    height: 160px; overflow: auto;
+    border: 1px dashed #334155; border-radius: 10px;
+    padding: 12px;
+  }
+  .scroll-inner { height: 420px; position: relative; }
+  .scroll-anchor {
+    anchor-name: --scroll;
+    position: absolute; top: 200px; left: 60px;
+    background: #f472b6; color: #0b1220;
+    padding: 8px 14px; border-radius: 8px; font-weight: 700;
+  }
+  .scroll-float {
+    position: absolute;
+    position-anchor: --scroll;
+    position-area: right span-bottom;
+    margin-left: 10px;
+    align-self: anchor-center;
+    background: #0f172a; border: 2px solid #f472b6; color: #f472b6;
+    padding: 6px 10px; border-radius: 8px;
+    font-size: 12px; font-weight: 700;
+    white-space: nowrap;
+    /* 锚滚出视口时一起隐藏，防止悬空 */
+    position-visibility: anchors-visible;
+  }
+</style>
+</head>
+<body>
+
+<h1>CSS 锚点定位</h1>
+<p class="sub">position-anchor · anchor() · position-area · position-try · anchor-size()</p>
+
+<div class="support-banner">
+  <span class="ok">✅ 当前浏览器支持锚点定位，全部示例可交互。</span>
+  <span class="no">⚠️ 当前浏览器不支持锚点定位（Firefox 需开启 layout.css.anchor-positioning）。示例布局会降级为静态展示，建议用 Chrome 125+ / Safari 26+ 查看。</span>
+</div>
+
+<!-- 示例1：基础 tooltip -->
+<section>
+  <h2>示例 1 · 基础 Tooltip：anchor() + anchor-center</h2>
+  <div class="demo-box" style="padding-top: 60px; text-align: center;">
+    <button class="btn tip-trigger">悬停 / 聚焦我</button>
+    <div class="tip-1">我在锚正上方 8px，水平居中 —— 零 JS</div>
+    <p class="note">核心三行：<code>position-anchor: --tip-1</code> · <code>bottom: calc(anchor(top) + 8px)</code> · <code>justify-self: anchor-center</code></p>
+  </div>
+</section>
+
+<!-- 示例2：position-area 九宫格 -->
+<section>
+  <h2>示例 2 · position-area 九宫格</h2>
+  <div class="demo-box">
+    <div class="area-stage">
+      <div class="area-anchor">锚元素</div>
+      <div class="area-float" id="areaFloat">漂浮物</div>
+    </div>
+    <div class="area-ctrl" id="areaCtrl">
+      <button data-pos="top left">↖ top left</button>
+      <button data-pos="top">↑ top</button>
+      <button data-pos="top right">↗ top right</button>
+      <button data-pos="left">← left</button>
+      <button data-pos="center">· center</button>
+      <button data-pos="right">→ right</button>
+      <button data-pos="bottom left">↙ bottom left</button>
+      <button data-pos="bottom" class="active">↓ bottom</button>
+      <button data-pos="bottom right">↘ bottom right</button>
+    </div>
+    <p class="note">只改一个 CSS 变量 <code>--pos</code> 就换了「格子」，对齐由 <code>anchor-center</code> 自动完成。</p>
+  </div>
+</section>
+
+<!-- 示例3：position-try 翻转 -->
+<section>
+  <h2>示例 3 · position-try 防溢出翻转</h2>
+  <div class="demo-box">
+    <div class="flip-stage">
+      <span class="flip-anchor a">锚 A（上方空间大）</span>
+      <div class="flip-float" style="position-anchor: --flip; visibility: hidden;"></div>
+      <br>
+      <span class="flip-anchor b">锚 B（贴近底部）</span>
+      <p class="note" style="margin-top: 90px;">👆 两个锚首选位置都是「下方」，锚 B 下方空间不足，浏览器自动执行 <code>flip-block</code> 翻到上方 —— 滚动容器试试跟随效果。</p>
+    </div>
+  </div>
+</section>
+
+<!-- 示例4：anchor-size 等宽菜单 -->
+<section>
+  <h2>示例 4 · anchor-size() 等宽下拉菜单</h2>
+  <div class="demo-box" style="padding-bottom: 140px;">
+    <button class="btn menu-anchor">账户设置 ▾（Tab 聚焦展开）</button>
+    <ul class="menu-4">
+      <li>个人资料</li>
+      <li>通知偏好</li>
+      <li>安全与登录</li>
+      <li>退出登录</li>
+    </ul>
+    <p class="note"><code>min-width: anchor-size(width)</code>：菜单至少与 220px 宽的触发器等宽，内容更长时自动撑开。</p>
+  </div>
+</section>
+
+<!-- 示例5：滚动跟随 -->
+<section>
+  <h2>示例 5 · 滚动跟随 + anchors-visible</h2>
+  <div class="demo-box">
+    <div class="scroll-stage">
+      <div class="scroll-inner">
+        <p class="note">⬇ 向下滚动这个容器</p>
+        <div class="scroll-anchor">滚动中的锚</div>
+        <div class="scroll-float">我贴着锚，布局引擎逐帧跟随</div>
+      </div>
+    </div>
+    <p class="note">跟随由布局引擎完成，零 JS、零 rAF；锚滚出视口时 <code>position-visibility: anchors-visible</code> 让气泡一起消失。</p>
+  </div>
+</section>
+
+<script>
+  // 示例2：切换 position-area
+  const float2 = document.getElementById('areaFloat');
+  document.getElementById('areaCtrl').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    document.querySelectorAll('#areaCtrl button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    float2.style.setProperty('--pos', btn.dataset.pos);
+  });
+
+  // 示例3：为两个锚各配一个气泡（复用同一样式，锚名需要唯一 → 用两个锚名）
+  // 简化做法：直接给两个锚分别写内联锚名与对应气泡
+  const stage = document.querySelector('.flip-stage');
+  document.querySelectorAll('.flip-anchor').forEach((anchor, i) => {
+    const name = `--flip-${i}`;
+    anchor.style.anchorName = name;
+    const float = document.createElement('div');
+    float.className = 'flip-float';
+    float.style.positionAnchor = name;
+    float.textContent = i === 0 ? '首选下方，空间够 → 正常' : '下方放不下 → flip-block 翻上来';
+    anchor.after(float);
+  });
+  // 移除占位用的隐藏气泡
+  document.querySelectorAll('.flip-float[style*="visibility"]').forEach(el => el.remove());
+</script>
+
+</body>
+</html>

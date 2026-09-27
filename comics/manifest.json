@@ -33,6 +33,8 @@
     { "ep": "EP.27", "comic": "css/EP.27-view-transitions", "doc": "docs/css/17-view-transitions.md", "example": "examples/css/17-view-transitions", "title": "View Transitions" },
     { "ep": "EP.28", "comic": "css/EP.28-css-nesting", "doc": "docs/css/18-css-nesting.md", "example": "examples/css/18-css-nesting", "title": "CSS 嵌套" },
     { "ep": "EP.29", "comic": "css/EP.29-scope", "doc": "docs/css/19-scope.md", "example": "examples/css/19-scope", "title": "@scope 作用域" },
-    { "ep": "EP.30", "comic": "css/EP.30-property", "doc": "docs/css/20-property.md", "example": "examples/css/20-property", "title": "@property 注册" }
+    { "ep": "EP.30", "comic": "css/EP.30-property", "doc": "docs/css/20-property.md", "example": "examples/css/20-property", "title": "@property 注册" },
+    { "ep": "EP.31", "comic": "css/EP.31-anchor-positioning", "doc": "docs/css/21-anchor-positioning.md", "example": "examples/css/21-anchor-positioning", "title": "锚点定位" },
+    { "ep": "EP.32", "comic": "html/EP.32-popover", "doc": "docs/html/10-popover.md", "example": "examples/html/10-popover", "title": "Popover" }
   ]
 }
