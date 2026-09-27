@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!--
+  comics/reader.html · 漫画剧场全文阅读器（霓虹墨 Neon Ink）
+  ────────────────────────────────────────────────────────
+  设计决策与坑点：
+  1. 内容整合：优先 fetch manifest.json（唯一登记处，css/html 两篇在此合并为完整序列，
+     按 EP 编号排序）；file:// 双击时 fetch 受 CORS 限制会失败，静默回退到内嵌
+     FALLBACK 清单——两个来源无缝合并，http(s) 下新增话数自动生效，双击也能读。
+     ※ 新增话数时记得同步下方 FALLBACK_EPISODES（与 index.html 的 EPISODES 保持一致）。
+  2. 一键打开：默认目录卡片模式（省流量），点击「一键打开全文」切换为连续滚动模式，
+     一次性渲染全部 SVG（img loading="lazy" 懒加载，不会真的同时拉 40 张）。
+  3. 进度记忆：IntersectionObserver 判定当前可见话数写入 localStorage，
+     下次打开出现「继续阅读」按钮一键回到上次位置；URL #EP.XX 锚点同样支持。
+  4. 响应式：≥1024px 左侧固定章节导航；<1024px 折叠为顶部横滑 chips；SVG 100% 自适应。
+  5. 错误处理：每张原画 onerror 替换为错误卡片（话数+标题+重试按钮），
+     重试时给 src 加时间戳参数绕过缓存；manifest 拉取失败在页脚给出提示条。
+-->
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>漫画剧场 · 全文阅读 — 霓虹墨 Neon Ink</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #131c2e;
+      --line: #334155;
+      --cyan: #22d3ee;
+      --violet: #a78bfa;
+      --pink: #f472b6;
+      --amber: #fbbf24;
+      --red: #f87171;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --toolbar-h: 56px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    /* ===== 顶部工具栏（吸顶） ===== */
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      height: var(--toolbar-h);
+      padding: 0 20px;
+      background: rgba(11, 18, 32, .92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .toolbar .brand {
+      font-size: 15px;
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--cyan), var(--violet), var(--pink));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      white-space: nowrap;
+    }
+
+    .btn {
+      border: 2px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 7px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: border-color .18s ease, color .18s ease, transform .18s ease;
+    }
+
+    .btn:hover {
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    .btn:active {
+      transform: scale(.96);
+    }
+
+    .btn-primary {
+      background: linear-gradient(90deg, var(--cyan), var(--violet));
+      border-color: transparent;
+      color: #0b1220;
+    }
+
+    .btn-primary:hover {
+      color: #0b1220;
+      filter: brightness(1.1);
+    }
+
+    .btn-resume {
+      border-color: var(--amber);
+      color: var(--amber);
+      display: none;
+      /* 有阅读记录时由 JS 点亮 */
+    }
+
+    .btn-resume.show {
+      display: inline-block;
+    }
+
+    .progress-wrap {
+      flex: 1;
+      min-width: 60px;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--line);
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--cyan), var(--pink));
+      transition: width .15s linear;
+    }
+
+    .progress-text {
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+      min-width: 64px;
+      text-align: right;
+    }
+
+    /* ===== 主体布局：导航 + 内容 ===== */
+    .layout {
+      display: flex;
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px 20px 96px;
+      gap: 28px;
+    }
+
+    /* --- 章节导航（桌面侧边） --- */
+    .sidenav {
+      position: sticky;
+      top: calc(var(--toolbar-h) + 20px);
+      align-self: flex-start;
+      width: 208px;
+      max-height: calc(100vh - var(--toolbar-h) - 40px);
+      overflow-y: auto;
+      flex-shrink: 0;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel);
+      padding: 12px;
+    }
+
+    .sidenav .nav-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      color: var(--muted);
+      padding: 4px 8px 10px;
+    }
+
+    .nav-item {
+      display: block;
+      text-decoration: none;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      border-left: 3px solid transparent;
+      transition: background .15s ease, color .15s ease;
+    }
+
+    .nav-item:hover {
+      background: #1e293b;
+      color: var(--text);
+    }
+
+    .nav-item.active {
+      color: var(--cyan);
+      border-left-color: var(--cyan);
+      background: #1e293b;
+      font-weight: 600;
+    }
+
+    .nav-item .ep {
+      font-weight: 700;
+      margin-right: 6px;
+    }
+
+    /* --- 章节导航（移动/窄屏横滑 chips） --- */
+    .chips {
+      display: none;
+      position: sticky;
+      top: var(--toolbar-h);
+      z-index: 20;
+      gap: 8px;
+      padding: 10px 16px;
+      background: rgba(11, 18, 32, .92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--line);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .chips::-webkit-scrollbar {
+      display: none;
+    }
+
+    .chip {
+      flex-shrink: 0;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 12px;
+      background: var(--panel);
+    }
+
+    .chip.active {
+      color: #0b1220;
+      background: var(--cyan);
+      border-color: var(--cyan);
+    }
+
+    /* --- 目录模式（卡片网格） --- */
+    .grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 2px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      transition: transform .18s ease, border-color .18s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: var(--cyan);
+    }
+
+    .card img {
+      width: 100%;
+      aspect-ratio: 10 / 7;
+      display: block;
+      object-fit: cover;
+      background: #0f172a;
+    }
+
+    .card .meta {
+      padding: 12px 14px 14px;
+    }
+
+    .card .ep {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      color: var(--cyan);
+    }
+
+    .card .title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-top: 3px;
+    }
+
+    /* --- 全文模式（连续滚动） --- */
+    .reader {
+      flex: 1;
+      display: none;
+      max-width: 880px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    body.mode-reader .reader {
+      display: block;
+    }
+
+    body.mode-reader .grid {
+      display: none;
+    }
+
+    .episode {
+      margin-bottom: 44px;
+      scroll-margin-top: calc(var(--toolbar-h) + 16px);
+    }
+
+    .episode-head {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .episode-head .ep-tag {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      color: #0b1220;
+      background: linear-gradient(90deg, var(--cyan), var(--violet));
+      border-radius: 999px;
+      padding: 4px 12px;
+    }
+
+    .episode-head h2 {
+      font-size: 19px;
+    }
+
+    .episode-head .links {
+      margin-left: auto;
+      font-size: 12.5px;
+      display: flex;
+      gap: 12px;
+    }
+
+    .episode-head .links a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    .episode-head .links a:hover {
+      color: var(--cyan);
+    }
+
+    .episode .frame {
+      border: 2px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      background: #0f172a;
+    }
+
+    .episode .frame img {
+      width: 100%;
+      display: block;
+    }
+
+    /* --- 加载失败错误卡片 --- */
+    .err-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 44px 20px;
+      border: 2px dashed var(--red);
+      border-radius: 16px;
+      background: rgba(248, 113, 113, .06);
+      text-align: center;
+    }
+
+    .err-card .err-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--red);
+    }
+
+    .err-card .err-desc {
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+
+    .err-card .btn {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    .err-card .btn:hover {
+      background: var(--red);
+      color: #0b1220;
+    }
+
+    /* --- manifest 拉取失败提示条 --- */
+    .notice {
+      display: none;
+      max-width: 1180px;
+      margin: 16px auto 0;
+      padding: 10px 18px;
+      font-size: 12.5px;
+      color: var(--amber);
+      border: 1px solid var(--amber);
+      border-radius: 10px;
+      background: rgba(251, 191, 36, .07);
+    }
+
+    .notice.show {
+      display: block;
+    }
+
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12.5px;
+      padding: 32px 16px 48px;
+    }
+
+    footer a {
+      color: var(--cyan);
+      text-decoration: none;
+    }
+
+    /* ===== 响应式：<1024px 侧边导航折叠为横滑 chips ===== */
+    @media (max-width: 1023px) {
+      .layout {
+        flex-direction: column;
+        padding-top: 0;
+      }
+
+      .sidenav {
+        display: none;
+      }
+
+      .chips {
+        display: flex;
+      }
+
+      .episode {
+        scroll-margin-top: calc(var(--toolbar-h) + 52px);
+      }
+    }
+
+    /* ===== 响应式：<640px 工具栏紧凑化 ===== */
+    @media (max-width: 639px) {
+      .toolbar {
+        gap: 8px;
+        padding: 0 12px;
+      }
+
+      .toolbar .brand {
+        display: none;
+      }
+
+      .progress-text {
+        min-width: 52px;
+      }
+
+      .episode-head h2 {
+        font-size: 16px;
+      }
+
+      .episode-head .links {
+        margin-left: 0;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- ===== 吸顶工具栏：一键打开 / 继续阅读 / 进度 ===== -->
+  <div class="toolbar">
+    <span class="brand">漫画剧场 · 全文阅读</span>
+    <button class="btn btn-primary" id="btn-open-all">一键打开全文</button>
+    <button class="btn btn-resume" id="btn-resume"></button>
+    <div class="progress-wrap">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <span class="progress-text" id="progress-text">0 / 0</span>
+  </div>
+
+  <!-- 窄屏章节导航（横滑 chips） -->
+  <nav class="chips" id="chips" aria-label="章节导航"></nav>
+
+  <div class="notice" id="notice">未能拉取 manifest.json，已回退到内嵌话数清单（file:// 双击打开时属正常现象）。</div>
+
+  <div class="layout">
+    <!-- 宽屏章节导航（侧边固定） -->
+    <nav class="sidenav" id="sidenav" aria-label="章节导航">
+      <div class="nav-title">章节导航</div>
+    </nav>
+
+    <div style="flex:1; min-width:0;">
+      <!-- 目录模式 -->
+      <div class="grid" id="grid"></div>
+      <!-- 全文模式（连续滚动） -->
+      <div class="reader" id="reader"></div>
+    </div>
+  </div>
+
+  <footer>霓虹墨 Neon Ink ｜ <a href="./index.html">返回卡片预览页</a> ｜ 进度自动记忆于本机 localStorage</footer>
+
+  <script>
+    /* ================= 内嵌兜底清单（与 index.html EPISODES 同步维护） ================= */
+    const FALLBACK_EPISODES = [
+      { ep: "EP.01", comic: "css/EP.01-selectors", title: "选择器" },
+      { ep: "EP.02", comic: "css/EP.02-animation-transition", title: "动画与过渡" },
+      { ep: "EP.03", comic: "css/EP.03-flexbox", title: "Flexbox" },
+      { ep: "EP.04", comic: "css/EP.04-grid", title: "Grid" },
+      { ep: "EP.05", comic: "css/EP.05-responsive", title: "响应式" },
+      { ep: "EP.06", comic: "css/EP.06-variables-calc", title: "变量与 calc" },
+      { ep: "EP.07", comic: "css/EP.07-shadows", title: "阴影" },
+      { ep: "EP.08", comic: "css/EP.08-gradients", title: "渐变" },
+      { ep: "EP.09", comic: "css/EP.09-transform", title: "Transform" },
+      { ep: "EP.10", comic: "css/EP.10-text-truncation", title: "文本截断" },
+      { ep: "EP.11", comic: "css/EP.11-pro-tips", title: "CSS 进阶技巧" },
+      { ep: "EP.12", comic: "html/EP.12-semantic", title: "语义化标签" },
+      { ep: "EP.13", comic: "html/EP.13-forms", title: "表单" },
+      { ep: "EP.14", comic: "html/EP.14-canvas", title: "Canvas" },
+      { ep: "EP.15", comic: "html/EP.15-svg", title: "SVG" },
+      { ep: "EP.16", comic: "html/EP.16-web-storage", title: "Web Storage" },
+      { ep: "EP.17", comic: "html/EP.17-web-workers", title: "Web Workers" },
+      { ep: "EP.18", comic: "html/EP.18-geolocation", title: "Geolocation" },
+      { ep: "EP.19", comic: "html/EP.19-drag-drop", title: "拖放" },
+      { ep: "EP.20", comic: "html/EP.20-multimedia", title: "多媒体" },
+      { ep: "EP.21", comic: "html/EP.21-pro-tips", title: "HTML 进阶技巧（完结）" },
+      { ep: "EP.22", comic: "css/EP.22-container-queries", title: "容器查询" },
+      { ep: "EP.23", comic: "css/EP.23-cascade-layers", title: "层叠层" },
+      { ep: "EP.24", comic: "css/EP.24-modern-colors", title: "现代颜色" },
+      { ep: "EP.25", comic: "css/EP.25-scroll-driven-animations", title: "滚动驱动动画" },
+      { ep: "EP.26", comic: "css/EP.26-has-selector", title: ":has() 选择器" },
+      { ep: "EP.27", comic: "css/EP.27-view-transitions", title: "View Transitions" },
+      { ep: "EP.28", comic: "css/EP.28-css-nesting", title: "CSS 嵌套" },
+      { ep: "EP.29", comic: "css/EP.29-scope", title: "@scope 作用域" },
+      { ep: "EP.30", comic: "css/EP.30-property", title: "@property 注册" },
+      { ep: "EP.31", comic: "css/EP.31-anchor-positioning", title: "锚点定位" },
+      { ep: "EP.32", comic: "html/EP.32-popover", title: "Popover" },
+      { ep: "EP.33", comic: "css/EP.33-starting-style", title: "@starting-style" },
+      { ep: "EP.34", comic: "html/EP.34-observers", title: "Observer 三件套" },
+      { ep: "EP.35", comic: "css/EP.35-scroll-snap", title: "滚动吸附" },
+      { ep: "EP.36", comic: "html/EP.36-dialog", title: "dialog 元素" },
+      { ep: "EP.37", comic: "css/EP.37-view-transitions-advanced", title: "View Transitions 进阶" },
+      { ep: "EP.38", comic: "html/EP.38-speculation-rules", title: "Speculation Rules" },
+      { ep: "EP.39", comic: "css/EP.39-color-mix-light-dark", title: "color-mix 与 light-dark" },
+      { ep: "EP.40", comic: "html/EP.40-details-advanced", title: "details 进阶" }
+    ];
+
+    const LS_KEY = "neon-ink-reader-progress";
+    let episodes = [];
+    let currentEp = null;
+
+    /* ================= 1. 内容整合：manifest 优先，内嵌兜底，按 EP 排序合并 ================= */
+    async function loadEpisodes() {
+      try {
+        const res = await fetch("./manifest.json");
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        if (!Array.isArray(data.episodes) || data.episodes.length === 0) throw new Error("episodes 为空");
+        return data.episodes.map(({ ep, comic, title }) => ({ ep, comic, title }));
+      } catch (e) {
+        // file:// 双击 / 网络异常：静默回退内嵌清单 + 提示条
+        document.getElementById("notice").classList.add("show");
+        return FALLBACK_EPISODES;
+      }
+    }
+
+    const epNum = (ep) => parseInt(ep.slice(3), 10);
+
+    /* ================= 2. 目录模式渲染 ================= */
+    function renderGrid() {
+      const grid = document.getElementById("grid");
+      grid.innerHTML = "";
+      for (const e of episodes) {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <img src="${e.comic}.svg" alt="${e.ep} ${e.title}" loading="lazy" decoding="async">
+          <div class="meta">
+            <div class="ep">${e.ep}</div>
+            <div class="title">${e.title}</div>
+          </div>`;
+        card.querySelector("img").addEventListener("error", function () {
+          this.closest(".card").querySelector(".title").textContent = e.title + "（原画加载失败）";
+          this.style.display = "none";
+        });
+        // 点击卡片任意位置进入全文模式并锚定本话
+        card.style.cursor = "pointer";
+        card.addEventListener("click", () => openReader(e.ep));
+        grid.appendChild(card);
+      }
+    }
+
+    /* ================= 3. 全文模式渲染（连续滚动 + 错误重试） ================= */
+    function renderReader() {
+      const reader = document.getElementById("reader");
+      reader.innerHTML = "";
+      for (const e of episodes) {
+        const sec = document.createElement("section");
+        sec.className = "episode";
+        sec.id = e.ep;
+        sec.dataset.ep = e.ep;
+        sec.innerHTML = `
+          <div class="episode-head">
+            <span class="ep-tag">${e.ep}</span>
+            <h2>${e.title}</h2>
+            <span class="links">
+              <a href="${e.comic}.svg" target="_blank" rel="noopener">原画 SVG</a>
+              <a href="${e.comic}.md" target="_blank" rel="noopener">讲解 MD</a>
+            </span>
+          </div>
+          <div class="frame"><img data-src="${e.comic}.svg" alt="${e.ep} ${e.title}" loading="lazy" decoding="async"></div>`;
+        attachImgWithRetry(sec.querySelector("img"), e);
+        reader.appendChild(sec);
+      }
+    }
+
+    // 图片加载失败 → 替换为错误卡片 + 重试按钮（时间戳绕缓存）
+    function attachImgWithRetry(img, e) {
+      const frame = img.closest(".frame");
+      const load = () => { img.src = img.dataset.src; };
+      img.addEventListener("error", () => {
+        const err = document.createElement("div");
+        err.className = "err-card";
+        err.innerHTML = `
+          <div class="err-title">${e.ep} 《${e.title}》原画加载失败</div>
+          <div class="err-desc">路径：${e.comic}.svg ｜ 请检查文件是否存在或网络是否可用</div>
+          <button class="btn">重试加载</button>`;
+        err.querySelector(".btn").addEventListener("click", () => {
+          // 重试：换新 img 并加时间戳参数强制重新请求（attachImgWithRetry 末尾会自动 load）
+          const fresh = document.createElement("img");
+          fresh.dataset.src = `${e.comic}.svg?retry=${Date.now()}`;
+          fresh.alt = img.alt;
+          fresh.loading = "lazy";
+          fresh.decoding = "async";
+          const newFrame = document.createElement("div");
+          newFrame.className = "frame";
+          newFrame.appendChild(fresh);
+          err.replaceWith(newFrame);
+          attachImgWithRetry(fresh, e);
+        });
+        frame.replaceWith(err);
+      }, { once: true });
+      load();
+    }
+
+    /* ================= 4. 章节导航（侧边 + chips 双份，共用高亮） ================= */
+    function renderNav() {
+      const sidenav = document.getElementById("sidenav");
+      const chips = document.getElementById("chips");
+      sidenav.querySelectorAll(".nav-item").forEach((n) => n.remove());
+      chips.innerHTML = "";
+      for (const e of episodes) {
+        const a = document.createElement("a");
+        a.className = "nav-item";
+        a.href = `#${e.ep}`;
+        a.dataset.ep = e.ep;
+        a.innerHTML = `<span class="ep">${e.ep}</span>${e.title}`;
+        a.addEventListener("click", (ev) => { ev.preventDefault(); openReader(e.ep); });
+        sidenav.appendChild(a);
+
+        const c = document.createElement("a");
+        c.className = "chip";
+        c.href = `#${e.ep}`;
+        c.dataset.ep = e.ep;
+        c.textContent = e.ep;
+        c.addEventListener("click", (ev) => { ev.preventDefault(); openReader(e.ep); });
+        chips.appendChild(c);
+      }
+    }
+
+    function highlightNav(ep) {
+      document.querySelectorAll(".nav-item, .chip").forEach((n) =>
+        n.classList.toggle("active", n.dataset.ep === ep));
+    }
+
+    /* ================= 5. 一键打开 / 收起全文 ================= */
+    const btnOpenAll = document.getElementById("btn-open-all");
+
+    function openReader(anchorEp) {
+      if (!document.body.classList.contains("mode-reader")) {
+        document.body.classList.add("mode-reader");
+        btnOpenAll.textContent = "收起全文";
+      }
+      if (anchorEp) {
+        // 等浏览器完成布局后再滚动锚定（SVG 懒加载不撑开高度，用 scrollIntoView 即可）
+        requestAnimationFrame(() => {
+          const target = document.getElementById(anchorEp);
+          if (target) target.scrollIntoView({ behavior: "instant", block: "start" });
+          setCurrent(anchorEp);
+        });
+      }
+    }
+
+    function closeReader() {
+      document.body.classList.remove("mode-reader");
+      btnOpenAll.textContent = "一键打开全文";
+      window.scrollTo({ top: 0, behavior: "instant" });
+    }
+
+    btnOpenAll.addEventListener("click", () => {
+      document.body.classList.contains("mode-reader") ? closeReader() : openReader();
+    });
+
+    /* ================= 6. 进度追踪：当前话数 + 进度条 + localStorage 记忆 ================= */
+    const progressBar = document.getElementById("progress-bar");
+    const progressText = document.getElementById("progress-text");
+
+    function setCurrent(ep) {
+      if (currentEp === ep) return;
+      currentEp = ep;
+      const idx = episodes.findIndex((e) => e.ep === ep);
+      const pct = episodes.length ? ((idx + 1) / episodes.length) * 100 : 0;
+      progressBar.style.width = pct + "%";
+      progressText.textContent = `${idx + 1} / ${episodes.length}`;
+      highlightNav(ep);
+      try { localStorage.setItem(LS_KEY, ep); } catch (_) { /* 隐私模式写失败静默 */ }
+    }
+
+    // IntersectionObserver：视口中上部出现的话数视为「正在读」
+    const io = new IntersectionObserver((entries) => {
+      for (const en of entries) {
+        if (en.isIntersecting) setCurrent(en.target.dataset.ep);
+      }
+    }, { rootMargin: "-20% 0px -60% 0px" });
+
+    function observeEpisodes() {
+      document.querySelectorAll(".episode").forEach((s) => io.observe(s));
+    }
+
+    /* ================= 7. 继续阅读 ================= */
+    const btnResume = document.getElementById("btn-resume");
+
+    function initResume() {
+      let saved = null;
+      try { saved = localStorage.getItem(LS_KEY); } catch (_) { }
+      if (saved && episodes.some((e) => e.ep === saved)) {
+        btnResume.textContent = `继续阅读 ${saved}`;
+        btnResume.classList.add("show");
+        btnResume.addEventListener("click", () => openReader(saved));
+      }
+      // URL #EP.XX 锚点优先于 localStorage
+      const hash = decodeURIComponent(location.hash.slice(1));
+      if (hash && episodes.some((e) => e.ep === hash)) openReader(hash);
+    }
+
+    /* ================= 启动 ================= */
+    (async function init() {
+      episodes = (await loadEpisodes()).sort((a, b) => epNum(a.ep) - epNum(b.ep));
+      progressText.textContent = `0 / ${episodes.length}`;
+      renderGrid();
+      renderReader();
+      renderNav();
+      observeEpisodes();
+      initResume();
+    })();
+  </script>
+</body>
+
+</html>
