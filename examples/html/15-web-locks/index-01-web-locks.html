@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Web Locks API · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 800px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+  .btn {
+    padding: 8px 16px; border-radius: 8px; border: 2px solid #22d3ee;
+    background: #0f172a; color: #22d3ee; font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-right: 8px; margin-bottom: 8px;
+  }
+  .btn:hover { background: #1e293b; }
+  .btn.pink { border-color: #f472b6; color: #f472b6; }
+  .btn.amber { border-color: #fbbf24; color: #fbbf24; }
+  .btn.green { border-color: #22c55e; color: #22c55e; }
+
+  .log-box {
+    background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+    padding: 12px; margin-top: 12px; max-height: 220px; overflow-y: auto;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12.5px; line-height: 1.7;
+  }
+  .log-box .log { border-bottom: 1px solid #1e293b; padding: 3px 0; }
+  .log-box .log:last-child { border-bottom: none; }
+  .log-box .time { color: #64748b; margin-right: 8px; }
+  .log-box .tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-right: 6px; }
+  .log-box .tag.exclusive { background: #7f1d1d; color: #fecaca; }
+  .log-box .tag.shared { background: #14532d; color: #bbf7d0; }
+  .log-box .tag.info { background: #1e293b; color: #94a3b8; }
+  .log-box .tag.err { background: #78350f; color: #fde68a; }
+
+  .status-bar {
+    display: flex; gap: 16px; margin-top: 12px; font-size: 13px;
+  }
+  .status-item {
+    background: #0f172a; padding: 6px 12px; border-radius: 6px;
+    border: 1px solid #334155;
+  }
+  .status-item strong { color: #22d3ee; }
+
+  .support-banner {
+    max-width: 800px; margin: 0 auto 24px; padding: 12px 16px;
+    border-radius: 10px; font-size: 14px;
+    background: #14532d; border: 2px solid #22c55e; color: #bbf7d0;
+  }
+  .support-banner.no { background: #7f1d1d; border-color: #ef4444; color: #fecaca; }
+</style>
+</head>
+<body>
+
+<h1>Web Locks API</h1>
+<p class="sub">跨标签页互斥 · 独占/共享锁 · 队列机制 · 自动释放</p>
+
+<div class="support-banner" id="support-banner">
+  <span class="yes">✅ 当前浏览器支持 Web Locks API，下方示例可直接运行。</span>
+  <span class="no" style="display:none;">⚠️ 当前浏览器不支持 Web Locks API（需 Chrome 69+ / Firefox 72+ / Safari 15.4+）。</span>
+</div>
+
+<!-- ===== 示例 1：独占锁 vs 共享锁 ===== -->
+<section>
+  <h2>1. 独占锁 vs 共享锁</h2>
+  <div class="demo-box">
+    <p style="font-size:13px;color:#94a3b8;margin-bottom:12px;">
+      独占锁同时只能有一个持有者；共享锁允许多个读并发，但排斥写。
+      点击下方按钮观察日志——独占锁排队执行，共享锁并发执行。
+    </p>
+    <button class="btn" id="btn-exclusive">获取独占锁（写）</button>
+    <button class="btn green" id="btn-shared">获取共享锁（读）</button>
+    <button class="btn pink" id="btn-both">同时发起 独占+共享</button>
+    <div class="log-box" id="log1"></div>
+    <div class="status-bar">
+      <div class="status-item">当前持有：<strong id="held-count">0</strong></div>
+      <div class="status-item">排队等待：<strong id="pending-count">0</strong></div>
+    </div>
+    <p class="note">独占锁回调执行 2 秒模拟写操作；共享锁回调执行 1 秒模拟读操作。观察两者的排队/并发差异。</p>
+  </div>
+</section>
+
+<!-- ===== 示例 2：ifAvailable —— 非阻塞尝试 ===== -->
+<section>
+  <h2>2. ifAvailable：锁被占用时不排队，立即返回</h2>
+  <div class="demo-box">
+    <p style="font-size:13px;color:#94a3b8;margin-bottom:12px;">
+      先点击「占用锁 3 秒」，再点击「尝试获取」——锁被占用时立即返回 <code>null</code>，不排队。
+    </p>
+    <button class="btn amber" id="btn-hold">占用锁 3 秒</button>
+    <button class="btn" id="btn-try">尝试获取（ifAvailable）</button>
+    <div class="log-box" id="log2"></div>
+    <p class="note">适合「能拿就拿，拿不到就跳过」的场景，例如轮询更新缓存。</p>
+  </div>
+</section>
+
+<!-- ===== 示例 3：跨标签页竞态 ===== -->
+<section>
+  <h2>3. 跨标签页竞态：两个标签同时写 localStorage</h2>
+  <div class="demo-box">
+    <p style="font-size:13px;color:#94a3b8;margin-bottom:12px;">
+      <strong>在新标签页打开本页</strong>，两边同时点击「写入数据」。
+      无锁时互相覆盖；用 Web Locks 时排队执行，后写入的能看到先写入的结果。
+    </p>
+    <button class="btn" id="btn-write-nolock">写入（无锁）</button>
+    <button class="btn green" id="btn-write-lock">写入（有锁）</button>
+    <button class="btn pink" id="btn-read">读取当前值</button>
+    <div class="log-box" id="log3"></div>
+    <p class="note">无锁模式下两边同时 setItem，后执行者覆盖先执行者；有锁模式下 setItem 排队，后者读到前者的值后再写入，数据一致。</p>
+  </div>
+</section>
+
+<!-- ===== 示例 4：AbortSignal 超时 ===== -->
+<section>
+  <h2>4. AbortSignal：取锁超时自动放弃</h2>
+  <div class="demo-box">
+    <p style="font-size:13px;color:#94a3b8;margin-bottom:12px;">
+      先点击「占用锁 5 秒」，再点击「带 2 秒超时的取锁」——超时后自动放弃，抛出 AbortError。
+    </p>
+    <button class="btn amber" id="btn-hold4">占用锁 5 秒</button>
+    <button class="btn" id="btn-timeout">取锁（2 秒超时）</button>
+    <div class="log-box" id="log4"></div>
+  </div>
+</section>
+
+<script>
+  const $ = (s) => document.querySelector(s);
+  const banner = $('#support-banner');
+  if (!navigator.locks) {
+    banner.classList.add('no');
+    banner.querySelector('.yes').style.display = 'none';
+    banner.querySelector('.no').style.display = 'inline';
+  }
+
+  const now = () => new Date().toLocaleTimeString('zh-CN', { hour12: false, fractionalSecondDigits: 3 });
+  function log(boxId, msg, tag = 'info') {
+    const box = $(`#${boxId}`);
+    const div = document.createElement('div');
+    div.className = 'log';
+    div.innerHTML = `<span class="time">${now()}</span><span class="tag ${tag}">${tag}</span>${msg}`;
+    box.prepend(div);
+    while (box.children.length > 50) box.lastChild.remove();
+  }
+
+  async function updateStatus() {
+    if (!navigator.locks) return;
+    try {
+      const state = await navigator.locks.query();
+      $('#held-count').textContent = state.held.length;
+      $('#pending-count').textContent = state.pending.length;
+    } catch (_) {}
+  }
+  setInterval(updateStatus, 500);
+
+  // ===== 示例 1：独占 vs 共享 =====
+  $('#btn-exclusive').addEventListener('click', async () => {
+    log('log1', '请求独占锁...', 'exclusive');
+    await navigator.locks.request('demo-ex', async () => {
+      log('log1', '✅ 获得独占锁，执行写操作（2 秒）', 'exclusive');
+      await new Promise(r => setTimeout(r, 2000));
+      log('log1', '🔓 释放独占锁', 'exclusive');
+    });
+  });
+
+  $('#btn-shared').addEventListener('click', async () => {
+    log('log1', '请求共享锁...', 'shared');
+    await navigator.locks.request('demo-ex', { mode: 'shared' }, async () => {
+      log('log1', '✅ 获得共享锁，执行读操作（1 秒）', 'shared');
+      await new Promise(r => setTimeout(r, 1000));
+      log('log1', '🔓 释放共享锁', 'shared');
+    });
+  });
+
+  $('#btn-both').addEventListener('click', () => {
+    $('#btn-exclusive').click();
+    $('#btn-shared').click();
+  });
+
+  // ===== 示例 2：ifAvailable =====
+  $('#btn-hold').addEventListener('click', async () => {
+    log('log2', '占用锁 3 秒...', 'info');
+    await navigator.locks.request('demo-if', async () => {
+      await new Promise(r => setTimeout(r, 3000));
+      log('log2', '🔓 释放', 'info');
+    });
+  });
+
+  $('#btn-try').addEventListener('click', async () => {
+    log('log2', '尝试获取（ifAvailable）...', 'info');
+    const result = await navigator.locks.request('demo-if', { ifAvailable: true }, async (lock) => {
+      if (!lock) {
+        log('log2', '❌ 锁被占用，立即返回 null', 'err');
+        return null;
+      }
+      log('log2', '✅ 获得锁', 'info');
+      return 'got';
+    });
+    if (result === null) log('log2', '返回结果：null（锁不可用）', 'err');
+  });
+
+  // ===== 示例 3：跨标签竞态 =====
+  const STORAGE_KEY = 'web-lock-demo';
+  $('#btn-write-nolock').addEventListener('click', () => {
+    const val = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const item = { tab: Math.random().toString(36).slice(2, 6), time: Date.now() };
+    val.push(item);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(val));
+    log('log3', `无锁写入：${JSON.stringify(item)}（共 ${val.length} 条）`, 'info');
+  });
+
+  $('#btn-write-lock').addEventListener('click', async () => {
+    await navigator.locks.request('demo-storage', async () => {
+      const val = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      const item = { tab: Math.random().toString(36).slice(2, 6), time: Date.now() };
+      val.push(item);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(val));
+      log('log3', `有锁写入：${JSON.stringify(item)}（共 ${val.length} 条）`, 'exclusive');
+    });
+  });
+
+  $('#btn-read').addEventListener('click', () => {
+    const val = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    log('log3', `当前值：${JSON.stringify(val)}`, 'info');
+  });
+
+  // ===== 示例 4：AbortSignal 超时 =====
+  $('#btn-hold4').addEventListener('click', async () => {
+    log('log4', '占用锁 5 秒...', 'info');
+    await navigator.locks.request('demo-abort', async () => {
+      await new Promise(r => setTimeout(r, 5000));
+      log('log4', '🔓 释放', 'info');
+    });
+  });
+
+  $('#btn-timeout').addEventListener('click', async () => {
+    const ac = new AbortController();
+    setTimeout(() => ac.abort(), 2000);
+    log('log4', '取锁（2 秒超时）...', 'info');
+    try {
+      await navigator.locks.request('demo-abort', { signal: ac.signal }, async () => {
+        log('log4', '✅ 获得锁', 'info');
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') log('log4', '⏰ 取锁超时，已放弃', 'err');
+      else throw e;
+    }
+  });
+</script>
+
+</body>
+</html>

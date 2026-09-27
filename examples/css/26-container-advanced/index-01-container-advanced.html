@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>@container 进阶 · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 900px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+  .btn {
+    padding: 8px 16px; border-radius: 8px; border: 2px solid #22d3ee;
+    background: #0f172a; color: #22d3ee; font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-right: 8px; margin-bottom: 8px;
+  }
+  .btn:hover { background: #1e293b; }
+
+  /* ===== 支持度检测横幅 ===== */
+  .support-banner {
+    max-width: 900px; margin: 0 auto 24px; padding: 12px 16px;
+    border-radius: 10px; font-size: 14px;
+    background: #14532d; border: 2px solid #22c55e; color: #bbf7d0;
+  }
+  .support-banner.no { background: #7f1d1d; border-color: #ef4444; color: #fecaca; }
+
+  /* ===== 示例 1：style queries —— 暗色侧栏自动适配 ===== */
+  .theme-light { --theme: light; background: #f1f5f9; padding: 16px; border-radius: 10px; }
+  .theme-dark  { --theme: dark;  background: #1e293b; padding: 16px; border-radius: 10px; }
+  .theme-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .theme-card {
+    background: #fff; border: 2px solid #cbd5e1; border-radius: 10px;
+    padding: 16px; color: #1e293b;
+  }
+  .theme-card h4 { margin-bottom: 6px; font-size: 15px; }
+  .theme-card p { font-size: 13px; color: #64748b; }
+
+  /* style queries：查容器的 --theme 自定义属性 */
+  @container style(--theme: dark) {
+    .theme-card {
+      background: #0f172a; border-color: #475569; color: #e2e8f0;
+    }
+    .theme-card p { color: #94a3b8; }
+  }
+
+  /* ===== 示例 2：容器单位排版 —— 卡片内文字随容器缩放 ===== */
+  .resize-hint { font-size: 12px; color: #64748b; margin-bottom: 10px; }
+  .cq-outer {
+    container-type: inline-size;
+    background: #0f172a; border: 2px dashed #334155; border-radius: 10px;
+    padding: 16px; resize: horizontal; overflow: auto; min-width: 240px; max-width: 100%;
+  }
+  .cq-card { display: grid; gap: 1.5cqi; }
+  .cq-card h4 { font-size: clamp(14px, 4.5cqi, 24px); color: #22d3ee; }
+  .cq-card p  { font-size: clamp(12px, 3cqi, 16px); color: #94a3b8; }
+  .cq-card .tag {
+    display: inline-block; font-size: clamp(10px, 2.5cqi, 13px);
+    background: #1e293b; padding: 2px 8px; border-radius: 999px; color: #a78bfa;
+  }
+
+  /* ===== 示例 3：嵌套命名容器 —— dashboard 查外层，widget 查内层 ===== */
+  .dashboard {
+    container: dashboard / inline-size;
+    background: #0f172a; border-radius: 12px; padding: 16px;
+  }
+  .widget-row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .widget {
+    container: widget / inline-size;
+    flex: 1; min-width: 200px;
+    background: #1e293b; border-radius: 10px; padding: 14px;
+  }
+  .widget-inner { display: flex; flex-direction: column; gap: 8px; }
+  .widget-inner .num { font-size: 28px; font-weight: 800; color: #fbbf24; }
+  .widget-inner .label { font-size: 13px; color: #94a3b8; }
+
+  /* widget 容器宽 ≥ 220px 时内部横排 */
+  @container widget (min-width: 220px) {
+    .widget-inner { flex-direction: row; align-items: center; justify-content: space-between; }
+  }
+  /* dashboard 容器窄于 500px 时 widget 卡片紧凑 */
+  @container dashboard (max-width: 500px) {
+    .widget { padding: 10px; }
+    .widget-inner .num { font-size: 20px; }
+  }
+
+  /* ===== 示例 4：@container × @scope —— 组件自治 ===== */
+  .scope-card-wrapper { container-type: inline-size; }
+  @scope (.scope-card) {
+    :scope {
+      display: grid; gap: 2cqi;
+      background: #1e293b; border-radius: 12px; padding: 3cqi;
+      border: 2px solid #334155;
+    }
+    .scope-card h4 { font-size: clamp(15px, 5cqi, 22px); color: #f472b6; }
+    .scope-card p  { font-size: clamp(12px, 3.2cqi, 15px); color: #94a3b8; }
+  }
+  @container (min-width: 420px) {
+    @scope (.scope-card) {
+      :scope { grid-template-columns: 100px 1fr; align-items: center; }
+      .scope-card .icon { font-size: 40px; text-align: center; }
+    }
+  }
+</style>
+</head>
+<body>
+
+<h1>@container 进阶</h1>
+<p class="sub">style queries · 容器单位 · 嵌套命名 · @scope 组合</p>
+
+<div class="support-banner" id="support-banner">
+  <span class="yes">✅ 当前浏览器支持 Style Queries 与容器单位，下方示例可直接查看效果。</span>
+  <span class="no" style="display:none;">⚠️ 当前浏览器不支持 Style Queries（需 Chrome 111+ / Safari 18+），示例 1 可能无视觉差异；容器单位与嵌套查询仍可运行。</span>
+</div>
+
+<!-- ===== 示例 1：style queries ===== -->
+<section>
+  <h2>1. Style Queries：容器声明 --theme，卡片自动换肤</h2>
+  <div class="demo-box">
+    <div class="theme-grid">
+      <div class="theme-light">
+        <p style="font-size:12px;color:#64748b;margin-bottom:8px;">--theme: light</p>
+        <div class="theme-card">
+          <h4>用户卡片</h4>
+          <p>同一张卡片，放进不同主题容器自动适配。</p>
+        </div>
+      </div>
+      <div class="theme-dark">
+        <p style="font-size:12px;color:#94a3b8;margin-bottom:8px;">--theme: dark</p>
+        <div class="theme-card">
+          <h4>用户卡片</h4>
+          <p>同一张卡片，放进不同主题容器自动适配。</p>
+        </div>
+      </div>
+    </div>
+    <p class="note">容器只需声明 <code>--theme: dark</code>，卡片用 <code>@container style(--theme: dark)</code> 自动换深色皮肤——无需传 class。</p>
+  </div>
+</section>
+
+<!-- ===== 示例 2：容器单位排版 ===== -->
+<section>
+  <h2>2. 容器单位：拖动右下角，文字随容器宽度缩放</h2>
+  <div class="demo-box">
+    <p class="resize-hint">⤡ 拖动容器右下角调整宽度，观察标题/正文/标签字号变化</p>
+    <div class="cq-outer">
+      <div class="cq-card">
+        <span class="tag">容器查询</span>
+        <h4>响应式排版</h4>
+        <p>clamp(最小值, cqi 比例, 最大值) 让文字在任意容器宽度下比例协调，不再被视口 vw 绑架。</p>
+      </div>
+    </div>
+    <p class="note"><code>cqi</code> = 容器内联尺寸的 1%。容器 400px 时 5cqi = 20px，800px 时 = 40px，<code>clamp()</code> 兜底极值。</p>
+  </div>
+</section>
+
+<!-- ===== 示例 3：嵌套命名容器 ===== -->
+<section>
+  <h2>3. 嵌套命名容器：widget 查自己，dashboard 查外层</h2>
+  <div class="demo-box">
+    <div class="dashboard" style="resize: horizontal; overflow: auto; min-width: 320px; max-width: 100%;">
+      <p style="font-size:12px;color:#64748b;margin-bottom:10px;">⤡ 拖动 dashboard 右下角调宽度</p>
+      <div class="widget-row">
+        <div class="widget">
+          <div class="widget-inner">
+            <span class="num">42</span>
+            <span class="label">活跃用户</span>
+          </div>
+        </div>
+        <div class="widget">
+          <div class="widget-inner">
+            <span class="num">98%</span>
+            <span class="label">满意度</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note">widget 宽 ≥ 220px 时内部横排（查 widget 容器）；dashboard 窄于 500px 时卡片紧凑（查 dashboard 容器）。命名防止嵌套串台。</p>
+  </div>
+</section>
+
+<!-- ===== 示例 4：@container × @scope ===== -->
+<section>
+  <h2>4. @container × @scope：组件自带断点与样式封装</h2>
+  <div class="demo-box">
+    <div class="scope-card-wrapper" style="resize: horizontal; overflow: auto; min-width: 260px; max-width: 100%;">
+      <div class="scope-card">
+        <div class="icon">🎴</div>
+        <div>
+          <h4>装哪美哪</h4>
+          <p>@container 管「何时变」，@scope 管「影响谁」。组件样式完全自包含，消费者零配置。</p>
+        </div>
+      </div>
+    </div>
+    <p class="note">容器 ≥ 420px 时切换为横排（图标左、文字右），窄时竖排。所有样式都在 <code>@scope</code> 内，不污染外部。</p>
+  </div>
+</section>
+
+<script>
+  // 支持度检测：Style Queries 需要 CSS.supports 检测
+  const supportsStyleQueries = CSS.supports('container-type: inline-size') &&
+    CSS.supports('@container style(--x: 1) { }');
+  const banner = document.getElementById('support-banner');
+  if (!supportsStyleQueries) {
+    banner.classList.add('no');
+    banner.querySelector('.yes').style.display = 'none';
+    banner.querySelector('.no').style.display = 'inline';
+  }
+</script>
+
+</body>
+</html>
