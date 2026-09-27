@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dialog 元素 · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 800px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+  .btn {
+    padding: 8px 16px; border-radius: 8px; border: 2px solid #22d3ee;
+    background: #0f172a; color: #22d3ee; font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-right: 8px; margin-bottom: 8px;
+  }
+  .btn.pink { border-color: #f472b6; color: #f472b6; }
+  .btn.amber { border-color: #fbbf24; color: #fbbf24; }
+
+  /* ===== 支持度检测横幅 ===== */
+  .support-banner {
+    max-width: 800px; margin: 0 auto 24px; padding: 12px 16px;
+    border-radius: 10px; font-size: 14px;
+    background: #14532d; border: 2px solid #22c55e; color: #bbf7d0;
+  }
+  .support-banner .no { display: none; }
+
+  /* ===== dialog 通用重置 + 样式 ===== */
+  dialog {
+    /* 清 UA 默认样式：黑边框/自动 margin/固定 max-width */
+    padding: 0; border: none; margin: auto; max-width: none;
+    background: #1e293b; border: 2px solid #22d3ee; border-radius: 14px;
+    color: #e2e8f0; width: min(420px, 90vw);
+  }
+  dialog::backdrop {
+    background: rgb(2 6 23 / .6);
+    backdrop-filter: blur(3px);
+    /* 遮罩也参与过渡（配合下方 allow-discrete） */
+    transition: opacity .25s ease, display .25s allow-discrete, overlay .25s allow-discrete;
+    opacity: 1;
+  }
+  dialog .dlg-body { padding: 22px 24px; }
+  dialog h3 { font-size: 17px; color: #f472b6; margin-bottom: 10px; }
+  dialog p { font-size: 14px; color: #cbd5e1; margin-bottom: 16px; }
+  dialog .dlg-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* ===== 示例4：进出场动画三件套 ===== */
+  dialog.animated {
+    opacity: 1;
+    translate: 0 0;
+    transition:
+      opacity .25s ease,
+      translate .25s ease,
+      overlay .25s allow-discrete,
+      display .25s allow-discrete;
+  }
+  dialog.animated:not([open]) {
+    opacity: 0;
+    translate: 0 20px;
+  }
+  @starting-style {
+    dialog.animated[open] {
+      opacity: 0;
+      translate: 0 20px;
+    }
+  }
+  /* 遮罩淡出 */
+  dialog.animated:not([open])::backdrop { opacity: 0; }
+  @starting-style {
+    dialog.animated[open]::backdrop { opacity: 0; }
+  }
+
+  /* ===== 示例5：非模态抽屉 ===== */
+  #drawer {
+    margin: 0 0 0 auto;              /* 贴右 */
+    height: 100vh; max-height: none;
+    width: 280px; border-radius: 0;
+    border: none; border-left: 2px solid #a78bfa;
+  }
+
+  .result-log {
+    background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+    padding: 10px 14px; font-family: Menlo, monospace; font-size: 12.5px;
+    color: #34d399; min-height: 40px; margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+
+<h1>&lt;dialog&gt; 元素</h1>
+<p class="sub">showModal / show / close · ::backdrop · form method="dialog" · closedby</p>
+
+<div class="support-banner">
+  <span class="ok">✅ 当前浏览器支持原生 dialog。模态打开后：页面背景自动惰性化、焦点圈禁在弹窗内、Esc 可关闭。</span>
+  <span class="no">⚠️ 当前浏览器不支持 dialog（Chrome 37+ / Safari 15.4+ / Firefox 98+）。</span>
+</div>
+
+<!-- 示例1：模态确认框（form method="dialog" 零 JS 分流） -->
+<section>
+  <h2>示例 1 · 确认对话框（零 JS 返回值分流）</h2>
+  <div class="demo-box">
+    <button class="btn pink" id="btnDel">删除记录</button>
+    <dialog id="delDlg">
+      <form method="dialog" class="dlg-body">
+        <h3>删除确认</h3>
+        <p>删除后不可恢复，确定继续吗？按钮的 <code>value</code> 会自动写入 <code>returnValue</code>。</p>
+        <div class="dlg-actions">
+          <button class="btn" value="cancel" formnovalidate>取消</button>
+          <button class="btn pink" value="confirm">确定删除</button>
+        </div>
+      </form>
+    </dialog>
+    <div class="result-log" id="log1">// 操作结果会打印在这里</div>
+    <p class="note">点按钮即关窗：<code>form method="dialog"</code> 让表单提交 = 关闭对话框，按钮 value 写入 returnValue。<strong>无一行 JS 参与「确认/取消」分流。</strong></p>
+  </div>
+</section>
+
+<!-- 示例2：拦截 Esc（cancel 事件） -->
+<section>
+  <h2>示例 2 · 拦截 Esc（表单未保存保护）</h2>
+  <div class="demo-box">
+    <button class="btn amber" id="btnEdit">编辑资料（有未保存内容）</button>
+    <dialog id="editDlg">
+      <form method="dialog" class="dlg-body">
+        <h3>编辑资料</h3>
+        <p>这个弹窗拦截了 Esc：有未保存内容时按 Esc 只会抖动提示，不会关闭。请点按钮关闭。</p>
+        <div class="dlg-actions">
+          <button class="btn" value="discard">放弃修改</button>
+          <button class="btn amber" value="save">保存并关闭</button>
+        </div>
+      </form>
+    </dialog>
+    <div class="result-log" id="log2">// 试试打开后按 Esc</div>
+    <p class="note">Esc → 先触发 <code>cancel</code>（可 <code>preventDefault()</code> 拦截）再默认关闭；拦截后 <code>close</code> 不触发。</p>
+  </div>
+</section>
+
+<!-- 示例3：closedby 轻关闭 -->
+<section>
+  <h2>示例 3 · closedby="any" 点外部即关</h2>
+  <div class="demo-box">
+    <button class="btn" id="btnLight">打开轻关闭弹窗</button>
+    <dialog id="lightDlg" closedby="any">
+      <div class="dlg-body">
+        <h3>轻关闭（light dismiss）</h3>
+        <p><code>closedby="any"</code>：点击弹窗外部任意处即关闭（无需监听 backdrop 点击）。不支持的旧浏览器见 JS 退化方案。</p>
+        <div class="dlg-actions">
+          <button class="btn" onclick="document.getElementById('lightDlg').close()">手动关闭</button>
+        </div>
+      </div>
+    </dialog>
+    <div class="result-log" id="log3">// closedby 支持情况会打印在这里</div>
+    <p class="note"><code>closedby</code> 三档：<code>any</code> 点外部关 / <code>closerequest</code> 仅 Esc / <code>none</code> 只能代码关（强制确认场景）。</p>
+  </div>
+</section>
+
+<!-- 示例4：进出场动画 -->
+<section>
+  <h2>示例 4 · 进出场动画（@starting-style 三件套）</h2>
+  <div class="demo-box">
+    <button class="btn pink" id="btnAnim">打开动画弹窗</button>
+    <dialog id="animDlg" class="animated">
+      <div class="dlg-body">
+        <h3>平滑进出场</h3>
+        <p>打开：从 <code>translate 20px + 透明</code> 上浮淡入；关闭：反向播完再退出 top layer。遮罩同步淡入淡出。</p>
+        <div class="dlg-actions">
+          <button class="btn pink" onclick="document.getElementById('animDlg').close()">关闭（观察离场动画）</button>
+        </div>
+      </div>
+    </dialog>
+    <p class="note">三件套：终态 + <code>:not([open])</code> 离场态 + <code>@starting-style</code> 入场起点；<code>display/overlay</code> 挂 <code>allow-discrete</code>。详见 CSS 篇 22。</p>
+  </div>
+</section>
+
+<!-- 示例5：非模态抽屉（show） -->
+<section>
+  <h2>示例 5 · 非模态抽屉（show，无遮罩可交互）</h2>
+  <div class="demo-box">
+    <button class="btn" id="btnDrawer">打开设置抽屉</button>
+    <button class="btn amber" id="btnBg" >点我证明页面仍可交互</button>
+    <dialog id="drawer">
+      <div class="dlg-body">
+        <h3>设置抽屉（非模态）</h3>
+        <p><code>dlg.show()</code> 打开：无遮罩、页面不惰性化、Esc 不默认关闭（非模态下 Esc 会触发 cancel 但默认不关闭——本例保持原生行为）。</p>
+        <div class="dlg-actions">
+          <button class="btn" onclick="document.getElementById('drawer').close()">收起</button>
+        </div>
+      </div>
+    </dialog>
+    <div class="result-log" id="log5">// 抽屉打开时点左边按钮试试</div>
+    <p class="note">模态 vs 非模态分工：<strong>打断流程要答案 → showModal；并排辅助面板 → show</strong>。菜单/提示类浮层请用 popover（HTML 篇 10）。</p>
+  </div>
+</section>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  // 支持度检测
+  if (typeof HTMLDialogElement !== 'function') {
+    document.querySelector('.support-banner').className = 'support-banner';
+    document.querySelector('.support-banner').style.cssText =
+      'background:#450a0a;border-color:#ef4444;color:#fecaca';
+    document.querySelector('.support-banner .ok').style.display = 'none';
+    document.querySelector('.support-banner .no').style.display = 'inline';
+  }
+
+  // 示例1：确认/取消分流
+  $('btnDel').addEventListener('click', () => $('delDlg').showModal());
+  $('delDlg').addEventListener('close', (e) => {
+    $('log1').textContent = `returnValue = "${e.target.returnValue}"` +
+      (e.target.returnValue === 'confirm' ? '  → 执行删除 ✅' : '  → 已取消');
+  });
+
+  // 示例2：拦截 Esc（cancel 可拦截，close 不可拦截）
+  const formDirty = true;   // 模拟「有未保存内容」
+  $('btnEdit').addEventListener('click', () => $('editDlg').showModal());
+  $('editDlg').addEventListener('cancel', (e) => {
+    if (formDirty) {
+      e.preventDefault();
+      $('log2').textContent = 'Esc 被拦截：有未保存内容，弹窗不关闭 ✋';
+      // 抖动提示
+      $('editDlg').animate(
+        [{ transform: 'translateX(0)' }, { transform: 'translateX(-8px)' },
+         { transform: 'translateX(8px)' }, { transform: 'translateX(0)' }],
+        { duration: 200, iterations: 1 }
+      );
+    }
+  });
+  $('editDlg').addEventListener('close', (e) => {
+    $('log2').textContent = `已关闭，returnValue = "${e.target.returnValue}"`;
+  });
+
+  // 示例3：closedby 支持检测 + 旧浏览器退化
+  const supportsClosedBy = 'closedBy' in HTMLDialogElement.prototype;
+  $('log3').textContent = supportsClosedBy
+    ? 'closedby="any" 原生支持 ✅ → 点弹窗外部试试'
+    : 'closedby 不支持 → 已启用退化方案（监听 backdrop 点击）';
+  if (!supportsClosedBy) {
+    $('lightDlg').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) e.currentTarget.close();  // 点在弹窗矩形外
+    });
+  }
+  $('btnLight').addEventListener('click', () => $('lightDlg').showModal());
+
+  // 示例4：动画弹窗（纯 CSS 驱动，JS 只负责开/关）
+  $('btnAnim').addEventListener('click', () => $('animDlg').showModal());
+
+  // 示例5：非模态抽屉
+  $('btnDrawer').addEventListener('click', () => {
+    const d = $('drawer');
+    d.open ? d.close() : d.show();
+  });
+  $('btnBg').addEventListener('click', () => {
+    $('log5').textContent = `背景按钮被点击！时间 ${new Date().toLocaleTimeString()} —— 非模态下页面保持可交互`;
+  });
+</script>
+
+</body>
+</html>

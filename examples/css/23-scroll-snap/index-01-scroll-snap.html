@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>滚动吸附 Scroll Snap · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 800px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+  .btn {
+    padding: 8px 16px; border-radius: 8px; border: 2px solid #22d3ee;
+    background: #0f172a; color: #22d3ee; font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-right: 8px; margin-bottom: 8px;
+  }
+  .btn.pink { border-color: #f472b6; color: #f472b6; }
+
+  /* ===== 支持度检测横幅 ===== */
+  .support-banner {
+    max-width: 800px; margin: 0 auto 24px; padding: 12px 16px;
+    border-radius: 10px; font-size: 14px;
+    background: #14532d; border: 2px solid #22c55e; color: #bbf7d0;
+  }
+  @supports not (scroll-snap-type: x mandatory) {
+    .support-banner {
+      background: #450a0a; border-color: #ef4444; color: #fecaca;
+    }
+    .support-banner .ok { display: none; }
+  }
+  @supports (scroll-snap-type: x mandatory) {
+    .support-banner .no { display: none; }
+  }
+
+  /* ===== 示例1：水平卡片流（mandatory + center） ===== */
+  .card-row {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 20px;      /* 首尾卡片也能完整居中 */
+    overscroll-behavior-x: contain;   /* 横向滑到底不链式带动页面 */
+    padding-bottom: 8px;
+  }
+  .card-row .card {
+    flex: 0 0 72%;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;         /* 快速甩动也逐张停靠 */
+    background: #1e293b; border: 2px solid #22d3ee; border-radius: 12px;
+    padding: 28px 20px; text-align: center;
+  }
+  .card-row .card b { font-size: 20px; color: #22d3ee; }
+  .card-row .card p { font-size: 13px; color: #94a3b8; margin-top: 6px; }
+
+  /* ===== 示例2：整屏翻页（y mandatory + stop always） ===== */
+  .pages {
+    height: 320px;                    /* 用 320px 演示「屏」，真实项目 100vh */
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    border-radius: 12px;
+    border: 2px solid #a78bfa;
+  }
+  .pages .page {
+    height: 320px;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;         /* 一屏一停，不连跳 */
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 700;
+  }
+  .pages .page small { font-size: 13px; font-weight: 400; margin-top: 8px; opacity: .75; }
+  .pages .p1 { background: #164e63; }
+  .pages .p2 { background: #4c1d95; }
+  .pages .p3 { background: #701a4b; }
+
+  /* ===== 示例3：图片轮播（纯 CSS + 锚点导航） ===== */
+  .carousel {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;          /* 锚点跳转平滑滚动 */
+    border-radius: 12px;
+    border: 2px solid #f472b6;
+  }
+  .carousel .slide {
+    flex: none; width: 100%; height: 180px;
+    scroll-snap-align: center;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; font-weight: 700;
+  }
+  .carousel .s1 { background: linear-gradient(135deg, #0e7490, #22d3ee); color: #083344; }
+  .carousel .s2 { background: linear-gradient(135deg, #7c3aed, #c4b5fd); color: #2e1065; }
+  .carousel .s3 { background: linear-gradient(135deg, #db2777, #f9a8d4); color: #500724; }
+  .dots { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+  .dots a {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #334155; border: 2px solid #64748b;
+    display: block; transition: background .2s;
+  }
+  .dots a:hover, .dots a:focus { background: #f472b6; border-color: #f472b6; }
+
+  /* ===== 示例4：mandatory vs proximity 对比 ===== */
+  .vs-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .vs-list {
+    height: 220px; overflow-y: auto;
+    border-radius: 12px; border: 2px solid #334155;
+    background: #0f172a;
+  }
+  .vs-list.mandatory { scroll-snap-type: y mandatory; border-color: #f87171; }
+  .vs-list.proximity { scroll-snap-type: y proximity; border-color: #34d399; }
+  .vs-list .row { padding: 10px 14px; font-size: 13px; color: #cbd5e1; }
+  .vs-list .tall { padding: 26px 14px; background: #1e293b; }  /* 高行：mandatory 的陷阱 */
+  .vs-list h3 {
+    scroll-snap-align: start;
+    padding: 8px 14px; font-size: 13px; color: #fbbf24;
+    background: #131c2e; position: sticky; top: 0;
+  }
+  .vs-tag { font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+
+  /* ===== 示例5：scroll-padding 避让固定头 ===== */
+  .doc-scroll {
+    position: relative;
+    height: 240px; overflow-y: auto;
+    scroll-snap-type: y proximity;
+    scroll-padding-top: 48px;         /* 给「固定头」留位：吸附点对齐到头部下沿 */
+    border: 2px solid #fbbf24; border-radius: 12px;
+    background: #0f172a;
+  }
+  .doc-scroll .fake-header {
+    position: sticky; top: 0; z-index: 2;
+    height: 48px; display: flex; align-items: center; padding: 0 14px;
+    background: #fbbf24; color: #451a03; font-size: 13px; font-weight: 700;
+  }
+  .doc-scroll h3 {
+    scroll-snap-align: start;
+    font-size: 14px; color: #22d3ee; padding: 10px 14px 4px;
+  }
+  .doc-scroll p { font-size: 13px; color: #94a3b8; padding: 0 14px 10px; }
+</style>
+</head>
+<body>
+
+<h1>滚动吸附 Scroll Snap</h1>
+<p class="sub">scroll-snap-type · scroll-snap-align · scroll-snap-stop · scroll-padding</p>
+
+<div class="support-banner">
+  <span class="ok">✅ 当前浏览器支持 Scroll Snap，全部示例可交互（用触摸板/鼠标滚轮/拖动滚动条试试）。</span>
+  <span class="no">⚠️ 当前浏览器不支持 scroll-snap-type（Chrome 69+ / Safari 14.1+ / Firefox 68+）。示例退化为普通滚动。</span>
+</div>
+
+<!-- 示例1：水平卡片流 -->
+<section>
+  <h2>示例 1 · 水平卡片流（x mandatory + center）</h2>
+  <div class="demo-box">
+    <div class="card-row">
+      <div class="card"><b>卡片 1</b><p>scroll-snap-align: center</p></div>
+      <div class="card"><b>卡片 2</b><p>松手自动居中</p></div>
+      <div class="card"><b>卡片 3</b><p>stop: always 逐张停靠</p></div>
+      <div class="card"><b>卡片 4</b><p>scroll-padding-inline 让首尾也能居中</p></div>
+      <div class="card"><b>卡片 5</b><p>原生惯性 60fps</p></div>
+    </div>
+    <p class="note">横向滑动后松手 → 自动吸附到最近一张卡片的中心。<code>scroll-snap-stop: always</code> 保证快速甩动也逐张停靠，不会一甩到底。</p>
+  </div>
+</section>
+
+<!-- 示例2：整屏翻页 -->
+<section>
+  <h2>示例 2 · 整屏翻页（y mandatory）</h2>
+  <div class="demo-box">
+    <div class="pages">
+      <div class="page p1">第一屏 · 青<small>height: 100% + align: start</small></div>
+      <div class="page p2">第二屏 · 紫<small>stop: always 一屏一停</small></div>
+      <div class="page p3">第三屏 · 粉<small>真实项目把 320px 换成 100vh</small></div>
+    </div>
+    <p class="note">在框内竖向滚动：每次松手都会吸附到某一屏的起点。<code>scroll-snap-stop: always</code> 保证不会一次跳过两屏。</p>
+  </div>
+</section>
+
+<!-- 示例3：图片轮播 -->
+<section>
+  <h2>示例 3 · 纯 CSS 轮播 + 锚点导航</h2>
+  <div class="demo-box">
+    <div class="carousel" id="carousel">
+      <div class="slide s1" id="slide-1">第 1 张</div>
+      <div class="slide s2" id="slide-2">第 2 张</div>
+      <div class="slide s3" id="slide-3">第 3 张</div>
+    </div>
+    <div class="dots">
+      <a href="#slide-1" aria-label="第 1 张"></a>
+      <a href="#slide-2" aria-label="第 2 张"></a>
+      <a href="#slide-3" aria-label="第 3 张"></a>
+    </div>
+    <p class="note">点圆点 → <code>scroll-behavior: smooth</code> 平滑滚动过去，落点仍由吸附接管。零 JS 轮播。</p>
+  </div>
+</section>
+
+<!-- 示例4：mandatory vs proximity -->
+<section>
+  <h2>示例 4 · mandatory vs proximity（内容不定高）</h2>
+  <div class="demo-box">
+    <div class="vs-wrap">
+      <div>
+        <p class="vs-tag" style="color:#f87171;">mandatory · 会「锁死」</p>
+        <div class="vs-list mandatory">
+          <h3>章节 A</h3>
+          <div class="row">普通行 1</div>
+          <div class="row tall">高行（内容多）—— mandatory 下滚过这里会被吸回标题，中间内容很难停留</div>
+          <div class="row">普通行 2</div>
+          <h3>章节 B</h3>
+          <div class="row">普通行 3</div>
+          <div class="row tall">高行（内容多）</div>
+          <div class="row">普通行 4</div>
+          <h3>章节 C</h3>
+          <div class="row">普通行 5</div>
+          <div class="row">普通行 6</div>
+        </div>
+      </div>
+      <div>
+        <p class="vs-tag" style="color:#34d399;">proximity · 轻轻吸住</p>
+        <div class="vs-list proximity">
+          <h3>章节 A</h3>
+          <div class="row">普通行 1</div>
+          <div class="row tall">高行（内容多）—— proximity 允许停在任意位置，滚到标题附近才吸附</div>
+          <div class="row">普通行 2</div>
+          <h3>章节 B</h3>
+          <div class="row">普通行 3</div>
+          <div class="row tall">高行（内容多）</div>
+          <div class="row">普通行 4</div>
+          <h3>章节 C</h3>
+          <div class="row">普通行 5</div>
+          <div class="row">普通行 6</div>
+        </div>
+      </div>
+    </div>
+    <p class="note">两边都滚一滚：<strong>mandatory 在内容高度不一时会「抢滚动」</strong>，proximity 只在停点靠近吸附点时才吸住。列表/文档场景选 proximity。</p>
+  </div>
+</section>
+
+<!-- 示例5：scroll-padding 避让固定头 -->
+<section>
+  <h2>示例 5 · scroll-padding-top 避让固定头</h2>
+  <div class="demo-box">
+    <div class="doc-scroll" id="docScroll">
+      <div class="fake-header">固定头部（sticky, 高 48px）</div>
+      <h3>第一节</h3>
+      <p>scroll-padding-top: 48px 让吸附口下移到头部下沿。</p>
+      <h3>第二节</h3>
+      <p>吸附后标题不会被固定头遮住。</p>
+      <h3>第三节</h3>
+      <p>同一属性同时影响 scrollIntoView / 锚点跳转 / 键盘分页。</p>
+      <h3>第四节</h3>
+      <p>试试下方按钮：scrollIntoView 也会自动避开头部。</p>
+      <h3>第五节</h3>
+      <p>滚到这里说明吸附与避让都正常。</p>
+    </div>
+    <div style="margin-top: 12px;">
+      <button class="btn" id="btnJump">scrollIntoView 到第四节</button>
+    </div>
+    <p class="note"><code>scroll-padding</code> 写在容器上收缩吸附口；子项侧对应的是 <code>scroll-margin</code>。</p>
+  </div>
+</section>
+
+<script>
+  // 示例5：scrollIntoView 同样遵守 scroll-padding
+  document.getElementById('btnJump').addEventListener('click', () => {
+    const h3s = document.querySelectorAll('#docScroll h3');
+    h3s[3].scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+</script>
+
+</body>
+</html>

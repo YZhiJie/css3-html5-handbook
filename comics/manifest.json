@@ -37,6 +37,8 @@
     { "ep": "EP.31", "comic": "css/EP.31-anchor-positioning", "doc": "docs/css/21-anchor-positioning.md", "example": "examples/css/21-anchor-positioning", "title": "锚点定位" },
     { "ep": "EP.32", "comic": "html/EP.32-popover", "doc": "docs/html/10-popover.md", "example": "examples/html/10-popover", "title": "Popover" },
     { "ep": "EP.33", "comic": "css/EP.33-starting-style", "doc": "docs/css/22-starting-style.md", "example": "examples/css/22-starting-style", "title": "@starting-style" },
-    { "ep": "EP.34", "comic": "html/EP.34-observers", "doc": "docs/html/11-observers.md", "example": "examples/html/11-observers", "title": "Observer 三件套" }
+    { "ep": "EP.34", "comic": "html/EP.34-observers", "doc": "docs/html/11-observers.md", "example": "examples/html/11-observers", "title": "Observer 三件套" },
+    { "ep": "EP.35", "comic": "css/EP.35-scroll-snap", "doc": "docs/css/23-scroll-snap.md", "example": "examples/css/23-scroll-snap", "title": "滚动吸附" },
+    { "ep": "EP.36", "comic": "html/EP.36-dialog", "doc": "docs/html/12-dialog.md", "example": "examples/html/12-dialog", "title": "dialog 元素" }
   ]
 }
