@@ -21,7 +21,7 @@ css3-html5-handbook/
 ├── examples/               # 可运行示例（与文档一一对应）
 │   ├── css/
 │   └── html/
-└── comics/                 # 漫画剧场（「霓虹墨」风格，全 26 话）
+└── comics/                 # 漫画剧场（「霓虹墨」风格，全 28 话）
     ├── style-guide.md      # 漫画美术风格规范
     ├── manifest.json       # 话数清单（校验器依据）
     ├── check-comics.mjs    # SVG 良构 / MD 行数 / 链接一致性校验
@@ -52,6 +52,8 @@ css3-html5-handbook/
 | 14 | 现代颜色 | [docs/css/14-modern-colors.md](docs/css/14-modern-colors.md) | [examples/css/14-modern-colors/](examples/css/14-modern-colors/) |
 | 15 | 滚动驱动动画 | [docs/css/15-scroll-driven-animations.md](docs/css/15-scroll-driven-animations.md) | [examples/css/15-scroll-driven-animations/](examples/css/15-scroll-driven-animations/) |
 | 16 | :has() 选择器 | [docs/css/16-has-selector.md](docs/css/16-has-selector.md) | [examples/css/16-has-selector/](examples/css/16-has-selector/) |
+| 17 | View Transitions | [docs/css/17-view-transitions.md](docs/css/17-view-transitions.md) | [examples/css/17-view-transitions/](examples/css/17-view-transitions/) |
+| 18 | CSS 嵌套 | [docs/css/18-css-nesting.md](docs/css/18-css-nesting.md) | [examples/css/18-css-nesting/](examples/css/18-css-nesting/) |
 
 ### HTML5 篇
 
@@ -106,6 +108,8 @@ css3-html5-handbook/
 | EP.24 | 现代颜色 | [SVG](comics/css/EP.24-modern-colors.svg) | [讲解](comics/css/EP.24-modern-colors.md) |
 | EP.25 | 滚动驱动动画 | [SVG](comics/css/EP.25-scroll-driven-animations.svg) | [讲解](comics/css/EP.25-scroll-driven-animations.md) |
 | EP.26 | :has() 选择器 | [SVG](comics/css/EP.26-has-selector.svg) | [讲解](comics/css/EP.26-has-selector.md) |
+| EP.27 | View Transitions | [SVG](comics/css/EP.27-view-transitions.svg) | [讲解](comics/css/EP.27-view-transitions.md) |
+| EP.28 | CSS 嵌套 | [SVG](comics/css/EP.28-css-nesting.svg) | [讲解](comics/css/EP.28-css-nesting.md) |
 
 ## 如何使用
 
@@ -126,6 +130,7 @@ css3-html5-handbook/
 
 | 版本 | 日期 | 说明 |
 | --- | --- | --- |
+| v1.6.0 | 2026-09-28 | CSS 篇扩展：新增 View Transitions（17）与 CSS 嵌套（18）两章，配套漫画 EP.27–28，全 28 话 |
 | v1.5.0 | 2026-09-28 | CSS 篇扩展：新增滚动驱动动画（15）与 :has() 选择器（16）两章，配套漫画 EP.25–26，全 26 话 |
 | v1.4.0 | 2026-09-27 | CSS 篇扩展：新增现代颜色（14）一章，配套漫画 EP.24，全 24 话 |
 | v1.3.0 | 2026-09-27 | CSS 篇扩展：新增容器查询（12）与层叠层（13）两章，配套漫画 EP.22–23，全 23 话 |

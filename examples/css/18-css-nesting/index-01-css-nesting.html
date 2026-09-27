@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSS 嵌套 · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 800px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+
+  /* ===== 示例1：基础嵌套 · 卡片 ===== */
+  .n-card {
+    background: #1e293b;
+    border: 2px solid #334155;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+
+    /* 后代：等价于 .n-card .n-title */
+    .n-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #22d3ee;
+      margin-bottom: 6px;
+    }
+    .n-body { font-size: 13px; color: #94a3b8; }
+
+    /* & 拼接：等价于 .n-card.featured（同一个元素） */
+    &.featured {
+      border-color: #fbbf24;
+
+      /* 嵌套里再嵌套：.n-card.featured .n-title */
+      .n-title { color: #fbbf24; }
+      .n-title::before { content: "★ "; }
+    }
+
+    /* 悬停：等价于 .n-card:hover */
+    &:hover { border-color: #a78bfa; }
+  }
+
+  /* ===== 示例2：按钮组件全状态（& 大合集） ===== */
+  .n-btn {
+    padding: 9px 20px;
+    border: none;
+    border-radius: 8px;
+    background: #334155;
+    color: #e2e8f0;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-right: 10px;
+
+    &:hover { background: #475569; }
+    &:focus-visible { outline: 2px solid #22d3ee; outline-offset: 2px; }
+    &:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    &.primary {
+      background: #22d3ee;
+      color: #0b1220;
+      &:hover { background: #67e8f9; }   /* 变体内部继续嵌套状态 */
+    }
+    &.danger {
+      background: #ef4444;
+      color: #fff;
+      &:hover { background: #f87171; }
+    }
+  }
+
+  /* ===== 示例3：嵌套 @media —— 响应式跟着组件走 ===== */
+  .n-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1fr;
+
+    /* 等价于 @media (min-width: 560px) { .n-grid { ... } } */
+    @media (min-width: 560px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    @media (min-width: 860px) {
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    .n-cell {
+      background: #1e293b;
+      border: 2px solid #334155;
+      border-radius: 8px;
+      padding: 18px;
+      text-align: center;
+      font-size: 14px;
+
+      @media (min-width: 860px) {
+        padding: 24px;   /* 子元素也能各自声明断点 */
+      }
+    }
+  }
+
+  /* ===== 示例4：& 在非开头位置 —— 主题切换 ===== */
+  .n-panel {
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 16px;
+    transition: background .3s;
+
+    .n-panel-title { font-weight: 700; margin-bottom: 6px; color: #e2e8f0; }
+    .n-panel-text { font-size: 13px; color: #94a3b8; }
+
+    /* 等价于 [data-theme=gold] .n-panel —— 祖先条件反向写 */
+    [data-theme="gold"] & {
+      background: #451a03;
+
+      .n-panel-title { color: #fbbf24; }
+      .n-panel-text { color: #fbbf24aa; }
+    }
+  }
+
+  /* ===== 示例5：表单字段组（嵌套 + :has + 伪类） ===== */
+  .n-field {
+    margin-bottom: 14px;
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: #cbd5e1;
+    }
+    input {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 6px;
+      border: 2px solid #334155;
+      background: #0b1220;
+      color: #e2e8f0;
+      font-size: 14px;
+
+      &:focus { outline: none; border-color: #22d3ee; }
+      &:invalid:not(:placeholder-shown) { border-color: #ef4444; }
+    }
+    .n-err {
+      display: none;
+      font-size: 12px;
+      color: #ef4444;
+      margin-top: 4px;
+    }
+    /* 嵌套 + :has 组合：字段内输入无效时显示错误文案 */
+    &:has(input:invalid:not(:placeholder-shown)) .n-err { display: block; }
+  }
+</style>
+</head>
+<body>
+
+<h1>CSS 嵌套</h1>
+<p class="sub">规则套规则，结构即文档 —— 原生 CSS 的 Sass 式写法</p>
+
+<!-- 示例1：基础嵌套 -->
+<section>
+  <h2>示例 1 · 基础嵌套：后代 / &amp; 拼接 / 悬停</h2>
+  <div class="demo-box">
+    <div class="n-card">
+      <div class="n-title">普通卡片</div>
+      <div class="n-body">标题样式来自嵌套规则 <code>.n-card { .n-title {} }</code>，悬停卡片边框变紫（<code>&amp;:hover</code>）。</div>
+    </div>
+    <div class="n-card featured">
+      <div class="n-title">精选卡片</div>
+      <div class="n-body"><code>&amp;.featured</code> 拼接为 <code>.n-card.featured</code>（同元素），其内部的 <code>.n-title</code> 展开为 <code>.n-card.featured .n-title</code>。</div>
+    </div>
+  </div>
+  <div class="note">
+    <code>&amp;.featured</code>（无空格）= 同一个元素加状态；<code>.featured</code>（有空格）= 后代元素。一字之差，语义完全不同。
+  </div>
+</section>
+
+<!-- 示例2：按钮全状态 -->
+<section>
+  <h2>示例 2 · &amp; 大合集：一个按钮收拢全部状态</h2>
+  <div class="demo-box">
+    <button class="n-btn">默认</button>
+    <button class="n-btn primary">主要</button>
+    <button class="n-btn danger">危险</button>
+    <button class="n-btn" disabled>禁用</button>
+  </div>
+  <div class="note">
+    <code>&amp;:hover</code>、<code>&amp;:focus-visible</code>、<code>&amp;:disabled</code>、<code>&amp;.primary</code> 全部内嵌在 <code>.n-btn</code> 块中；变体内部还能继续嵌套自己的 <code>&amp;:hover</code>。
+  </div>
+</section>
+
+<!-- 示例3：嵌套 @media -->
+<section>
+  <h2>示例 3 · 嵌套 @media：响应式跟着组件走（缩放窗口看效果）</h2>
+  <div class="demo-box">
+    <div class="n-grid">
+      <div class="n-cell">A</div>
+      <div class="n-cell">B</div>
+      <div class="n-cell">C</div>
+      <div class="n-cell">D</div>
+    </div>
+  </div>
+  <div class="note">
+    <code>@media (min-width: 560px)</code> 直接写在 <code>.n-grid</code> 块内，等价于在外层写 <code>@media { .n-grid {} }</code>。断点与组件同址维护，不再跳转文件底部「响应式专区」。
+  </div>
+</section>
+
+<!-- 示例4：祖先条件 -->
+<section>
+  <h2>示例 4 · &amp; 在非开头位置：主题切换反向写</h2>
+  <div class="demo-box">
+    <button class="n-btn primary" id="themeToggle" style="margin-bottom:14px">切换金色主题</button>
+    <div id="themeScope">
+      <div class="n-panel">
+        <div class="n-panel-title">面板标题</div>
+        <div class="n-panel-text">
+          这段面板的暗金样式由 <code>[data-theme="gold"] &amp;</code> 嵌套规则驱动——
+          写在组件内部，却由祖先属性控制，展开为 <code>[data-theme="gold"] .n-panel</code>。
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note">
+    <code>&amp;</code> 可出现在子选择器任意位置：前面是「新的祖先条件」，展开后 <code>&amp;</code> 被替换为父选择器。
+  </div>
+</section>
+
+<!-- 示例5：表单字段组 -->
+<section>
+  <h2>示例 5 · 组合拳：嵌套 + :has() + 伪类验证</h2>
+  <div class="demo-box">
+    <div class="n-field">
+      <label>邮箱（输入非法格式试试）</label>
+      <input type="email" placeholder="name@example.com">
+      <div class="n-err">邮箱格式不正确</div>
+    </div>
+    <div class="n-field">
+      <label>年龄（1-120）</label>
+      <input type="number" min="1" max="120" placeholder="18">
+      <div class="n-err">年龄需在 1-120 之间</div>
+    </div>
+  </div>
+  <div class="note">
+    错误提示的显示规则 <code>&amp;:has(input:invalid:not(:placeholder-shown)) .n-err</code> 完整内嵌在 <code>.n-field</code> 块中——
+    嵌套负责结构收拢，<code>:has()</code> 负责状态感知，两者叠加零 JS。
+  </div>
+</section>
+
+<script>
+  // 示例4：主题切换（仅切换祖先属性，样式全部由嵌套规则驱动）
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const scope = document.getElementById('themeScope');
+    scope.dataset.theme = scope.dataset.theme === 'gold' ? '' : 'gold';
+  });
+</script>
+
+</body>
+</html>

@@ -29,6 +29,8 @@
     { "ep": "EP.23", "comic": "css/EP.23-cascade-layers", "doc": "docs/css/13-cascade-layers.md", "example": "examples/css/13-cascade-layers", "title": "层叠层" },
     { "ep": "EP.24", "comic": "css/EP.24-modern-colors", "doc": "docs/css/14-modern-colors.md", "example": "examples/css/14-modern-colors", "title": "现代颜色" },
     { "ep": "EP.25", "comic": "css/EP.25-scroll-driven-animations", "doc": "docs/css/15-scroll-driven-animations.md", "example": "examples/css/15-scroll-driven-animations", "title": "滚动驱动动画" },
-    { "ep": "EP.26", "comic": "css/EP.26-has-selector", "doc": "docs/css/16-has-selector.md", "example": "examples/css/16-has-selector", "title": ":has() 选择器" }
+    { "ep": "EP.26", "comic": "css/EP.26-has-selector", "doc": "docs/css/16-has-selector.md", "example": "examples/css/16-has-selector", "title": ":has() 选择器" },
+    { "ep": "EP.27", "comic": "css/EP.27-view-transitions", "doc": "docs/css/17-view-transitions.md", "example": "examples/css/17-view-transitions", "title": "View Transitions" },
+    { "ep": "EP.28", "comic": "css/EP.28-css-nesting", "doc": "docs/css/18-css-nesting.md", "example": "examples/css/18-css-nesting", "title": "CSS 嵌套" }
   ]
 }

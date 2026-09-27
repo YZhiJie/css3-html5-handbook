@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>View Transitions · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 800px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+  button {
+    padding: 8px 16px; border-radius: 8px; border: none;
+    background: #22d3ee; color: #0b1220; font-weight: 700; cursor: pointer;
+    font-size: 13px;
+  }
+  button:hover { filter: brightness(1.1); }
+
+  /* ===== 全局：View Transitions 默认动画微调 ===== */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 300ms;
+  }
+  /* 减少动画偏好时全局禁用 */
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) { animation: none !important; }
+  }
+
+  /* ===== 示例1：列表增删过渡 ===== */
+  .todo-list { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+  .todo-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #1e293b; border: 2px solid #334155; border-radius: 8px;
+    padding: 10px 14px; font-size: 14px;
+    view-transition-class: todo;   /* 批量复用动画 */
+  }
+  .todo-item .del {
+    background: #ef4444; color: #fff; padding: 4px 10px;
+    font-size: 12px; border-radius: 6px;
+  }
+  /* 被删除项的离场动画（JS 中临时命名为 leaving） */
+  ::view-transition-old(leaving) {
+    animation: 250ms ease-in both todo-out;
+  }
+  /* 新增项的入场动画（JS 中临时命名为 entering） */
+  ::view-transition-new(entering) {
+    animation: 300ms ease-out both todo-in;
+  }
+  /* 其余兄弟项的位置补间（class 统一声明） */
+  ::view-transition-group(todo) {
+    animation-duration: 300ms;
+    animation-timing-function: ease-in-out;
+  }
+  @keyframes todo-out {
+    to { transform: translateX(60px); opacity: 0; }
+  }
+  @keyframes todo-in {
+    from { transform: translateY(-20px) scale(0.95); opacity: 0; }
+  }
+
+  /* ===== 示例2：卡片 ↔ 详情 共享元素 ===== */
+  .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .g-card {
+    background: #1e293b; border: 2px solid #334155; border-radius: 10px;
+    overflow: hidden; cursor: pointer; transition: border-color .2s;
+  }
+  .g-card:hover { border-color: #a78bfa; }
+  .g-card .thumb {
+    width: 100%; height: 90px; display: flex; align-items: center;
+    justify-content: center; font-size: 28px; font-weight: bold; color: #0b1220;
+  }
+  .g-card p { padding: 8px 10px; font-size: 12px; color: #94a3b8; }
+  .viewer {
+    display: none; margin-top: 16px; border-radius: 12px; overflow: hidden;
+    border: 2px solid #a78bfa;
+  }
+  .viewer.open { display: block; }
+  .viewer .hero {
+    height: 200px; display: flex; align-items: center; justify-content: center;
+    font-size: 56px; font-weight: bold; color: #0b1220;
+  }
+  .viewer .bar {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #1e293b; padding: 10px 14px; font-size: 13px;
+  }
+  /* 过渡时共享元素只补间位置/尺寸，不做交叉淡化 */
+  ::view-transition-old(shared-hero),
+  ::view-transition-new(shared-hero) { animation: none; }
+  ::view-transition-group(shared-hero) { animation-duration: 380ms; }
+
+  /* ===== 示例3：标签页切换 ===== */
+  .tabs { display: flex; gap: 8px; margin-bottom: 0; }
+  .tab {
+    padding: 8px 18px; border-radius: 8px 8px 0 0; cursor: pointer;
+    background: #1e293b; border: 2px solid #334155; border-bottom: none;
+    font-size: 13px; color: #94a3b8; user-select: none;
+  }
+  .tab.active { background: #131c2e; color: #22d3ee; border-color: #22d3ee; }
+  .panel {
+    display: none; background: #131c2e; border: 2px solid #334155;
+    border-radius: 0 8px 8px 8px; padding: 24px; font-size: 14px; min-height: 90px;
+  }
+  .panel.active { display: block; view-transition-name: panel; }
+  ::view-transition-old(panel) { animation: 150ms ease-out both fade-out; }
+  ::view-transition-new(panel) { animation: 220ms 60ms ease-in both fade-in; }
+  @keyframes fade-out { to { opacity: 0; transform: translateY(-8px); } }
+  @keyframes fade-in { from { opacity: 0; transform: translateY(12px); } }
+
+  /* ===== 示例4：暗色模式圆形展开（本页局部模拟） ===== */
+  .theme-stage {
+    position: relative; height: 140px; border-radius: 12px; overflow: hidden;
+    background: #1e293b; border: 2px solid #334155;
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+  }
+  .theme-stage.invert { filter: invert(0.92) hue-rotate(180deg); }
+  .theme-stage .chip {
+    padding: 10px 18px; border-radius: 999px; background: #22d3ee;
+    color: #0b1220; font-weight: 700; font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<h1>View Transitions</h1>
+<p class="sub">DOM 状态变化的自动补间动画 —— 告别手写 FLIP</p>
+
+<!-- 示例1：列表增删 -->
+<section>
+  <h2>示例 1 · 列表增删：删除离场 + 兄弟补位 + 新增入场</h2>
+  <div class="demo-box">
+    <button id="addBtn">＋ 添加一项</button>
+    <div class="todo-list" id="todoList">
+      <div class="todo-item"><span>写周报</span><button class="del">删除</button></div>
+      <div class="todo-item"><span> Code Review</span><button class="del">删除</button></div>
+      <div class="todo-item"><span>发布 v1.6.0</span><button class="del">删除</button></div>
+    </div>
+  </div>
+  <div class="note">
+    删除：JS 临时命名 <code>leaving</code>，播放 <code>todo-out</code> 滑出动画。<br>
+    新增：JS 临时命名 <code>entering</code>，播放 <code>todo-in</code> 落入动画。<br>
+    兄弟补位：<code>view-transition-class: todo</code> 批量声明，位置变化自动补间，无需逐项写规则。
+  </div>
+</section>
+
+<!-- 示例2：共享元素 -->
+<section>
+  <h2>示例 2 · 共享元素：缩略图 → 详情大图</h2>
+  <div class="demo-box">
+    <div class="gallery" id="gallery">
+      <div class="g-card" data-color="#22d3ee" data-label="A">
+        <div class="thumb" style="background:#22d3ee">A</div><p>霓虹青 · 点击放大</p>
+      </div>
+      <div class="g-card" data-color="#a78bfa" data-label="B">
+        <div class="thumb" style="background:#a78bfa">B</div><p>幻紫 · 点击放大</p>
+      </div>
+      <div class="g-card" data-color="#f472b6" data-label="C">
+        <div class="thumb" style="background:#f472b6">C</div><p>品红 · 点击放大</p>
+      </div>
+    </div>
+    <div class="viewer" id="viewer">
+      <div class="hero" id="viewerHero">A</div>
+      <div class="bar">
+        <span id="viewerTitle">详情</span>
+        <button id="closeViewer">关闭</button>
+      </div>
+    </div>
+  </div>
+  <div class="note">
+    缩略图与详情头图在过渡瞬间共用 <code>view-transition-name: shared-hero</code>，
+    浏览器自动补间位置与尺寸。<code>old/new</code> 设 <code>animation: none</code> 去掉交叉淡化，只留形变。
+  </div>
+</section>
+
+<!-- 示例3：标签页切换 -->
+<section>
+  <h2>示例 3 · 标签页切换：旧面板淡出 + 新面板淡入</h2>
+  <div class="demo-box">
+    <div class="tabs" id="tabs">
+      <div class="tab active" data-panel="p1">概览</div>
+      <div class="tab" data-panel="p2">性能</div>
+      <div class="tab" data-panel="p3">日志</div>
+    </div>
+    <div class="panel active" id="p1">概览面板：3 个服务运行正常，今日构建 12 次。</div>
+    <div class="panel" id="p2">性能面板：LCP 1.2s · CLS 0.02 · INP 88ms。</div>
+    <div class="panel" id="p3">日志面板：[10:02] deploy ok · [10:15] cache warmed。</div>
+  </div>
+  <div class="note">
+    仅 <code>.panel.active</code> 持有 <code>view-transition-name: panel</code>，
+    切换时旧面板淡出、新面板延迟 60ms 淡入，形成交叉衔接。
+  </div>
+</section>
+
+<!-- 示例4：圆形展开 -->
+<section>
+  <h2>示例 4 · 主题切换：从点击处圆形展开</h2>
+  <div class="demo-box">
+    <div class="theme-stage" id="stage">
+      <span class="chip">示例舞台</span>
+      <button id="themeBtn">切换反色主题</button>
+    </div>
+  </div>
+  <div class="note">
+    <code>startViewTransition</code> 切换 class 后，在 <code>vt.ready</code> 里用 WAAPI 对
+    <code>::view-transition-new(root)</code> 播放 <code>clip-path: circle()</code> 展开动画。
+  </div>
+</section>
+
+<script>
+  const canVT = typeof document.startViewTransition === 'function';
+  function transition(update) {
+    if (canVT) return document.startViewTransition(update);
+    update();               // 不支持的浏览器直接更新 DOM
+    return null;
+  }
+
+  /* ===== 示例1：列表增删 ===== */
+  const list = document.getElementById('todoList');
+  let seq = 0;
+  const pool = ['复盘上周迭代', '更新依赖', '写漫画 EP.29', '优化首屏 LCP', '整理设计规范'];
+
+  list.addEventListener('click', (e) => {
+    const btn = e.target.closest('.del');
+    if (!btn) return;
+    const item = btn.closest('.todo-item');
+    item.style.viewTransitionName = 'leaving';       // 临时命名，触发离场动画
+    transition(() => item.remove());
+  });
+
+  document.getElementById('addBtn').addEventListener('click', () => {
+    const item = document.createElement('div');
+    item.className = 'todo-item';
+    item.style.viewTransitionName = 'entering';      // 临时命名，触发入场动画
+    item.innerHTML = `<span>${pool[seq++ % pool.length]}</span><button class="del">删除</button>`;
+    transition(() => {
+      list.appendChild(item);
+      requestAnimationFrame(() => item.style.viewTransitionName = '');  // 释放名字
+    });
+  });
+
+  /* ===== 示例2：共享元素 ===== */
+  const viewer = document.getElementById('viewer');
+  const hero = document.getElementById('viewerHero');
+  const viewerTitle = document.getElementById('viewerTitle');
+  let activeCard = null;
+
+  document.getElementById('gallery').addEventListener('click', (e) => {
+    const card = e.target.closest('.g-card');
+    if (!card || activeCard) return;
+    activeCard = card;
+    const thumb = card.querySelector('.thumb');
+    transition(() => {
+      thumb.style.viewTransitionName = 'shared-hero';   // 旧状态：缩略图
+      hero.style.viewTransitionName = 'shared-hero';    // 新状态：详情头图
+      hero.style.background = card.dataset.color;
+      hero.textContent = card.dataset.label;
+      viewerTitle.textContent = `详情 · ${card.dataset.label}`;
+      viewer.classList.add('open');
+    })?.finished.finally(() => {
+      thumb.style.viewTransitionName = '';              // 动画结束释放
+    });
+  });
+
+  document.getElementById('closeViewer').addEventListener('click', () => {
+    if (!activeCard) return;
+    const thumb = activeCard.querySelector('.thumb');
+    transition(() => {
+      hero.style.viewTransitionName = '';
+      thumb.style.viewTransitionName = 'shared-hero';   // 反向补间回缩略图
+      viewer.classList.remove('open');
+    })?.finished.finally(() => {
+      thumb.style.viewTransitionName = '';
+      activeCard = null;
+    });
+  });
+
+  /* ===== 示例3：标签页切换 ===== */
+  document.getElementById('tabs').addEventListener('click', (e) => {
+    const tab = e.target.closest('.tab');
+    if (!tab || tab.classList.contains('active')) return;
+    transition(() => {
+      document.querySelector('.tab.active').classList.remove('active');
+      document.querySelector('.panel.active').classList.remove('active');
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.panel).classList.add('active');
+    });
+  });
+
+  /* ===== 示例4：圆形展开 ===== */
+  const stage = document.getElementById('stage');
+  document.getElementById('themeBtn').addEventListener('click', (e) => {
+    const vt = transition(() => stage.classList.toggle('invert'));
+    if (!vt) return;
+    const rect = stage.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    const r = Math.hypot(Math.max(x, rect.width - x), Math.max(y, rect.height - y));
+    vt.ready.then(() => {
+      // 注意：此处对根快照整页生效；实战通常对独立容器命名后操作
+      stage.animate(
+        { clipPath: [`circle(0 at ${x}px ${y}px)`, `circle(${r}px at ${x}px ${y}px)`] },
+        { duration: 450, easing: 'ease-out', pseudoElement: '::view-transition-new(root)' }
+      );
+    });
+  });
+</script>
+
+</body>
+</html>
