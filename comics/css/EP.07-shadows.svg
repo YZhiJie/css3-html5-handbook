@@ -1,0 +1,223 @@
+<!-- EP.07 · 阴影 — 界面的海拔系统，规范见 ../style-guide.md -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 840">
+  <defs>
+    <style>
+      .t{font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;}
+      .m{font-family:'SFMono-Regular',Menlo,Consolas,monospace;}
+      .st{font-size:15px;fill:#94a3b8;}
+      .bt{font-size:30px;font-weight:bold;fill:#f8fafc;}
+      .pt{font-size:19px;font-weight:bold;fill:#f8fafc;}
+      .an{font-size:12.5px;fill:#94a3b8;}
+      .cd{font-size:11.5px;fill:#cbd5e1;}
+      .kt{font-size:20px;font-weight:bold;fill:#451a03;}
+      .kb{font-size:15px;fill:#451a03;}
+      .ft{font-size:12.5px;fill:#64748b;}
+    </style>
+    <pattern id="ht" width="14" height="14" patternUnits="userSpaceOnUse">
+      <circle cx="3" cy="3" r="1.8" fill="#f8fafc" opacity="0.05"/>
+    </pattern>
+    <g id="pixelv2">
+      <ellipse cx="0" cy="0" rx="46" ry="9" fill="#020617" opacity="0.5"/>
+      <rect x="-24" y="-8" width="18" height="9" rx="4" fill="#f8fafc" stroke="#0b1220" stroke-width="2.5"/>
+      <rect x="6" y="-8" width="18" height="9" rx="4" fill="#f8fafc" stroke="#0b1220" stroke-width="2.5"/>
+      <rect x="-18" y="-30" width="11" height="24" fill="#f8d8bf" stroke="#0b1220" stroke-width="2"/>
+      <rect x="7" y="-30" width="11" height="24" fill="#f8d8bf" stroke="#0b1220" stroke-width="2"/>
+      <path d="M 30 -128 Q 58 -120 54 -92 Q 51 -74 38 -70 Q 48 -86 42 -100 Q 38 -114 26 -120 Z" fill="#22d3ee" stroke="#0b1220" stroke-width="3"/>
+      <circle cx="29" cy="-124" r="5" fill="#fbbf24" stroke="#0b1220" stroke-width="2"/>
+      <path d="M -32 -84 L 32 -84 L 26 -26 L -26 -26 Z" fill="#f472b6" stroke="#0b1220" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M -26 -34 L 26 -34" stroke="#db2777" stroke-width="2"/>
+      <path d="M -6 -80 L -9 -64" stroke="#f8fafc" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M 6 -80 L 9 -64" stroke="#f8fafc" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="-9" cy="-62" r="2" fill="#f8fafc"/>
+      <circle cx="9" cy="-62" r="2" fill="#f8fafc"/>
+      <rect x="-14" y="-60" width="28" height="14" rx="4" fill="#22d3ee" stroke="#0b1220" stroke-width="2"/>
+      <text class="m" x="0" y="-50" text-anchor="middle" font-size="9" font-weight="bold" fill="#0b1220">CSS</text>
+      <rect x="-46" y="-72" width="14" height="36" rx="7" fill="#f472b6" stroke="#0b1220" stroke-width="2.5"/>
+      <rect x="30" y="-106" width="14" height="34" rx="7" fill="#f472b6" stroke="#0b1220" stroke-width="2.5" transform="rotate(-55 37 -89)"/>
+      <circle cx="0" cy="-106" r="31" fill="#ffdfc8" stroke="#0b1220" stroke-width="3"/>
+      <path d="M -33 -104 Q -35 -142 0 -142 Q 35 -142 33 -104 L 33 -96 Q 17 -110 0 -110 Q -17 -110 -33 -96 Z" fill="#22d3ee" stroke="#0b1220" stroke-width="3"/>
+      <path d="M -33 -114 L -39 -76 Q -33 -68 -26 -78 Z" fill="#22d3ee" stroke="#0b1220" stroke-width="2"/>
+      <path d="M 33 -114 L 39 -76 Q 33 -68 26 -78 Z" fill="#22d3ee" stroke="#0b1220" stroke-width="2"/>
+      <path d="M 8 -140 Q 20 -124 17 -108 L 24 -111 Q 27 -128 19 -138 Z" fill="#a78bfa" stroke="#0b1220" stroke-width="2"/>
+      <path d="M -19 -130 Q -25 -123 -19 -116" stroke="#fbbf24" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <ellipse cx="-12" cy="-108" rx="4.5" ry="6" fill="#0b1220"/>
+      <ellipse cx="12" cy="-108" rx="4.5" ry="6" fill="#0b1220"/>
+      <circle cx="-13.5" cy="-110.5" r="1.8" fill="#ffffff"/>
+      <circle cx="10.5" cy="-110.5" r="1.8" fill="#ffffff"/>
+      <path d="M -18 -118 Q -12 -121 -6 -119" stroke="#0b1220" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <path d="M 18 -118 Q 12 -121 6 -119" stroke="#0b1220" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <circle cx="-20" cy="-100" r="4" fill="#fb7185" opacity="0.55"/>
+      <circle cx="20" cy="-100" r="4" fill="#fb7185" opacity="0.55"/>
+      <path d="M -9 -94 Q 0 -83 9 -94" stroke="#0b1220" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </g>
+    <g id="taggyv2">
+      <ellipse cx="0" cy="0" rx="42" ry="8" fill="#020617" opacity="0.5"/>
+      <rect x="-26" y="-8" width="20" height="10" rx="5" fill="#f8fafc" stroke="#0b1220" stroke-width="2.5"/>
+      <rect x="6" y="-8" width="20" height="10" rx="5" fill="#f8fafc" stroke="#0b1220" stroke-width="2.5"/>
+      <rect x="-21" y="-24" width="13" height="18" fill="#c2410c" stroke="#0b1220" stroke-width="2"/>
+      <rect x="8" y="-24" width="13" height="18" fill="#c2410c" stroke="#0b1220" stroke-width="2"/>
+      <rect x="-34" y="-78" width="68" height="60" rx="14" fill="#fb923c" stroke="#0b1220" stroke-width="3"/>
+      <polygon points="-13,-70 13,-70 10,-48 0,-44 -10,-48" fill="#0b1220" stroke="#0b1220" stroke-width="2"/>
+      <text class="m" x="0" y="-52" text-anchor="middle" font-size="11" font-weight="bold" fill="#fbbf24">5</text>
+      <rect x="-34" y="-26" width="68" height="8" fill="#c2410c" stroke="#0b1220" stroke-width="2"/>
+      <rect x="-6" y="-27" width="12" height="10" rx="2" fill="#fbbf24" stroke="#0b1220" stroke-width="2"/>
+      <rect x="-48" y="-68" width="14" height="34" rx="7" fill="#fb923c" stroke="#0b1220" stroke-width="2.5"/>
+      <circle cx="-41" cy="-66" r="5" fill="#fdba74" stroke="#0b1220" stroke-width="2"/>
+      <rect x="32" y="-71" width="34" height="13" rx="6.5" fill="#fb923c" stroke="#0b1220" stroke-width="2.5" transform="rotate(-20 32 -65)"/>
+      <circle cx="38" cy="-64" r="5" fill="#fdba74" stroke="#0b1220" stroke-width="2"/>
+      <rect x="-30" y="-128" width="60" height="46" rx="13" fill="#fdba74" stroke="#0b1220" stroke-width="3"/>
+      <rect x="-36" y="-112" width="8" height="18" rx="3" fill="#fb923c" stroke="#0b1220" stroke-width="2"/>
+      <rect x="28" y="-112" width="8" height="18" rx="3" fill="#fb923c" stroke="#0b1220" stroke-width="2"/>
+      <rect x="-23" y="-118" width="46" height="22" rx="8" fill="#0b1220"/>
+      <text class="m" x="-10" y="-102" text-anchor="middle" font-size="16" font-weight="bold" fill="#22d3ee">&lt;</text>
+      <text class="m" x="10" y="-102" text-anchor="middle" font-size="16" font-weight="bold" fill="#22d3ee">&gt;</text>
+      <circle cx="-6" cy="-90" r="1.5" fill="#0b1220"/>
+      <circle cx="0" cy="-90" r="1.5" fill="#0b1220"/>
+      <circle cx="6" cy="-90" r="1.5" fill="#0b1220"/>
+      <line x1="0" y1="-128" x2="0" y2="-142" stroke="#0b1220" stroke-width="3"/>
+      <circle cx="0" cy="-147" r="9" fill="none" stroke="#fbbf24" stroke-width="1.5" opacity="0.4"/>
+      <circle cx="0" cy="-147" r="5.5" fill="#fbbf24" stroke="#0b1220" stroke-width="2"/>
+    </g>
+    <g id="moov2">
+      <ellipse cx="0" cy="68" rx="48" ry="7" fill="#020617" opacity="0.5"/>
+      <line x1="-9" y1="60" x2="-9" y2="66" stroke="#78350f" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="9" y1="60" x2="9" y2="66" stroke="#78350f" stroke-width="3.5" stroke-linecap="round"/>
+      <ellipse cx="0" cy="12" rx="30" ry="22" fill="#b45309" stroke="#78350f" stroke-width="3"/>
+      <ellipse cx="0" cy="16" rx="17" ry="13" fill="#fde68a"/>
+      <path d="M -30 18 L 30 18 L 38 52 Q 0 60 -38 52 Z" fill="#1e293b" stroke="#0b1220" stroke-width="2.5"/>
+      <line x1="0" y1="22" x2="0" y2="54" stroke="#334155" stroke-width="2"/>
+      <path d="M -30 2 Q -46 12 -37 28 Q -30 20 -28 6 Z" fill="#92400e" stroke="#78350f" stroke-width="2.5"/>
+      <path d="M 30 -4 Q 44 -14 40 -28 Q 30 -22 26 -8 Z" fill="#92400e" stroke="#78350f" stroke-width="2.5"/>
+      <line x1="40" y1="-28" x2="56" y2="-56" stroke="#b45309" stroke-width="3.5" stroke-linecap="round"/>
+      <circle cx="56" cy="-56" r="3.5" fill="#fbbf24" stroke="#78350f" stroke-width="1.5"/>
+      <polygon points="-9,10 0,6 0,14" fill="#f472b6" stroke="#0b1220" stroke-width="1.5"/>
+      <polygon points="9,10 0,6 0,14" fill="#f472b6" stroke="#0b1220" stroke-width="1.5"/>
+      <circle cx="0" cy="10" r="2.5" fill="#db2777"/>
+      <circle cx="0" cy="-26" r="33" fill="#f59e0b" stroke="#78350f" stroke-width="3"/>
+      <polygon points="-27,-50 0,-62 27,-50 0,-42" fill="#1e293b" stroke="#0b1220" stroke-width="2"/>
+      <circle cx="0" cy="-62" r="2.5" fill="#fbbf24"/>
+      <path d="M 27 -50 L 33 -34" stroke="#fbbf24" stroke-width="2"/>
+      <circle cx="33" cy="-31" r="3" fill="#fbbf24"/>
+      <circle cx="-12" cy="-30" r="12.5" fill="#fffbeb" stroke="#78350f" stroke-width="2"/>
+      <circle cx="12" cy="-30" r="12.5" fill="#fffbeb" stroke="#78350f" stroke-width="2"/>
+      <line x1="-1" y1="-30" x2="1" y2="-30" stroke="#78350f" stroke-width="2"/>
+      <line x1="-24.5" y1="-30" x2="-30" y2="-32" stroke="#78350f" stroke-width="2"/>
+      <line x1="24.5" y1="-30" x2="30" y2="-32" stroke="#78350f" stroke-width="2"/>
+      <circle cx="-12" cy="-30" r="4.5" fill="#0b1220"/>
+      <circle cx="12" cy="-30" r="4.5" fill="#0b1220"/>
+      <circle cx="-13.5" cy="-32" r="1.5" fill="#ffffff"/>
+      <circle cx="10.5" cy="-32" r="1.5" fill="#ffffff"/>
+      <polygon points="0,-14 -6,-22 6,-22" fill="#f97316" stroke="#78350f" stroke-width="2"/>
+    </g>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="840" fill="#0b1220"/>
+
+  <!-- ===== 顶部横幅 ===== -->
+  <rect x="40" y="6" width="120" height="6" rx="3" fill="#22d3ee"/>
+  <rect x="40" y="16" width="120" height="6" rx="3" fill="#f472b6"/>
+  <text class="t st" x="40" y="40">前端漫画实验室 · CSS3 × HTML5 漫画剧场</text>
+  <text class="t bt" x="40" y="80">第 7 话 · 阴影 — 界面的海拔系统</text>
+  <rect x="1020" y="26" width="140" height="44" rx="22" fill="#22d3ee"/>
+  <text class="m" x="1090" y="54" text-anchor="middle" font-size="19" font-weight="bold" fill="#0b1220">EP.07</text>
+  <line x1="0" y1="96" x2="1200" y2="96" stroke="#1e293b" stroke-width="2"/>
+
+  <!-- ===== 格1 · 痛点现场 ===== -->
+  <rect x="40" y="120" width="556" height="250" rx="16" fill="#131c2e" stroke="#334155" stroke-width="3"/>
+  <rect x="40" y="120" width="556" height="250" rx="16" fill="url(#ht)"/>
+  <circle cx="66" cy="146" r="14" fill="#22d3ee"/>
+  <text class="m" x="66" y="151" text-anchor="middle" font-size="15" font-weight="bold" fill="#0b1220">1</text>
+  <text class="t pt" x="92" y="152">痛点现场 · 尖角处"漏光"</text>
+  <rect x="70" y="186" width="300" height="84" rx="12" fill="#020617" opacity="0.5"/>
+  <rect x="64" y="180" width="300" height="84" rx="12" fill="#22d3ee" stroke="#0b1220" stroke-width="3"/>
+  <text class="t" x="84" y="214" font-size="15" font-weight="bold" fill="#0b1220">在吗？我遇到个 bug</text>
+  <text class="t" x="84" y="240" font-size="12" fill="#0b1220">气泡尾巴的阴影怎么不见了？</text>
+  <polygon points="92,264 112,264 96,284" fill="#22d3ee" stroke="#0b1220" stroke-width="3" stroke-linejoin="round"/>
+  <ellipse cx="100" cy="282" rx="28" ry="14" fill="none" stroke="#f87171" stroke-width="2" stroke-dasharray="5 4"/>
+  <text class="t" x="136" y="290" font-size="11" fill="#f87171">阴影在这里断了</text>
+  <text class="t" x="64" y="320" font-size="15" font-weight="bold" fill="#f87171">box-shadow 只认矩形——尖角处阴影"断"了</text>
+  <text class="t an" x="64" y="344">异形轮廓要贴边走，得换 drop-shadow（贴 alpha 剪影）</text>
+  <use href="#pixelv2" transform="translate(524,352) scale(0.55)"/>
+  <text class="t" x="552" y="284" font-size="20" font-weight="bold" fill="#f87171">?</text>
+  <circle cx="560" cy="146" r="12" fill="#f87171"/>
+  <text class="t" x="560" y="151" text-anchor="middle" font-size="15" font-weight="bold" fill="#0b1220">?</text>
+
+  <!-- ===== 格2 · 机制登场 ===== -->
+  <rect x="616" y="120" width="544" height="250" rx="16" fill="#131c2e" stroke="#334155" stroke-width="3"/>
+  <rect x="616" y="120" width="544" height="250" rx="16" fill="url(#ht)"/>
+  <circle cx="642" cy="146" r="14" fill="#a78bfa"/>
+  <text class="m" x="642" y="151" text-anchor="middle" font-size="15" font-weight="bold" fill="#0b1220">2</text>
+  <text class="t pt" x="668" y="152">机制登场 · 阴影三兄弟</text>
+  <rect x="648" y="172" width="150" height="116" rx="10" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <rect x="674" y="206" width="84" height="34" rx="6" fill="#020617" opacity="0.75"/>
+  <rect x="664" y="196" width="84" height="34" rx="6" fill="#22d3ee"/>
+  <text class="m" x="660" y="262" font-size="12" font-weight="bold" fill="#22d3ee">box-shadow</text>
+  <text class="t" x="660" y="280" font-size="10.5" fill="#94a3b8">矩形轮廓</text>
+  <text class="t" x="660" y="296" font-size="10.5" fill="#94a3b8">有 spread / inset</text>
+  <rect x="818" y="172" width="150" height="116" rx="10" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <text class="t" x="897" y="248" font-size="44" font-weight="bold" fill="#7c3aed" opacity="0.85">字</text>
+  <text class="t" x="891" y="240" font-size="44" font-weight="bold" fill="#f8fafc">字</text>
+  <text class="m" x="830" y="262" font-size="12" font-weight="bold" fill="#a78bfa">text-shadow</text>
+  <text class="t" x="830" y="280" font-size="10.5" fill="#94a3b8">字形轮廓</text>
+  <text class="t" x="830" y="296" font-size="10.5" fill="#94a3b8">无 spread / inset</text>
+  <rect x="984" y="172" width="120" height="116" rx="10" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <polygon points="1054,196 1059,207 1071,207 1061,214 1065,226 1054,219 1043,226 1047,214 1037,207 1049,207" fill="#020617" opacity="0.75" transform="translate(8,8)"/>
+  <polygon points="1054,196 1059,207 1071,207 1061,214 1065,226 1054,219 1043,226 1047,214 1037,207 1049,207" fill="#fbbf24"/>
+  <text class="m" x="996" y="262" font-size="11" font-weight="bold" fill="#fbbf24">drop-shadow</text>
+  <text class="t" x="996" y="280" font-size="10.5" fill="#94a3b8">alpha 真实剪影</text>
+  <text class="t" x="996" y="296" font-size="10.5" fill="#94a3b8">无 spread</text>
+  <text class="t an" x="648" y="344">多层阴影"先细后粗"：先写的层画在最上层</text>
+  <use href="#taggyv2" transform="translate(1105,356) scale(0.44)"/>
+
+  <!-- ===== 格3 · 落地收束 ===== -->
+  <rect x="40" y="390" width="1120" height="230" rx="16" fill="#131c2e" stroke="#334155" stroke-width="3"/>
+  <rect x="40" y="390" width="1120" height="230" rx="16" fill="url(#ht)"/>
+  <circle cx="66" cy="416" r="14" fill="#fbbf24"/>
+  <text class="m" x="66" y="421" text-anchor="middle" font-size="15" font-weight="bold" fill="#0b1220">3</text>
+  <text class="t pt" x="92" y="422">落地收束 · 海拔三段式</text>
+  <rect x="100" y="470" width="240" height="84" rx="12" fill="#020617" opacity="0.35"/>
+  <rect x="90" y="460" width="240" height="84" rx="12" fill="#020617" opacity="0.45"/>
+  <rect x="86" y="455" width="240" height="84" rx="12" fill="#020617" opacity="0.6"/>
+  <rect x="84" y="452" width="240" height="84" rx="12" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <rect x="100" y="470" width="120" height="8" rx="4" fill="#334155"/>
+  <rect x="100" y="488" width="200" height="6" rx="3" fill="#334155"/>
+  <rect x="100" y="502" width="180" height="6" rx="3" fill="#334155"/>
+  <rect x="100" y="516" width="200" height="6" rx="3" fill="#334155"/>
+  <circle cx="72" cy="562" r="4" fill="#22d3ee"/>
+  <text class="m" x="84" y="566" font-size="11" fill="#94a3b8">① 接触 0 1px 2px</text>
+  <circle cx="212" cy="562" r="4" fill="#a78bfa"/>
+  <text class="m" x="224" y="566" font-size="11" fill="#94a3b8">② 主体 0 4px 12px</text>
+  <circle cx="352" cy="562" r="4" fill="#64748b"/>
+  <text class="m" x="364" y="566" font-size="11" fill="#94a3b8">③ 环境 0 16px 40px</text>
+  <rect x="574" y="438" width="342" height="152" rx="16" fill="none" stroke="#22d3ee" stroke-width="2" opacity="0.35"/>
+  <rect x="580" y="444" width="330" height="140" rx="10" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <text class="m cd" x="596" y="470" fill="#f87171">/* 别逐帧改 box-shadow —— 必然重绘 */</text>
+  <text class="m cd" x="596" y="492">.card { transition: transform .2s; }</text>
+  <text class="m cd" x="596" y="514">.card:hover {</text>
+  <text class="m cd" x="596" y="532" fill="#22d3ee">  transform: translateY(-4px); }</text>
+  <text class="m cd" x="596" y="556" fill="#64748b">/* 明暗变化 → 伪元素 opacity */</text>
+  <text class="m cd" x="596" y="576">.card::after { opacity: 1 }</text>
+  <text class="t" x="930" y="458" font-size="10.5" fill="#94a3b8">绘制成本</text>
+  <rect x="930" y="470" width="56" height="18" rx="3" fill="#f87171"/>
+  <text class="t" x="996" y="484" font-size="10.5" fill="#f87171">改 shadow 值 · 28fps</text>
+  <rect x="930" y="510" width="56" height="34" rx="3" fill="#22d3ee"/>
+  <text class="t" x="996" y="530" font-size="10.5" fill="#22d3ee">transform 接管 · 60fps</text>
+  <text class="t" x="930" y="566" font-size="10.5" fill="#64748b">will-change 克制用——</text>
+  <text class="t" x="930" y="584" font-size="10.5" fill="#64748b">只提升动画容器</text>
+  <path d="M 552 428 l 3 8 8 3 -8 3 -3 8 -3 -8 -8 -3 8 -3 Z" fill="#fbbf24"/>
+
+  <!-- ===== 知识条 ===== -->
+  <rect x="40" y="640" width="1120" height="152" rx="16" fill="#fbbf24" stroke="#78350f" stroke-width="3"/>
+  <use href="#moov2" transform="translate(150,744) scale(0.62)"/>
+  <text class="t kt" x="230" y="676">码叔划重点</text>
+  <circle cx="248" cy="703" r="4" fill="#b45309"/>
+  <text class="t kb" x="266" y="708">三种阴影三种轮廓：box-shadow 矩形、text-shadow 字形、drop-shadow 实际 alpha 剪影</text>
+  <circle cx="248" cy="731" r="4" fill="#b45309"/>
+  <text class="t kb" x="266" y="736">多层阴影先细后粗（先写的在上层）；透明度控制在 6%~14% 不发脏</text>
+  <circle cx="248" cy="759" r="4" fill="#b45309"/>
+  <text class="t kb" x="266" y="764">动画别直接改 box-shadow 值——必重绘：抬升用 transform，明暗用伪元素 opacity</text>
+  <rect x="1000" y="700" width="140" height="32" rx="16" fill="none" stroke="#b45309" stroke-width="1.5"/>
+  <text class="t" x="1070" y="721" text-anchor="middle" font-size="13" font-weight="bold" fill="#b45309">EP.07 · 阴影</text>
+
+  <text class="t ft" x="40" y="822">霓虹墨 Neon Ink · 第 7 话 — 深入阅读 docs/css/07-shadows.md · 示例 examples/css/07-shadows</text>
+</svg>
