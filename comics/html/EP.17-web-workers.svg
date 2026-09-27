@@ -116,7 +116,7 @@
   <rect x="40" y="6" width="120" height="6" rx="3" fill="#fbbf24"/>
   <rect x="40" y="16" width="120" height="6" rx="3" fill="#fb923c"/>
   <text class="t st" x="40" y="40">前端漫画实验室 · CSS3 × HTML5 漫画剧场 · HTML 篇</text>
-  <text class="t bt" x="40" y="80">第 17 话 · Web Workers — 后台线程解凍页面</text>
+  <text class="t bt" x="40" y="80">第 17 话 · Web Workers — 后台线程解冻页面</text>
   <rect x="1020" y="26" width="140" height="44" rx="22" fill="#fbbf24"/>
   <text class="m" x="1090" y="54" text-anchor="middle" font-size="19" font-weight="bold" fill="#0b1220">EP.17</text>
   <line x1="0" y1="96" x2="1200" y2="96" stroke="#1e293b" stroke-width="2"/>
