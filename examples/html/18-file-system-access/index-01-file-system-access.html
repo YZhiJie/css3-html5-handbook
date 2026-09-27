@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>File System Access API · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #f472b6; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 900px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+  .btn {
+    padding: 8px 16px; border-radius: 8px; border: 2px solid #22d3ee;
+    background: #0f172a; color: #22d3ee; font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-right: 8px; margin-bottom: 8px;
+  }
+  .btn.pink { border-color: #f472b6; color: #f472b6; }
+  .btn.amber { border-color: #fbbf24; color: #fbbf24; }
+  .log {
+    background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+    padding: 10px 14px; font-family: Menlo, monospace; font-size: 12.5px;
+    color: #34d399; min-height: 40px; margin-top: 10px;
+    max-height: 200px; overflow-y: auto; white-space: pre-wrap;
+  }
+  .support {
+    max-width: 900px; margin: 0 auto 24px; padding: 12px 16px;
+    border-radius: 10px; font-size: 14px;
+    background: #14532d; border: 2px solid #22c55e; color: #bbf7d0;
+  }
+  .support.no {
+    background: #450a0a; border-color: #ef4444; color: #fecaca;
+  }
+</style>
+</head>
+<body>
+
+<h1>File System Access API</h1>
+<p class="sub">showOpenFilePicker · showSaveFilePicker · showDirectoryPicker</p>
+
+<div class="support" id="support">
+  ✅ 当前浏览器支持 File System Access API（Chrome 86+ / Edge 86+ / Safari 15.2+）
+</div>
+
+<!-- 演示 1：打开文件 -->
+<section>
+  <h2>演示 1 · 打开文件</h2>
+  <div class="demo-box">
+    <button class="btn" id="btnOpen">打开文本文件</button>
+    <div class="log" id="log1">// 点击按钮选择 .txt 或 .md 文件</div>
+    <p class="note"><code>showOpenFilePicker</code> 返回 FileSystemFileHandle，可读取内容。</p>
+  </div>
+</section>
+
+<!-- 演示 2：保存文件 -->
+<section>
+  <h2>演示 2 · 保存文件</h2>
+  <div class="demo-box">
+    <button class="btn pink" id="btnSave">保存新文件</button>
+    <div class="log" id="log2">// 点击按钮保存文本到本地</div>
+    <p class="note"><code>showSaveFilePicker</code> 打开保存对话框，<code>createWritable</code> 写入内容。</p>
+  </div>
+</section>
+
+<!-- 演示 3：读写目录 -->
+<section>
+  <h2>演示 3 · 读写目录</h2>
+  <div class="demo-box">
+    <button class="btn amber" id="btnDir">打开目录</button>
+    <div class="log" id="log3">// 点击按钮选择目录，遍历内容</div>
+    <p class="note"><code>showDirectoryPicker</code> 返回目录句柄，可遍历、创建、删除文件。</p>
+  </div>
+</section>
+
+<!-- 演示 4：权限管理 -->
+<section>
+  <h2>演示 4 · 权限管理</h2>
+  <div class="demo-box">
+    <button class="btn" id="btnPerm">检查权限</button>
+    <div class="log" id="log4">// 检查已打开文件的权限状态</div>
+    <p class="note"><code>queryPermission</code> 检查权限，<code>requestPermission</code> 请求授权。</p>
+  </div>
+</section>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  // 特性检测
+  if (!('showOpenFilePicker' in window)) {
+    $('support').className = 'support no';
+    $('support').textContent = '⚠️ 当前浏览器不支持 File System Access API（仅 Chrome 86+ / Edge 86+ / Safari 15.2+）';
+  }
+
+  // 演示 1：打开文件
+  $('btnOpen').addEventListener('click', async () => {
+    try {
+      const [handle] = await showOpenFilePicker({
+        types: [{
+          description: '文本文件',
+          accept: { 'text/plain': ['.txt', '.md'] }
+        }]
+      });
+      const file = await handle.getFile();
+      const text = await file.text();
+      $('log1').textContent = `✅ 已打开：${file.name}\n大小：${file.size} 字节\n内容预览：\n${text.slice(0, 200)}${text.length > 200 ? '...' : ''}`;
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        $('log1').textContent = '❌ 用户取消选择';
+      } else {
+        $('log1').textContent = '❌ 打开失败：' + err.message;
+      }
+    }
+  });
+
+  // 演示 2：保存文件
+  $('btnSave').addEventListener('click', async () => {
+    try {
+      const handle = await showSaveFilePicker({
+        suggestedName: 'untitled.txt',
+        types: [{
+          description: '文本文件',
+          accept: { 'text/plain': ['.txt'] }
+        }]
+      });
+      const writable = await handle.createWritable();
+      await writable.write('Hello, File System Access API!\n\n这是从网页直接保存的本地文件。');
+      await writable.close();
+      $('log2').textContent = `✅ 已保存：${handle.name}\n内容已写入本地磁盘`;
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        $('log2').textContent = '❌ 用户取消保存';
+      } else {
+        $('log2').textContent = '❌ 保存失败：' + err.message;
+      }
+    }
+  });
+
+  // 演示 3：读写目录
+  $('btnDir').addEventListener('click', async () => {
+    try {
+      const dirHandle = await showDirectoryPicker();
+      let output = `📁 目录：${dirHandle.name}\n\n`;
+      let fileCount = 0;
+      let dirCount = 0;
+      for await (const [name, handle] of dirHandle.entries()) {
+        if (handle.kind === 'file') {
+          fileCount++;
+          output += `  📄 ${name}\n`;
+        } else {
+          dirCount++;
+          output += `  📁 ${name}/\n`;
+        }
+        if (fileCount + dirCount >= 10) {
+          output += '  ... (更多)\n';
+          break;
+        }
+      }
+      output += `\n共 ${fileCount} 个文件，${dirCount} 个目录`;
+      $('log3').textContent = output;
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        $('log3').textContent = '❌ 用户取消选择';
+      } else {
+        $('log3').textContent = '❌ 打开失败：' + err.message;
+      }
+    }
+  });
+
+  // 演示 4：权限管理
+  let currentHandle = null;
+  $('btnPerm').addEventListener('click', async () => {
+    if (!currentHandle) {
+      // 先打开一个文件
+      try {
+        [currentHandle] = await showOpenFilePicker();
+      } catch (err) {
+        $('log4').textContent = '❌ 请先打开一个文件';
+        return;
+      }
+    }
+    const opts = { mode: 'readwrite' };
+    const query = await currentHandle.queryPermission(opts);
+    $('log4').textContent = `当前权限：${query}\n` +
+      (query === 'granted' ? '✅ 已有读写权限' : '⚠️ 需要请求权限');
+  });
+</script>
+
+</body>
+</html>

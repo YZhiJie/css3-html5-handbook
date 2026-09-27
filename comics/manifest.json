@@ -49,6 +49,8 @@
     { "ep": "EP.43", "comic": "css/EP.43-text-wrap-field-sizing", "doc": "docs/css/27-text-wrap-field-sizing.md", "example": "examples/css/27-text-wrap-field-sizing", "title": "text-wrap 与 field-sizing" },
     { "ep": "EP.44", "comic": "html/EP.44-web-components", "doc": "docs/html/16-web-components.md", "example": "examples/html/16-web-components", "title": "Web Components 入门" },
     { "ep": "EP.45", "comic": "css/EP.45-layer-advanced", "doc": "docs/css/28-layer-advanced.md", "example": "examples/css/28-layer-advanced", "title": "@layer 进阶" },
-    { "ep": "EP.46", "comic": "html/EP.46-service-worker-cache", "doc": "docs/html/17-service-worker-cache.md", "example": "examples/html/17-service-worker-cache", "title": "Service Worker 缓存" }
+    { "ep": "EP.46", "comic": "html/EP.46-service-worker-cache", "doc": "docs/html/17-service-worker-cache.md", "example": "examples/html/17-service-worker-cache", "title": "Service Worker 缓存" },
+    { "ep": "EP.47", "comic": "css/EP.47-logical-properties", "doc": "docs/css/29-logical-properties.md", "example": "examples/css/29-logical-properties", "title": "逻辑属性进阶" },
+    { "ep": "EP.48", "comic": "html/EP.48-file-system-access", "doc": "docs/html/18-file-system-access.md", "example": "examples/html/18-file-system-access", "title": "File System Access" }
   ]
 }

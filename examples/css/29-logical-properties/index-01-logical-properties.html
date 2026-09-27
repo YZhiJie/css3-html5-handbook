@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSS 逻辑属性 · 示例</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    background: #0b1220;
+    color: #e2e8f0;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  h1 { text-align: center; margin-bottom: 8px; font-size: 28px; color: #22d3ee; }
+  .sub { text-align: center; color: #94a3b8; margin-bottom: 32px; }
+  section { max-width: 900px; margin: 0 auto 40px; }
+  section h2 {
+    font-size: 18px; color: #fbbf24; margin-bottom: 12px;
+    padding-bottom: 6px; border-bottom: 1px solid #334155;
+  }
+  .demo-box {
+    background: #131c2e; border: 2px solid #334155; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .note { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+  code {
+    background: #0f172a; padding: 2px 6px; border-radius: 4px;
+    font-size: 13px; color: #22d3ee;
+  }
+
+  /* ===== 演示 1：RTL 自动适配 ===== */
+  .rtl-card {
+    margin-inline-start: 16px;   /* LTR 左间距，RTL 右间距 */
+    padding-inline: 20px;
+    padding-block: 12px;
+    background: #1e293b;
+    border-radius: 8px;
+    border-inline-start: 4px solid #22d3ee;
+    margin-block-end: 12px;
+  }
+
+  /* ===== 演示 2：垂直书写 ===== */
+  .vertical-demo {
+    writing-mode: vertical-rl;
+    inline-size: 150px;          /* vertical-rl = height */
+    block-size: 200px;           /* vertical-rl = width */
+    background: #1e293b;
+    border: 2px solid #a78bfa;
+    border-radius: 8px;
+    padding: 16px;
+    margin-block: 12px;
+  }
+
+  /* ===== 演示 3：逻辑简写 ===== */
+  .logical-card {
+    margin-inline: auto;         /* 水平居中 */
+    margin-block: 16px;
+    padding-inline: 24px;
+    padding-block: 16px;
+    inline-size: 300px;          /* LTR = width */
+    block-size: 120px;           /* LTR = height */
+    background: #14532d;
+    border: 2px solid #22c55e;
+    border-radius: 12px;
+    text-align: center;
+  }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .label { font-size: 12px; color: #64748b; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>CSS 逻辑属性</h1>
+<p class="sub">inline-start · block-end · 逻辑简写 · RTL 自动适配</p>
+
+<!-- 演示 1：RTL 自动适配 -->
+<section>
+  <h2>演示 1 · RTL 语言自动适配</h2>
+  <div class="demo-box">
+    <div dir="ltr">
+      <div class="rtl-card">
+        LTR：左间距 16px，左对齐，左边框青色
+      </div>
+    </div>
+    <div dir="rtl">
+      <div class="rtl-card">
+        RTL：右间距 16px，右对齐，右边框青色（自动适配）
+      </div>
+    </div>
+    <p class="note"><code>margin-inline-start</code> 在 LTR 是左边距，RTL 是右边距——一套代码适配两种方向。</p>
+  </div>
+</section>
+
+<!-- 演示 2：垂直书写 -->
+<section>
+  <h2>演示 2 · 垂直书写模式</h2>
+  <div class="demo-box">
+    <div class="vertical-demo">
+      竖排文字：inline-size 控制高度，block-size 控制宽度
+    </div>
+    <p class="note"><code>writing-mode: vertical-rl</code> 时，<code>inline-size</code> = height，<code>block-size</code> = width。</p>
+  </div>
+</section>
+
+<!-- 演示 3：逻辑简写 -->
+<section>
+  <h2>演示 3 · 逻辑简写</h2>
+  <div class="demo-box">
+    <div class="logical-card">
+      逻辑简写卡片<br>
+      <span class="label">margin-inline: auto 水平居中</span>
+    </div>
+    <p class="note"><code>margin-inline</code> = margin-inline-start + margin-inline-end；<code>inline-size</code> = width。</p>
+  </div>
+</section>
+
+<!-- 演示 4：物理 vs 逻辑对比 -->
+<section>
+  <h2>演示 4 · 物理 vs 逻辑对比</h2>
+  <div class="demo-box">
+    <div class="grid-2">
+      <div>
+        <strong>物理属性（LTR 固定）</strong>
+        <div style="margin-left: 16px; padding: 12px; background: #450a0a; border-left: 4px solid #f87171; border-radius: 8px; margin-top: 8px;">
+          margin-left: 16px<br>
+          border-left: 4px<br>
+          RTL 下全错
+        </div>
+      </div>
+      <div>
+        <strong>逻辑属性（自动适配）</strong>
+        <div class="rtl-card" style="margin-inline-start: 16px;">
+          margin-inline-start: 16px<br>
+          border-inline-start: 4px<br>
+          RTL 自动翻转
+        </div>
+      </div>
+    </div>
+    <p class="note">左边物理属性在 RTL 下间距和边框方向全错；右边逻辑属性自动适配。</p>
+  </div>
+</section>
+
+</body>
+</html>

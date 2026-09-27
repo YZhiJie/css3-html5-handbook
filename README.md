@@ -16,18 +16,18 @@ css3-html5-handbook/
 ├── cheatsheet.md           # 高频语法速查表
 ├── design-system.md        # Spark 设计系统（Web 界面用：色彩/字体/组件/动效 token）
 ├── docs/                   # 深度文档（每主题一篇）
-│   ├── css/                # CSS3 二十大主题
-│   └── html/               # HTML5 十七大主题
+│   ├── css/                # CSS3 二十一大主题
+│   └── html/               # HTML5 十八大主题
 ├── examples/               # 可运行示例（与文档一一对应）
 │   ├── css/
 │   └── html/
-└── comics/                 # 漫画剧场（「霓虹墨」风格，全 46 话）
+└── comics/                 # 漫画剧场（「霓虹墨」风格，全 48 话）
     ├── style-guide.md      # 漫画美术风格规范
     ├── manifest.json       # 话数清单（校验器依据）
     ├── check-comics.mjs    # SVG 良构 / MD 行数 / 链接一致性校验
     ├── samples/            # 三张风格定妆稿（SVG，不参与编号）
-    ├── css/                # CSS 篇 EP.01–11、EP.22–31、EP.33、EP.35、EP.37、EP.39、EP.41、EP.43、EP.45（SVG + 讲解 MD）
-    └── html/               # HTML 篇 EP.12–21、EP.32、EP.34、EP.36、EP.38、EP.40、EP.42、EP.44、EP.46（SVG + 讲解 MD）
+    ├── css/                # CSS 篇 EP.01–11、EP.22–31、EP.33、EP.35、EP.37、EP.39、EP.41、EP.43、EP.45、EP.47（SVG + 讲解 MD）
+    └── html/               # HTML 篇 EP.12–21、EP.32、EP.34、EP.36、EP.38、EP.40、EP.42、EP.44、EP.46、EP.48（SVG + 讲解 MD）
 ```
 
 ## 内容导航
@@ -64,6 +64,7 @@ css3-html5-handbook/
 | 26 | @container 进阶 | [docs/css/26-container-advanced.md](docs/css/26-container-advanced.md) | [examples/css/26-container-advanced/](examples/css/26-container-advanced/) |
 | 27 | text-wrap 与 field-sizing | [docs/css/27-text-wrap-field-sizing.md](docs/css/27-text-wrap-field-sizing.md) | [examples/css/27-text-wrap-field-sizing/](examples/css/27-text-wrap-field-sizing/) |
 | 28 | @layer 进阶 | [docs/css/28-layer-advanced.md](docs/css/28-layer-advanced.md) | [examples/css/28-layer-advanced/](examples/css/28-layer-advanced/) |
+| 29 | 逻辑属性进阶 | [docs/css/29-logical-properties.md](docs/css/29-logical-properties.md) | [examples/css/29-logical-properties/](examples/css/29-logical-properties/) |
 
 ### HTML5 篇
 
@@ -86,6 +87,7 @@ css3-html5-handbook/
 | 15 | Web Locks API | [docs/html/15-web-locks.md](docs/html/15-web-locks.md) | [examples/html/15-web-locks/](examples/html/15-web-locks/) |
 | 16 | Web Components 入门 | [docs/html/16-web-components.md](docs/html/16-web-components.md) | [examples/html/16-web-components/](examples/html/16-web-components/) |
 | 17 | Service Worker 缓存策略 | [docs/html/17-service-worker-cache.md](docs/html/17-service-worker-cache.md) | [examples/html/17-service-worker-cache/](examples/html/17-service-worker-cache/) |
+| 18 | File System Access API | [docs/html/18-file-system-access.md](docs/html/18-file-system-access.md) | [examples/html/18-file-system-access/](examples/html/18-file-system-access/) |
 
 ## 漫画剧场 · 霓虹墨 Neon Ink
 
@@ -146,6 +148,8 @@ css3-html5-handbook/
 | EP.44 | Web Components 入门 | [SVG](comics/html/EP.44-web-components.svg) | [讲解](comics/html/EP.44-web-components.md) |
 | EP.45 | @layer 进阶 | [SVG](comics/css/EP.45-layer-advanced.svg) | [讲解](comics/css/EP.45-layer-advanced.md) |
 | EP.46 | Service Worker 缓存 | [SVG](comics/html/EP.46-service-worker-cache.svg) | [讲解](comics/html/EP.46-service-worker-cache.md) |
+| EP.47 | 逻辑属性进阶 | [SVG](comics/css/EP.47-logical-properties.svg) | [讲解](comics/css/EP.47-logical-properties.md) |
+| EP.48 | File System Access | [SVG](comics/html/EP.48-file-system-access.svg) | [讲解](comics/html/EP.48-file-system-access.md) |
 
 ## 如何使用
 
@@ -167,6 +171,7 @@ css3-html5-handbook/
 
 | 版本 | 日期 | 说明 |
 | --- | --- | --- |
+| v1.16.0 | 2026-09-28 | CSS/HTML 篇扩展：新增逻辑属性进阶（29）与 File System Access API（18）两章，配套漫画 EP.47–48，全 48 话 |
 | v1.15.0 | 2026-09-28 | CSS/HTML 篇扩展：新增 @layer 进阶（28）与 Service Worker 缓存策略（17）两章，配套漫画 EP.45–46，全 46 话 |
 | v1.14.0 | 2026-09-28 | CSS/HTML 篇扩展：新增 text-wrap 与 field-sizing（27）与 Web Components 入门（16）两章，配套漫画 EP.43–44，全 44 话 |
 | v1.13.0 | 2026-09-28 | CSS/HTML 篇扩展：新增 @container 进阶（26）与 Web Locks API（15）两章，配套漫画 EP.41–42，全 42 话；新增漫画全文阅读器 reader.html |
